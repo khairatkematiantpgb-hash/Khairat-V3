@@ -1,0 +1,59 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+export interface Tanggungan {
+  nama: string;
+  hubungan: string; // e.g., 'Isteri', 'Suami', 'Anak', 'Ibu', 'Bapa'
+  ic: string;
+}
+
+export interface Member {
+  noAhli: string;
+  nama: string;
+  ic: string;
+  alamat: string;
+  status: string; // 'Aktif' | 'Tidak Aktif'
+  catatan?: string;
+  tanggungan?: Tanggungan[];
+}
+
+export interface LedgerRow {
+  noAhli: string;
+  namaAhli: string;
+  tahun: number;
+  jan: string;
+  feb: string;
+  mac: string;
+  apr: string;
+  mei: string;
+  jun: string;
+  jul: string;
+  ogo: string;
+  sep: string;
+  okt: string;
+  nov: string;
+  dis: string;
+  lebihanKredit: number;
+}
+
+export interface AppState {
+  members: Member[];
+  ledger: LedgerRow[];
+  googleSheetsId: string;
+  appsScriptUrl: string;
+  useGoogleSheets: boolean;
+  kadarYuranSebulan: number;
+  adminPassword?: string;
+}
+
+export const MONTH_KEYS: (keyof LedgerRow)[] = [
+  'jan', 'feb', 'mac', 'apr', 'mei', 'jun',
+  'jul', 'ogo', 'sep', 'okt', 'nov', 'dis'
+];
+
+export const MONTH_LABELS = [
+  'JAN', 'FEB', 'MAC', 'APR', 'MEI', 'JUN',
+  'JUL', 'OGO', 'SEP', 'OKT', 'NOV', 'DIS'
+];

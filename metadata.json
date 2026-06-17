@@ -1,0 +1,6 @@
+{
+  "name": "Sistem Khairat Kampung Gong Badak",
+  "description": "Portal pengurusan ahli khairat kematian dan kebajikan Kampung Gong Badak berserta pelunasan yuran automatik dwi-hala Google Sheets.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
