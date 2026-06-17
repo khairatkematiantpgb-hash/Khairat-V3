@@ -49,10 +49,22 @@ export default function App() {
   const [adminPassAttempt, setAdminPassAttempt] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  // 2. Local State Persister Hook
-  const handleChangeState = (newState: AppState) => {
+  // 2. State Persister & Server Synchronization Hook
+  const handleChangeState = async (newState: AppState) => {
     setState(newState);
     localStorage.setItem('khairat_gong_badak', JSON.stringify(newState));
+    localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(newState));
+    try {
+      await fetch('/api/state', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ state: newState }),
+      });
+    } catch (e) {
+      console.warn('Gagal menyimpan keadaan ke pelayan:', e);
+    }
   };
 
   // 3. Automated Google Sheets Synchronization Pull Trigger
@@ -73,8 +85,7 @@ export default function App() {
           ledger: result.data.ledger || state.ledger,
           googleSheetsId: result.data.spreadsheetId || state.googleSheetsId
         };
-        setState(mergedState);
-        localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(mergedState));
+        await handleChangeState(mergedState);
       } else {
         setSyncError(result.message || 'Gagal berkomunikasi dengan Google Sheets remote.');
       }
@@ -84,6 +95,26 @@ export default function App() {
       setSyncLoading(false);
     }
   };
+
+  // Load centralized shared state from the server on startup so all devices display raw up-to-date live data
+  useEffect(() => {
+    const loadSharedStateOnBoot = async () => {
+      try {
+        const res = await fetch('/api/state');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.state) {
+            setState(data.state);
+            localStorage.setItem('khairat_gong_badak', JSON.stringify(data.state));
+            localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(data.state));
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to pull bootstrapped state from container server:', err);
+      }
+    };
+    loadSharedStateOnBoot();
+  }, []);
 
   // Pull remote data on load if configured
   useEffect(() => {
@@ -182,7 +213,7 @@ export default function App() {
                 >
                   <div className="flex justify-between items-center">
                     <div>
-                      <span className="font-extrabold text-xs block group-hover:text-indigo-400">PENDUDUK KAMPUNG (BACA SAHAJA)</span>
+                      <span className="font-extrabold text-xs block group-hover:text-indigo-400">TETAMU (BACA SAHAJA)</span>
                       <p className="text-[10px] text-slate-505 mt-0.5 leading-relaxed">Akses telus: Menyaring & menyemak status tunggakan keahlian peribadi, melihat lejar am, serta cetak Sijil Perakuan.</p>
                     </div>
                     <LogIn className="h-4 w-4 shrink-0 text-slate-500 group-hover:text-indigo-400 transition" />

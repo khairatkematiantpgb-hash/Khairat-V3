@@ -359,19 +359,34 @@ export default function PaymentLedger({ state, onChangeState, onRefresh, syncLoa
   const uniqueYears = Array.from(new Set(state.ledger.map(row => row.tahun))).sort((a, b) => b - a);
 
   // Filter ledger rows
-  const filteredLedger = state.ledger.filter((row) => {
-    const matchesSearch =
-      row.namaAhli.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      row.noAhli.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      isSameMemberId(row.noAhli, searchTerm) ||
-      (row.jan + row.feb + row.mac + row.apr + row.mei + row.jun + row.jul + row.ogo + row.sep + row.okt + row.nov + row.dis)
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase());
-    
-    const matchesYear = selectedYear === 'Semua' || row.tahun.toString() === selectedYear;
+  const filteredLedger = state.ledger
+    .filter((row) => {
+      const cleanSearch = searchTerm.trim().toLowerCase();
+      if (!cleanSearch) return true;
 
-    return matchesSearch && matchesYear;
-  });
+      const isNumeric = /^\d+$/.test(cleanSearch);
+      let matchesSearch = false;
+
+      if (isNumeric) {
+        // If it is a pure number, match the member ID exactly (loose matching of zeros)
+        matchesSearch = isSameMemberId(row.noAhli, cleanSearch);
+      } else {
+        // Otherwise, do name substring, exact ID, or payments receipt search
+        matchesSearch =
+          row.namaAhli.toLowerCase().includes(cleanSearch) ||
+          row.noAhli.toLowerCase().includes(cleanSearch) ||
+          isSameMemberId(row.noAhli, cleanSearch) ||
+          (row.jan + row.feb + row.mac + row.apr + row.mei + row.jun + row.jul + row.ogo + row.sep + row.okt + row.nov + row.dis)
+            .toLowerCase()
+            .includes(cleanSearch);
+      }
+
+      return matchesSearch;
+    })
+    .filter((row) => {
+      const matchesYear = selectedYear === 'Semua' || row.tahun.toString() === selectedYear;
+      return matchesYear;
+    });
 
   // Export table content to Excel/CSV format
   const downloadExcel = () => {

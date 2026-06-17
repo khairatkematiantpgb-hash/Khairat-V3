@@ -19,21 +19,30 @@ interface ProfileDashboardProps {
 export default function ProfileDashboard({ state, selectedMemberId, setSelectedMemberId, onChangeState, currentRole }: ProfileDashboardProps) {
   const [searchQuery, setSearchQuery] = useState(selectedMemberId || '');
 
-  // Synchronize internal query state with the incoming parent coordinate
+  // Synchronize internal query state with the incoming parent coordinate ONLY if it differs
   useEffect(() => {
-    if (selectedMemberId) {
+    if (selectedMemberId && searchQuery !== selectedMemberId) {
       setSearchQuery(selectedMemberId);
     }
   }, [selectedMemberId]);
 
-  // Find targeted member
-  const foundMember = state.members.find(
-    m => isSameMemberId(m.noAhli, searchQuery) || m.nama.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Find targeted member based on active search query
+  const foundMember = searchQuery.trim() !== ''
+    ? state.members.find(
+        m => isSameMemberId(m.noAhli, searchQuery.trim()) || m.nama.toLowerCase().includes(searchQuery.trim().toLowerCase())
+      )
+    : null;
 
-  const finalMember = foundMember || (state.members.length > 0 ? state.members[0] : null);
+  // The active member we are viewing:
+  // 1. If we found one via search, use that.
+  // 2. If search is empty, fallback to the pre-selected parent member.
+  // 3. Otherwise, if there is no query and no pre-selection, fallback to first member.
+  const finalMember = foundMember || (searchQuery.trim() === ''
+    ? (state.members.find(m => isSameMemberId(m.noAhli, selectedMemberId)) || (state.members.length > 0 ? state.members[0] : null))
+    : null);
 
-  // Sync selected ID up to the parent so switching tabs preserves selection
+  // Sync selected ID up to the parent ONLY when a matching member is actively found.
+  // This breaks the feedback loop when typing partial unmatched characters or backspacing!
   useEffect(() => {
     if (finalMember && finalMember.noAhli !== selectedMemberId) {
       setSelectedMemberId(finalMember.noAhli);
@@ -655,9 +664,18 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
 
         </div>
       ) : (
-        <div className="p-12 text-center text-slate-400 bg-white border border-slate-205 rounded-xl flex flex-col items-center justify-center gap-2">
-          <AlertCircle className="h-8 w-8 text-slate-350" />
-          <span>Sila pilih ahli berdaftar atau daftarkan ahli baru di paparan utama terlebih dahulu.</span>
+        <div className="p-12 text-center text-slate-400 bg-white border border-slate-200 rounded-xl flex flex-col items-center justify-center gap-3 shadow-3xs">
+          <Search className="h-8 w-8 text-slate-300 stroke-[1.5]" />
+          <div>
+            <p className="text-slate-800 text-xs font-bold font-sans">
+              {searchQuery ? 'Tiada Rekod Ahli Ditemui' : 'Carian Profil Kosong'}
+            </p>
+            <p className="text-slate-455 text-[10px] font-sans mt-0.5 max-w-sm mx-auto">
+              {searchQuery 
+                ? `Tiada rekod ahli keriah ditemui padanan bagi "${searchQuery}". Sila periksa ejaan nama atau digit ID/IC anda.` 
+                : 'Sila masukkan No. Ahli, Nama Penubuhan, atau No. IC di ruangan bar carian di atas untuk memaparkan butiran.'}
+            </p>
+          </div>
         </div>
       )}
 

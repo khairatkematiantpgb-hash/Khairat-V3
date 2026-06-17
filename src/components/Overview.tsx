@@ -157,136 +157,166 @@ export default function Overview({ state, onChangeState, onNavigate, currentRole
 
       {/* Two-Column Responsive Workspace Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6" id="dashboard-workspace-grid">
-        {/* Left Column: Register Form */}
-        <div className="lg:col-span-2 bg-white p-5 rounded-xl border border-slate-100 shadow-xs flex flex-col" id="register-member-form-card">
-          <div className="flex justify-between items-center pb-3 border-b border-slate-150 mb-4 bg-white">
-            <h3 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1.5 font-sans">
-              <UserPlus className="h-4.5 w-4.5 text-slate-800" />
-              Daftar Ahli Baru (B9-B13)
-            </h3>
-            <span className="text-[9px] font-black text-emerald-800 bg-emerald-50 border border-emerald-150 rounded px-2.5 py-0.5 uppercase">
-              Pendaftaran
-            </span>
-          </div>
+        {/* Left Column: Register Form or Guest Welcomer */}
+        {currentRole === 'admin' ? (
+          <div className="lg:col-span-2 bg-white p-5 rounded-xl border border-slate-100 shadow-xs flex flex-col" id="register-member-form-card">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-150 mb-4 bg-white">
+              <h3 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1.5 font-sans">
+                <UserPlus className="h-4.5 w-4.5 text-slate-800" />
+                Daftar Ahli Baru (B9-B13)
+              </h3>
+              <span className="text-[9px] font-black text-emerald-800 bg-emerald-50 border border-emerald-150 rounded px-2.5 py-0.5 uppercase">
+                Pendaftaran
+              </span>
+            </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* No. Ahli & Status Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* No. Ahli Input */}
-              <div className="space-y-1">
-                <label className="block text-[10px] font-bold text-slate-500 uppercase font-sans">
-                  No. Ahli <span className="text-rose-500">*</span>
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* No. Ahli & Status Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* No. Ahli Input */}
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase font-sans">
+                    No. Ahli <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      required
+                      placeholder="Contoh: 012"
+                      className="flex-grow bg-slate-50 border border-slate-300 text-slate-900 text-xs rounded px-3 py-2 outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 font-mono font-bold tracking-tight"
+                      value={noAhli}
+                      onChange={(e) => setNoAhli(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplySuggestion}
+                      className="px-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold text-[10px] rounded uppercase flex items-center gap-1 transition shadow-3xs cursor-pointer select-none"
+                      title="Dapatkan No. Ahli Cadangan seterusnya secara automatik"
+                    >
+                      <Sparkles className="h-3.5 w-3.5 text-emerald-600 animate-pulse" />
+                      <span>Cadangan</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Status Select */}
+                <div className="space-y-1 font-sans">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase">
+                    Status Keanggotaan <span className="text-rose-500">*</span>
+                  </label>
+                  <select
                     required
-                    placeholder="Contoh: 012"
-                    className="flex-grow bg-slate-50 border border-slate-300 text-slate-900 text-xs rounded px-3 py-2 outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 font-mono font-bold tracking-tight"
-                    value={noAhli}
-                    onChange={(e) => setNoAhli(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleApplySuggestion}
-                    className="px-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold text-[10px] rounded uppercase flex items-center gap-1 transition shadow-3xs cursor-pointer select-none"
-                    title="Dapatkan No. Ahli Cadangan seterusnya secara automatik"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 text-xs rounded px-3 py-2 outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 font-bold"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
                   >
-                    <Sparkles className="h-3.5 w-3.5 text-emerald-600 animate-pulse" />
-                    <span>Cadangan</span>
-                  </button>
+                    <option value="Aktif">Aktif (Keahlian Penuh)</option>
+                    <option value="Tidak Aktif">Tidak Aktif (Tangguh / Berpindah)</option>
+                  </select>
                 </div>
               </div>
 
-              {/* Status Select */}
+              {/* Nama Penuh */}
+              <div className="space-y-1">
+                <label className="block text-[10px] font-bold text-slate-500 uppercase font-sans">
+                  Nama Penuh <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: Haji Sulaiman bin Kassim"
+                  className="w-full bg-slate-50 border border-slate-300 text-slate-900 text-xs rounded px-3 py-2 outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 font-bold capitalize"
+                  value={nama}
+                  onChange={(e) => setNama(e.target.value)}
+                />
+              </div>
+
+              {/* No. IC */}
               <div className="space-y-1 font-sans">
                 <label className="block text-[10px] font-bold text-slate-500 uppercase">
-                  Status Keanggotaan <span className="text-rose-500">*</span>
+                  No. Kad Pengenalan <span className="text-rose-500">*</span>
                 </label>
-                <select
+                <input
+                  type="text"
                   required
-                  className="w-full bg-slate-50 border border-slate-300 text-slate-900 text-xs rounded px-3 py-2 outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 font-bold"
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
+                  placeholder="Contoh: 821012-11-5431"
+                  className="w-full bg-slate-50 border border-slate-300 text-slate-900 text-xs rounded px-3 py-2 outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 font-mono text-[11px]"
+                  value={ic}
+                  onChange={(e) => setIc(e.target.value)}
+                />
+              </div>
+
+              {/* Alamat */}
+              <div className="space-y-1 font-sans">
+                <label className="block text-[10px] font-bold text-slate-500 uppercase font-sans">
+                  Alamat Berdaftar <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  placeholder="Alamat tempat tinggal lengkap di Gong Badak..."
+                  className="w-full bg-slate-50 border border-slate-300 text-slate-900 text-xs rounded p-3 outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 leading-relaxed font-sans"
+                  value={alamat}
+                  onChange={(e) => setAlamat(e.target.value)}
+                />
+              </div>
+
+              {/* Feedback messages */}
+              {errorMsg && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded font-bold text-xs flex items-center gap-2 font-sans animate-pulse">
+                  <ShieldAlert className="h-4.5 w-4.5 shrink-0" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+
+              {successMsg && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded font-bold text-xs flex items-center gap-2 font-sans">
+                  <CheckCircle className="h-4.5 w-4.5 shrink-0" />
+                  <span>{successMsg}</span>
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <div className="pt-2 border-t border-slate-100 flex justify-end">
+                <button
+                  type="submit"
+                  className="w-full sm:w-auto px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs uppercase rounded transition border-b-4 border-emerald-950 flex items-center justify-center gap-1.5 cursor-pointer shadow-sm shadow-emerald-700/10"
                 >
-                  <option value="Aktif">Aktif (Keahlian Penuh)</option>
-                  <option value="Tidak Aktif">Tidak Aktif (Tangguh / Berpindah)</option>
-                </select>
+                  <PlusCircle className="h-4 w-4" />
+                  Daftar Ahli Baru
+                </button>
               </div>
+            </form>
+          </div>
+        ) : (
+          <div className="lg:col-span-2 bg-[#f8fafc]/95 p-6 rounded-xl border border-slate-200 text-slate-900 flex flex-col justify-center space-y-4 shadow-3xs" id="visitor-welcome-card">
+            <div className="h-10 w-10 rounded-full bg-emerald-50 border border-emerald-150 flex items-center justify-center text-emerald-600 mb-2">
+              <Info className="h-5 w-5" />
             </div>
-
-            {/* Nama Penuh */}
             <div className="space-y-1">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase font-sans">
-                Nama Penuh <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Contoh: Haji Sulaiman bin Kassim"
-                className="w-full bg-slate-50 border border-slate-300 text-slate-900 text-xs rounded px-3 py-2 outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 font-bold capitalize"
-                value={nama}
-                onChange={(e) => setNama(e.target.value)}
-              />
+              <span className="text-[9px] font-black uppercase text-emerald-700 bg-emerald-50 border border-emerald-155 rounded px-2.5 py-0.5 tracking-wider font-sans">
+                Sesi Tetamu (Baca Sahaja)
+              </span>
+              <h3 className="text-sm font-extrabold text-slate-800 font-sans pt-1">
+                Selamat Datang Ke Portal Khairat Kematian Kampung Gong Badak
+              </h3>
             </div>
-
-            {/* No. IC */}
-            <div className="space-y-1 font-sans">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase">
-                No. Kad Pengenalan <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Contoh: 821012-11-5431"
-                className="w-full bg-slate-50 border border-slate-300 text-slate-900 text-xs rounded px-3 py-2 outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 font-mono text-[11px]"
-                value={ic}
-                onChange={(e) => setIc(e.target.value)}
-              />
+            <p className="text-slate-500 text-xs leading-relaxed font-sans">
+              Anda kini sedang mengakses sistem menggunakan kebenaran pelawat awam. Untuk memelihara keutuhan & ketepatan pangkalan data kariah, fungsi penulisan seperti pendaftaran ahli baru, kemas kini butiran profil, dan perekodan transaksi sumbangan dikunci secara dwi-hala dan hanya boleh diubah suai oleh Admin berdaftar sahaja.
+            </p>
+            <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-2.5">
+              <h4 className="text-[10px] font-black uppercase text-slate-600 tracking-wider">
+                Fungsi Yang Boleh Diakses Dalam Sesi Pembacaan Ini:
+              </h4>
+              <ul className="space-y-1.5 text-[11px] text-slate-600 font-sans list-disc pl-4">
+                <li><strong className="text-slate-800">Menyaring & Semak Tunggakan Peribadi</strong>: Layari tab <strong>&quot;Carian Ahli&quot;</strong>, taip nama atau No. KP untuk melihat status dan memuat turun Sijil Perakuan.</li>
+                <li><strong className="text-slate-800">Pangkalan Data Rekod</strong>: Lihat senarai keseluruhan ahli kariah di tab <strong>&quot;Pangkalan Data Ahli&quot;</strong>.</li>
+                <li><strong className="text-slate-800">Jadual Pembayaran Am</strong>: Semak sejarah pembayaran lengkap kariah Gong Badak di tab <strong>&quot;Jadual Pembayaran&quot;</strong>.</li>
+                <li><strong className="text-slate-800">Cetak Rumusan Am</strong>: Akses tab <strong>&quot;Rumusan Khairat&quot;</strong> untuk menjana set Laporan PDF sumbangan.</li>
+              </ul>
             </div>
-
-            {/* Alamat */}
-            <div className="space-y-1 font-sans">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase font-sans">
-                Alamat Berdaftar <span className="text-rose-500">*</span>
-              </label>
-              <textarea
-                required
-                rows={3}
-                placeholder="Alamat tempat tinggal lengkap di Gong Badak..."
-                className="w-full bg-slate-50 border border-slate-300 text-slate-900 text-xs rounded p-3 outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 leading-relaxed font-sans"
-                value={alamat}
-                onChange={(e) => setAlamat(e.target.value)}
-              />
-            </div>
-
-            {/* Feedback messages */}
-            {errorMsg && (
-              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded font-bold text-xs flex items-center gap-2 font-sans animate-pulse">
-                <ShieldAlert className="h-4.5 w-4.5 shrink-0" />
-                <span>{errorMsg}</span>
-              </div>
-            )}
-
-            {successMsg && (
-              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded font-bold text-xs flex items-center gap-2 font-sans">
-                <CheckCircle className="h-4.5 w-4.5 shrink-0" />
-                <span>{successMsg}</span>
-              </div>
-            )}
-
-            {/* Submit Button */}
-            <div className="pt-2 border-t border-slate-100 flex justify-end">
-              <button
-                type="submit"
-                className="w-full sm:w-auto px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs uppercase rounded transition border-b-4 border-emerald-950 flex items-center justify-center gap-1.5 cursor-pointer shadow-sm shadow-emerald-700/10"
-              >
-                <PlusCircle className="h-4 w-4" />
-                Daftar Ahli Baru
-              </button>
-            </div>
-          </form>
-        </div>
+          </div>
+        )}
 
         {/* Right Column: Guide & active stats status */}
         <div className="space-y-6" id="overview-info-rail">

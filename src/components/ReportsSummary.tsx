@@ -106,18 +106,23 @@ export default function ReportsSummary({ state, onViewProfile }: ReportsSummaryP
     return arrearsSegments.length > 0 ? arrearsSegments.join('; ') : 'Tiada';
   };
 
-  // Filter members list based on query
-  const filteredList = state.members.filter((member) => {
-    const cleanSearch = searchQuery.trim().toLowerCase();
-    const isNumericSearch = /^\d+$/.test(cleanSearch);
+  // Filter and sort members list based on query
+  const filteredList = state.members
+    .filter((member) => {
+      const cleanSearch = searchQuery.trim().toLowerCase();
+      const isNumericSearch = /^\d+$/.test(cleanSearch);
 
-    const nameMatch = member.nama.toLowerCase().includes(cleanSearch);
-    const idMatch = member.noAhli.toLowerCase().includes(cleanSearch) || isSameMemberId(member.noAhli, cleanSearch);
-    const icMatch = member.ic && member.ic.includes(cleanSearch) && (!isNumericSearch || cleanSearch.length >= 4);
-    const addrMatch = member.alamat ? member.alamat.toLowerCase().includes(cleanSearch) : false;
-    
-    return nameMatch || idMatch || icMatch || addrMatch;
-  });
+      const nameMatch = member.nama.toLowerCase().includes(cleanSearch);
+      const idMatch = member.noAhli.toLowerCase().includes(cleanSearch) || isSameMemberId(member.noAhli, cleanSearch);
+      const icMatch = member.ic && member.ic.includes(cleanSearch) && (!isNumericSearch || cleanSearch.length >= 4);
+      const addrMatch = member.alamat ? member.alamat.toLowerCase().includes(cleanSearch) : false;
+      
+      return nameMatch || idMatch || icMatch || addrMatch;
+    })
+    .sort((a, b) => {
+      // Sort sequentially ascending by No. Ahli
+      return a.noAhli.localeCompare(b.noAhli, undefined, { numeric: true });
+    });
 
   // Export to Excel (CSV with UTF-8 BOM)
   const handleExportExcel = () => {

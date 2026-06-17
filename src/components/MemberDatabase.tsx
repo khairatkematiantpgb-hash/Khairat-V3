@@ -241,19 +241,36 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
     triggerAlert(`Sukses! ${totalImported} rekod pangkalan ahli telah berjaya dimasukkan/dikemas kini secara pukal.\n\nSila segerakkan (sync) perubahan ke Google Sheet jika anda mengaktifkan integrasi di tab Integrasi.`);
   };
 
-  // Filter members based on search and status
-  const filteredMembers = state.members.filter((m) => {
-    const cleanSearch = searchTerm.trim().toLowerCase();
-    const isNumericSearch = /^\d+$/.test(cleanSearch);
-    
-    const matchesSearch =
-      m.nama.toLowerCase().includes(cleanSearch) ||
-      m.noAhli.toLowerCase().includes(cleanSearch) ||
-      isSameMemberId(m.noAhli, cleanSearch) ||
-      (m.ic && m.ic.includes(cleanSearch) && (!isNumericSearch || cleanSearch.length >= 4));
-    const matchesStatus = statusFilter === 'Semua' || m.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  // Filter and sort members based on search and status
+  const filteredMembers = state.members
+    .filter((m) => {
+      const cleanSearch = searchTerm.trim().toLowerCase();
+      if (!cleanSearch) {
+        return statusFilter === 'Semua' || m.status === statusFilter;
+      }
+
+      const isNumericSearch = /^\d+$/.test(cleanSearch);
+      
+      let matchesSearch = false;
+      if (isNumericSearch) {
+        // If search is numeric, match member ID exactly (ignoring leading zeros) 
+        matchesSearch = isSameMemberId(m.noAhli, cleanSearch);
+      } else {
+        // If search contains letters/characters, search by name, exact ID, or IC
+        matchesSearch =
+          m.nama.toLowerCase().includes(cleanSearch) ||
+          m.noAhli.toLowerCase().includes(cleanSearch) ||
+          isSameMemberId(m.noAhli, cleanSearch) ||
+          (m.ic && m.ic.toLowerCase().includes(cleanSearch));
+      }
+
+      const matchesStatus = statusFilter === 'Semua' || m.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => {
+      // Sort member list ascending numerically by No. Ahli
+      return a.noAhli.localeCompare(b.noAhli, undefined, { numeric: true });
+    });
 
   // Export Member list to Excel (CSV format)
   const downloadExcel = () => {
@@ -743,19 +760,60 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
             >
               <ChevronLeft className="h-3.5 w-3.5" />
             </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-              <button
-                key={page}
-                onClick={() => handlePageChange(page)}
-                className={`px-2.5 py-0.5 text-[10px] font-bold rounded transition-all cursor-pointer ${
-                  currentPage === page
-                    ? 'bg-[#0f172a] text-white border border-slate-900'
-                    : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-100'
-                }`}
-              >
-                {page}
-              </button>
-            ))}
+            {(() => {
+              const range: (number | string)[] = [];
+              const maxVisibleNeighbors = 1; // Show current, previous 1, next 1
+              
+              if (totalPages <= 5) {
+                for (let i = 1; i <= totalPages; i++) {
+                  range.push(i);
+                }
+              } else {
+                // First page
+                range.push(1);
+                
+                const startNeighbor = Math.max(2, currentPage - maxVisibleNeighbors);
+                const endNeighbor = Math.min(totalPages - 1, currentPage + maxVisibleNeighbors);
+                
+                if (startNeighbor > 2) {
+                  range.push('...');
+                }
+                
+                for (let i = startNeighbor; i <= endNeighbor; i++) {
+                  range.push(i);
+                }
+                
+                if (endNeighbor < totalPages - 1) {
+                  range.push('...');
+                }
+                
+                // Last page
+                range.push(totalPages);
+              }
+              
+              return range.map((page, index) => {
+                if (page === '...') {
+                  return (
+                    <span key={`ellipsis-${index}`} className="px-2 py-1 text-[10px] font-bold text-slate-400 select-none flex items-center">
+                      ...
+                    </span>
+                  );
+                }
+                return (
+                  <button
+                    key={`page-${page}`}
+                    onClick={() => handlePageChange(page as number)}
+                    className={`px-2.5 py-0.5 text-[10px] font-bold rounded transition-all cursor-pointer ${
+                      currentPage === page
+                        ? 'bg-[#0f172a] text-white border border-slate-900'
+                        : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-100'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                );
+              });
+            })()}
             <button
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
