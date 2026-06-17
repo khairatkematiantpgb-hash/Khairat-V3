@@ -175,7 +175,7 @@ export default function App() {
               Kampung Gong Badak
             </span>
             <h1 className="text-sm md:text-[15px] font-extrabold text-slate-100 uppercase tracking-wide leading-tight">
-              Sistem Khairat Kematian Kampung Gong Badak
+              Sistem Khairat Kematian dan Kebajikan Kampung Gong Badak, Kuala Nerus, Terengganu
             </h1>
             <p className="text-slate-400 text-xxs">
               Portal Pendaftaran, Merekod Sumbangan Yuran Bulanan (RM3), dan Integrasi Lembaran Awan dwi-hala Google Sheets.

@@ -298,7 +298,7 @@ export default function Overview({ state, onChangeState, onNavigate, currentRole
                 Sesi Tetamu (Baca Sahaja)
               </span>
               <h3 className="text-sm font-extrabold text-slate-800 font-sans pt-1">
-                Selamat Datang Ke Portal Khairat Kematian Kampung Gong Badak
+                Selamat Datang Ke Portal Khairat Kematian dan Kebajikan Kampung Gong Badak, Kuala Nerus, Terengganu
               </h3>
             </div>
             <p className="text-slate-500 text-xs leading-relaxed font-sans">
