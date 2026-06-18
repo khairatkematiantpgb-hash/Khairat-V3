@@ -43,6 +43,7 @@ export default function App() {
   const [selectedMemberId, setSelectedMemberId] = useState<string>('');
   const [syncLoading, setSyncLoading] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [isServerConnected, setIsServerConnected] = useState(false);
 
   // Admin authentication state
   const [showAdminPassInput, setShowAdminPassInput] = useState(false);
@@ -103,18 +104,62 @@ export default function App() {
         const res = await fetch('/api/state');
         if (res.ok) {
           const data = await res.json();
+          setIsServerConnected(true);
           if (data.success && data.state) {
             setState(data.state);
             localStorage.setItem('khairat_gong_badak', JSON.stringify(data.state));
             localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(data.state));
+          } else {
+            // Server has no state file yet (first time or starting up). Save current state.
+            await fetch('/api/state', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ state }),
+            });
           }
+        } else {
+          setIsServerConnected(false);
         }
       } catch (err) {
+        setIsServerConnected(false);
         console.warn('Failed to pull bootstrapped state from container server:', err);
       }
     };
     loadSharedStateOnBoot();
   }, []);
+
+  // Setup standard dynamic polling for guest/visitor devices to get live database updates automatically
+  useEffect(() => {
+    if (currentRole === 'admin') return; // Admin updates are pushed transactionally. Guests poll.
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/state');
+        if (res.ok) {
+          const data = await res.json();
+          setIsServerConnected(true);
+          if (data.success && data.state) {
+            const currentString = localStorage.getItem('khairat_gong_badak');
+            const newString = JSON.stringify(data.state);
+            if (currentString !== newString) {
+              setState(data.state);
+              localStorage.setItem('khairat_gong_badak', newString);
+              localStorage.setItem('khairat_gong_badak_state_v1', newString);
+            }
+          }
+        } else {
+          setIsServerConnected(false);
+        }
+      } catch (err) {
+        setIsServerConnected(false);
+        console.warn('Failed to sync state during background poll:', err);
+      }
+    }, 8000); // Sync every 8 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [currentRole]);
 
   // Pull remote data on load if configured
   useEffect(() => {
@@ -304,6 +349,7 @@ export default function App() {
         state={state}
         currentRole={currentRole}
         onLogout={handleLogout}
+        isServerConnected={isServerConnected}
       />
 
       {/* Sync Error Ribbon */}

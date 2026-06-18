@@ -13,9 +13,10 @@ interface NavbarProps {
   state: AppState;
   currentRole: 'admin' | 'user';
   onLogout: () => void;
+  isServerConnected?: boolean;
 }
 
-export default function Navbar({ activeTab, onTabChange, state, currentRole, onLogout }: NavbarProps) {
+export default function Navbar({ activeTab, onTabChange, state, currentRole, onLogout, isServerConnected = false }: NavbarProps) {
   // Navigation tabs mapping
   const tabs = [
     { id: 'overview', label: 'Paparan Keseluruhan', icon: LayoutDashboard, role: 'both' },
@@ -55,13 +56,15 @@ export default function Navbar({ activeTab, onTabChange, state, currentRole, onL
 
         {/* Status Indicators & Session Controls */}
         <div className="flex flex-wrap items-center justify-center md:justify-end gap-3.5 text-xs">
-          {/* Connection Sheet status light indicator (Green/Orange) */}
+          {/* Connection status light indicator (Green/Orange) */}
           <div className="flex items-center gap-1.5 bg-[#022c22]/55 p-1.5 px-3 rounded-full border border-emerald-800 font-mono text-[10px] text-emerald-250">
-            <span className={`inline-block h-2 w-2 rounded-full ${state.useGoogleSheets && state.appsScriptUrl ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+            <span className={`inline-block h-2 w-2 rounded-full ${(state.useGoogleSheets && state.appsScriptUrl) || isServerConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
             <span>
               {state.useGoogleSheets && state.appsScriptUrl 
-                ? `Database: Connected Sheet (ID: ${getDisplaySheetId(state.googleSheetsId)})`
-                : 'Database: Offline Local Storage'
+                ? `Penyambungan: Google Sheets (ID: ${getDisplaySheetId(state.googleSheetsId)})`
+                : isServerConnected
+                  ? 'Penyambungan: Server Pusat Bersama (Masa Nyata/Live)'
+                  : 'Penyambungan: Mod Lokal (Offline)'
               }
             </span>
           </div>
