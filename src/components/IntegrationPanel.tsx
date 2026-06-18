@@ -29,6 +29,42 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
   const [adminPasswordInput, setAdminPasswordInput] = useState(state.adminPassword || 'gongbadak123');
   const [saveSettingsSuccess, setSaveSettingsSuccess] = useState(false);
   const [guestDomainChoice, setGuestDomainChoice] = useState<'vercel' | 'shared_app' | 'current'>('vercel');
+  const [shortenedUrls, setShortenedUrls] = useState<Record<string, string>>({});
+  const [shortenLoading, setShortenLoading] = useState(false);
+  const [shortenError, setShortenError] = useState<string | null>(null);
+
+  const handleGenerateShortLink = async (longUrl: string, domainType: string) => {
+    setShortenLoading(true);
+    setShortenError(null);
+    try {
+      const response = await fetch('/api/shorten', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: longUrl }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.shortUrl) {
+          setShortenedUrls(prev => ({
+            ...prev,
+            [domainType]: data.shortUrl
+          }));
+        } else {
+          setShortenError(data.message || 'Sistem gagal menjana pautan pendek.');
+        }
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        setShortenError(errData.message || `Gagal menghubungi pelayan pemendek URL (Status ${response.status})`);
+      }
+    } catch (err: any) {
+      setShortenError(`Ralat rangkaian: ${err.message || err}`);
+    } finally {
+      setShortenLoading(false);
+    }
+  };
 
   // Central live server states & handlers
   const [centralLoading, setCentralLoading] = useState(false);
@@ -506,40 +542,115 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
                     </div>
                   )}
 
-                  {/* Penjana Pautan Terakhir */}
-                  {(() => {
-                    let baseOrigin = currentOrigin;
-                    if (guestDomainChoice === 'vercel') {
-                      baseOrigin = 'https://khairat-v3.vercel.app';
-                    } else if (guestDomainChoice === 'shared_app') {
-                      baseOrigin = autoSharedOrigin;
-                    }
-                    
-                    const finalShareUrl = `${baseOrigin}${window.location.pathname}?s=${encodeURIComponent(state.appsScriptUrl)}`;
-                    
-                    return (
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          readOnly
-                          id="guest-share-url-input"
-                          onClick={(e) => (e.target as HTMLInputElement).select()}
-                          className="flex-grow bg-white border border-emerald-300 text-emerald-950 text-[10px] rounded px-3 py-2 focus:outline-none font-mono"
-                          value={finalShareUrl}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(finalShareUrl);
-                            alert(`Berjaya menyalin pautan tetamu (${guestDomainChoice.toUpperCase()}) ke dalam clipboard! Sila kongsikannya kepada ahli kariah.`);
-                          }}
-                          className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] uppercase rounded transition cursor-pointer select-none shrink-0"
-                        >
-                          Salin Pautan
-                        </button>
-                      </div>
-                    );
-                  })()}
+                   {/* Penjana Pautan Terakhir */}
+                   {(() => {
+                     let baseOrigin = currentOrigin;
+                     if (guestDomainChoice === 'vercel') {
+                       baseOrigin = 'https://khairat-v3.vercel.app';
+                     } else if (guestDomainChoice === 'shared_app') {
+                       baseOrigin = autoSharedOrigin;
+                     }
+                     
+                     const finalShareUrl = `${baseOrigin}${window.location.pathname}?s=${encodeURIComponent(state.appsScriptUrl)}`;
+                     const currentShortUrl = shortenedUrls[guestDomainChoice];
+                     
+                     return (
+                       <div className="space-y-3 pt-2 border-t border-emerald-100">
+                         {/* Option A: Long Link */}
+                         <div className="space-y-1">
+                           <label className="block text-[9.5px] font-bold text-emerald-950 uppercase tracking-wide">
+                             Pilihan 1: Pautan Asal (Panjang)
+                           </label>
+                           <div className="flex gap-2">
+                             <input
+                               type="text"
+                               readOnly
+                               id="guest-share-url-input"
+                               onClick={(e) => (e.target as HTMLInputElement).select()}
+                               className="flex-grow bg-white border border-emerald-300 text-emerald-950 text-[10px] rounded px-3 py-1.5 focus:outline-none font-mono"
+                               value={finalShareUrl}
+                             />
+                             <button
+                               type="button"
+                               onClick={() => {
+                                 navigator.clipboard.writeText(finalShareUrl);
+                                 alert(`Berjaya menyalin pautan tetamu (${guestDomainChoice.toUpperCase()}) ke dalam clipboard!`);
+                               }}
+                               className="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white font-bold text-[10px] uppercase rounded transition cursor-pointer select-none shrink-0"
+                             >
+                               Salin Pautan Asal
+                             </button>
+                           </div>
+                         </div>
+
+                         {/* Option B: Short Link */}
+                         <div className="bg-white/80 p-3 rounded-lg border border-emerald-250 space-y-1.5">
+                           <div className="flex items-center justify-between">
+                             <label className="block text-[9.5px] font-extrabold text-emerald-950 uppercase tracking-wide">
+                               Pilihan 2: Pautan Pendek (Short URL / Sangat Sesuai Untuk WhatsApp)
+                             </label>
+                             {currentShortUrl && (
+                               <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded uppercase">
+                                 Selesai Dijana
+                               </span>
+                             )}
+                           </div>
+                           
+                           {currentShortUrl ? (
+                             <div className="flex gap-2">
+                               <input
+                                 type="text"
+                                 readOnly
+                                 onClick={(e) => (e.target as HTMLInputElement).select()}
+                                 className="flex-grow bg-emerald-50 border border-emerald-400 text-emerald-950 text-[10.5px] font-bold rounded px-3 py-1.5 focus:outline-none font-mono"
+                                 value={currentShortUrl}
+                               />
+                               <button
+                                 type="button"
+                                 onClick={() => {
+                                   navigator.clipboard.writeText(currentShortUrl);
+                                   alert('Berjaya menyalin PAUTAN PENDEK tetamu ke dalam clipboard! Anda kini boleh berkongsi di WhatsApp.');
+                                 }}
+                                 className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[10px] uppercase rounded transition cursor-pointer select-none shrink-0 shadow-3xs"
+                               >
+                                 Salin Pautan Pendek
+                               </button>
+                             </div>
+                           ) : (
+                             <div className="space-y-2">
+                               <p className="text-[9.5px] text-slate-500 font-sans leading-relaxed">
+                                 Malas hantar pautan panjang? Klik butang di bawah untuk mengecilkan pautan {guestDomainChoice.toUpperCase()} menjadi pautan pendek bertaraf dunia (TinyURL) secara automatik untuk memudahkan hantaran media sosial.
+                               </p>
+                               <button
+                                 type="button"
+                                 disabled={shortenLoading}
+                                 onClick={() => handleGenerateShortLink(finalShareUrl, guestDomainChoice)}
+                                 className="w-full py-2 bg-emerald-650 hover:bg-emerald-750 disabled:bg-slate-400 text-white font-black text-[10px] uppercase rounded transition cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
+                               >
+                                 {shortenLoading ? (
+                                   <>
+                                     <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                                     <span>Sedang Menjana Pautan Pendek... Sila Tunggu Sebentar</span>
+                                   </>
+                                 ) : (
+                                   <>
+                                     <Share2 className="h-3.5 w-3.5" />
+                                     <span>Jana & Dapatkan Pautan Pendek (Short URL)</span>
+                                   </>
+                                 )}
+                               </button>
+
+                               {shortenError && (
+                                 <div className="bg-rose-50 border border-rose-200 p-2 rounded text-[10px] text-rose-850 font-sans mt-1">
+                                   <strong>Gagal jana pautan pendek:</strong> {shortenError}. Anda masih boleh menyalin Pilihan 1 (Pautan Asal) di atas secara manual!
+                                 </div>
+                               )}
+                             </div>
+                           )}
+                         </div>
+                       </div>
+                     );
+                   })()}
                   
                   <span className="text-[9px] text-slate-500 font-sans block leading-snug">
                     *Nota: Sebaik sahaja ahli kariah membuka pautan ini, sistem akan terus mendaftar ke dalam mod <strong>Pelawat (Read-Only)</strong> dan memperoleh senarai <strong>333 nama secara langsung (live)</strong>.

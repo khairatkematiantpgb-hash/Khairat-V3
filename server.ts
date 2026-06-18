@@ -61,6 +61,53 @@ async function startServer() {
     }
   });
 
+  // API Route: Shorten URL
+  app.post('/api/shorten', async (req, res) => {
+    const { url } = req.body;
+    if (!url) {
+      return res.status(400).json({ success: false, message: 'URL diperlukan' });
+    }
+    
+    try {
+      console.log('Sedang memendekkan URL:', url);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      
+      const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        const shortUrl = await response.text();
+        if (shortUrl && shortUrl.startsWith('http')) {
+          return res.json({ success: true, shortUrl });
+        }
+      }
+    } catch (error) {
+      console.error('TinyURL failing, trying fallback (is.gd):', error);
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const response = await fetch(`https://is.gd/create.php?format=simple&url=${encodeURIComponent(url)}`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (response.ok) {
+        const shortUrl = await response.text();
+        if (shortUrl && shortUrl.startsWith('http')) {
+          return res.json({ success: true, shortUrl });
+        }
+      }
+    } catch (error) {
+      console.error('is.gd also failing:', error);
+    }
+
+    res.status(500).json({ success: false, message: 'Gagal memproses pautan pendek secara automatik.' });
+  });
+
   // Vite development middleware vs production static assets
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
