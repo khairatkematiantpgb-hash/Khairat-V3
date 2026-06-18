@@ -28,6 +28,67 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
   const [adminPasswordInput, setAdminPasswordInput] = useState(state.adminPassword || 'gongbadak123');
   const [saveSettingsSuccess, setSaveSettingsSuccess] = useState(false);
 
+  // Central live server states & handlers
+  const [centralLoading, setCentralLoading] = useState(false);
+  const [centralResult, setCentralResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const handleForcePushToCentralServer = async () => {
+    setCentralLoading(true);
+    setCentralResult(null);
+    try {
+      const res = await fetch('/api/state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setCentralResult({
+            success: true,
+            message: `Selesai! Pangkalan data tempatan (${state.members?.length || 0} ahli) telah disimpan secara pusat ke Server Live. Peranti tetamu lain akan disegerak secara automatik seketika lagi!`
+          });
+        } else {
+          setCentralResult({ success: false, message: `Ralat maklum balas server: ${data.message}` });
+        }
+      } else {
+        setCentralResult({ success: false, message: `Gagal HTTP dengan status kerosakan ${res.status}` });
+      }
+    } catch (e: any) {
+      setCentralResult({ success: false, message: `Ralat sambungan: ${e.message}` });
+    } finally {
+      setCentralLoading(false);
+    }
+  };
+
+  const handleForcePullFromCentralServer = async () => {
+    setCentralLoading(true);
+    setCentralResult(null);
+    try {
+      const res = await fetch('/api/state');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.state) {
+          onChangeState(data.state);
+          localStorage.setItem('khairat_gong_badak', JSON.stringify(data.state));
+          localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(data.state));
+          setCentralResult({
+            success: true,
+            message: `Selesai! Berjaya menyegerak pangkalan data terkini daripada Server Live (${data.state.members?.length || 0} ahli ditemui).`
+          });
+        } else {
+          setCentralResult({ success: false, message: `Server tidak mempunyai dokumen simpanan: ${data.message || 'Kosong'}` });
+        }
+      } else {
+        setCentralResult({ success: false, message: `Gagal HTTP dengan status kerosakan ${res.status}` });
+      }
+    } catch (e: any) {
+      setCentralResult({ success: false, message: `Ralat sambungan: ${e.message}` });
+    } finally {
+      setCentralLoading(false);
+    }
+  };
+
   // Save custom portal parameters (fee & admin password)
   const handleUpdatePortalSettings = () => {
     const fee = parseFloat(kadarYuranInput) || 3;
@@ -176,6 +237,81 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
         {/* Left Column: API URLs & Switches */}
         <div className="lg:col-span-3 space-y-4" id="integration-controls-rail">
           
+          {/* Central Live Server Sync Console */}
+          <div className="bg-slate-900 text-white p-5 rounded-xl border border-slate-950 shadow-md space-y-4">
+            <div className="flex items-center gap-2.5 pb-3 border-b border-slate-800">
+              <div className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
+              <div>
+                <h3 className="text-xs font-black uppercase tracking-wider text-emerald-400">Peta Penyegerakan Server Pusat Masa Nyata (Live)</h3>
+                <p className="text-[10px] text-slate-400 font-sans mt-0.5">Sambungan secara langsung untuk menyelia dan menyegerak semua device tetamu & pelawat.</p>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-300 leading-relaxed font-sans">
+              Sistem ini membolehkan data anda disegerak secara langsung (real-time) antara peranti <strong>Pentadbir (Admin)</strong> dan peranti <strong>Tetamu/Pelawat</strong> menggunakan simpanan server kontena tanpa memerlukan persediaan manual Google Sheet.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 bg-slate-950 p-3 rounded-lg border border-slate-800/80 font-mono text-[10px]">
+              <div>
+                <span className="text-slate-450 block uppercase tracking-tight">Ahli Lokal (Pelayar Ini):</span>
+                <span className="text-xs font-bold text-white">{state.members?.length || 0} Orang Berdaftar</span>
+              </div>
+              <div>
+                <span className="text-slate-450 block uppercase tracking-tight">Status Pelayan (Live Server):</span>
+                <span className="text-xs font-bold text-emerald-300 flex items-center gap-1">
+                  <span className="inline-block h-2 w-2 rounded-full bg-emerald-400"></span>
+                  Sedia / Aktif
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest font-sans">Aksi Penyegerkan Pusat Pentadbir:</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={handleForcePushToCentralServer}
+                  disabled={centralLoading}
+                  className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold text-[10px] uppercase rounded-lg tracking-wider transition border-b-2 border-emerald-900 cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                  title="Tekan ini untuk hantar data 333 ahli anda ke server supaya peranti tetamu mendapat data yang sama"
+                >
+                  <RefreshCw className={`h-3 w-3 ${centralLoading ? 'animate-spin' : ''}`} />
+                  <span>Tolak Data ke Server (Push)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleForcePullFromCentralServer}
+                  disabled={centralLoading}
+                  className="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-100 font-extrabold text-[10px] uppercase rounded-lg tracking-wider transition border-b-2 border-slate-950 cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                  title="Ambil data terbaharu dari server untuk disimpan dalam pelayar ini"
+                >
+                  <RefreshCw className="h-3 w-3 text-slate-400" />
+                  <span>Tarik Data Server (Pull)</span>
+                </button>
+              </div>
+              <span className="text-[9px] text-slate-450 block leading-relaxed font-sans italic">
+                *Nota: Peranti tetamu/pelawat mengemas kini skrin mereka secara automatik setiap 8 saat daripada data Server Pusat ini.
+              </span>
+            </div>
+
+            {centralResult && (
+              <div className={`p-3 rounded-lg border text-xs leading-relaxed ${
+                centralResult.success
+                  ? 'bg-emerald-950/80 border-emerald-800 text-emerald-250'
+                  : 'bg-rose-950/80 border-rose-900 text-rose-250'
+              }`}>
+                <div className="flex gap-2 font-sans font-medium text-[10.5px]">
+                  {centralResult.success ? (
+                    <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" />
+                  ) : (
+                    <AlertTriangle className="h-4 w-4 text-rose-450 shrink-0" />
+                  )}
+                  <span>{centralResult.message}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-xs space-y-4">
             
             {/* Column Header */}

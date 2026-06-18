@@ -119,15 +119,18 @@ export default function App() {
             const localCount = localState?.members?.length || 0;
             const remoteCount = data.state?.members?.length || 0;
             
-            if (currentRole === 'admin' && localState && localCount > remoteCount) {
-              console.log('Admin local state has more records than server state. Up-syncing local database...');
-              await fetch('/api/state', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ state: localState }),
-              });
+            // Safety: if our local state has more records than the server state AND local state has substantial records (e.g. >15)
+            // we should PRESERVE the local state to prevent accidental local data clobbering by the server
+            if (localState && localCount > remoteCount && localCount > 15) {
+              console.log('Preserving rich local state of', localCount, 'members over remote', remoteCount, 'members');
+              const cachedRole = localStorage.getItem('khairat_gong_badak_role_v1') || currentRole;
+              if (cachedRole === 'admin') {
+                await fetch('/api/state', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ state: localState }),
+                });
+              }
               setState(localState);
             } else {
               // Adopt remote centered live database
@@ -153,10 +156,10 @@ export default function App() {
             }
           }
         } else {
-          setIsServerConnected(false);
+          setIsServerConnected(`HTTP ${res.status}`);
         }
       } catch (err) {
-        setIsServerConnected(false);
+        setIsServerConnected(err instanceof Error ? err.message : String(err));
         console.warn('Failed to pull bootstrapped state from container server:', err);
       }
     };
@@ -183,10 +186,10 @@ export default function App() {
             }
           }
         } else {
-          setIsServerConnected(false);
+          setIsServerConnected(`HTTP ${res.status}`);
         }
       } catch (err) {
-        setIsServerConnected(false);
+        setIsServerConnected(err instanceof Error ? err.message : String(err));
         console.warn('Failed to sync state during background poll:', err);
       }
     }, 8000); // Sync every 8 seconds
