@@ -61,15 +61,61 @@ async function startServer() {
     }
   });
 
-  // API Route: Shorten URL
+  // API Route: Shorten URL (Ad-free & Direct Redirect)
   app.post('/api/shorten', async (req, res) => {
     const { url } = req.body;
     if (!url) {
       return res.status(400).json({ success: false, message: 'URL diperlukan' });
     }
     
+    // 1st Priority: is.gd (100% free, direct redirection, absolutely NO ads or splash screens)
     try {
-      console.log('Sedang memendekkan URL:', url);
+      console.log('Shortening with is.gd:', url);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const response = await fetch(`https://is.gd/create.php?format=simple&url=${encodeURIComponent(url)}`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (response.ok) {
+        const shortUrl = await response.text();
+        if (shortUrl && shortUrl.startsWith('http')) {
+          console.log('is.gd produced:', shortUrl);
+          return res.json({ success: true, shortUrl });
+        }
+      }
+    } catch (error) {
+      console.error('is.gd failed, trying cleanuri:', error);
+    }
+
+    // 2nd Priority: cleanuri.com (100% free, no ads, direct redirections)
+    try {
+      console.log('Shortening with cleanuri.com:', url);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const response = await fetch('https://cleanuri.com/api/v1/shorten', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `url=${encodeURIComponent(url)}`,
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.result_url && data.result_url.startsWith('http')) {
+          console.log('cleanuri produced:', data.result_url);
+          return res.json({ success: true, shortUrl: data.result_url });
+        }
+      }
+    } catch (error) {
+      console.error('cleanuri failed, trying tinyurl:', error);
+    }
+
+    // 3rd Priority: tinyurl.com as absolute fallback
+    try {
+      console.log('Shortening with tinyurl:', url);
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 6000);
       
@@ -81,28 +127,12 @@ async function startServer() {
       if (response.ok) {
         const shortUrl = await response.text();
         if (shortUrl && shortUrl.startsWith('http')) {
+          console.log('tinyurl produced fallback:', shortUrl);
           return res.json({ success: true, shortUrl });
         }
       }
     } catch (error) {
-      console.error('TinyURL failing, trying fallback (is.gd):', error);
-    }
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
-      const response = await fetch(`https://is.gd/create.php?format=simple&url=${encodeURIComponent(url)}`, {
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-      if (response.ok) {
-        const shortUrl = await response.text();
-        if (shortUrl && shortUrl.startsWith('http')) {
-          return res.json({ success: true, shortUrl });
-        }
-      }
-    } catch (error) {
-      console.error('is.gd also failing:', error);
+      console.error('tinyurl also failed:', error);
     }
 
     res.status(500).json({ success: false, message: 'Gagal memproses pautan pendek secara automatik.' });

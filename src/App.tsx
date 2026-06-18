@@ -101,36 +101,54 @@ export default function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const scriptUrlParam = params.get('script') || params.get('s');
+    
+    // Default Apps Script URL terbaharu yang sahih dan aktif bagi Kampung Gong Badak
+    const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzWl9ccXM2e39h2rjYlezESn2Y-DOtQKxu3mqVZ45b64u_NtN6yeJWTGiy5eBWspo0T/exec';
+    
+    let needsUpdate = false;
+    let decodedUrl = '';
+    
     if (scriptUrlParam) {
       try {
-        const decodedUrl = decodeURIComponent(scriptUrlParam);
+        decodedUrl = decodeURIComponent(scriptUrlParam);
         if (decodedUrl.startsWith('https://script.google.com/')) {
-          console.log('Auto-configuring Google Apps Script URL from query parameter:', decodedUrl);
-          
-          let saved = localStorage.getItem('khairat_gong_badak') || localStorage.getItem('khairat_gong_badak_state_v1');
-          let currentState = state;
-          if (saved) {
-            try {
-              currentState = JSON.parse(saved);
-            } catch (e) {}
-          }
-
-          const updatedState = {
-            ...currentState,
-            useGoogleSheets: true,
-            appsScriptUrl: decodedUrl
-          };
-          
-          setState(updatedState);
-          localStorage.setItem('khairat_gong_badak', JSON.stringify(updatedState));
-          localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(updatedState));
-          
-          // Force guest role access to bypass the admin password screen immediately for easy sharing
-          setCurrentRole('user');
-          localStorage.setItem('khairat_gong_badak_role_v1', 'user');
+          needsUpdate = true;
         }
       } catch (err) {
         console.error('Failed to parse URL query script URL parameter:', err);
+      }
+    } else if (!state.appsScriptUrl || state.appsScriptUrl.trim() === '') {
+      // Jika pengguna melayari URL bersih (m.g. / sahaja) tanpa sebarang parametre, dan tiada pautan tersimpan,
+      // kita setkan pautan Google Sheets lalai secara automatik supaya mereka tidak mendapat ralat 404!
+      decodedUrl = DEFAULT_APPS_SCRIPT_URL;
+      needsUpdate = true;
+    }
+
+    if (needsUpdate && decodedUrl) {
+      console.log('Sistem mengkonfigurasi Google Apps Script secara automatik:', decodedUrl);
+      
+      let saved = localStorage.getItem('khairat_gong_badak') || localStorage.getItem('khairat_gong_badak_state_v1');
+      let currentState = state;
+      if (saved) {
+        try {
+          currentState = JSON.parse(saved);
+        } catch (e) {}
+      }
+
+      const updatedState = {
+        ...currentState,
+        useGoogleSheets: true,
+        appsScriptUrl: decodedUrl
+      };
+      
+      setState(updatedState);
+      localStorage.setItem('khairat_gong_badak', JSON.stringify(updatedState));
+      localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(updatedState));
+      
+      // Auto-set peranan pelawat 'user' supaya tetamu terus dibawa ke dashboard tanpa halangan kata laluan
+      if (!localStorage.getItem('khairat_gong_badak_role_v1')) {
+        setCurrentRole('user');
+        localStorage.setItem('khairat_gong_badak_role_v1', 'user');
       }
     }
   }, []);

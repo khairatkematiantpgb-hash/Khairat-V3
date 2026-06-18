@@ -16,6 +16,7 @@ interface ReportsSummaryProps {
 export default function ReportsSummary({ state, onViewProfile }: ReportsSummaryProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isPrinting, setIsPrinting] = useState(false);
+  const [filterGroup, setFilterGroup] = useState<string>('all');
 
   const kadarYuran = state.kadarYuranSebulan || 3;
 
@@ -106,9 +107,42 @@ export default function ReportsSummary({ state, onViewProfile }: ReportsSummaryP
     return arrearsSegments.length > 0 ? arrearsSegments.join('; ') : 'Tiada';
   };
 
-  // Filter and sort members list based on query
+  // Pre-calculate membership classifications for totals
+  const memberStats = state.members.map(m => {
+    const rows = state.ledger.filter(r => isSameMemberId(r.noAhli, m.noAhli));
+    const totalLebihanKredit = rows.reduce((acc, r) => acc + (r.lebihanKredit || 0), 0);
+    const dues = calculateOutstandingDues(m.noAhli, state.ledger, state.members, kadarYuran);
+    const actualDues = Math.max(0, dues - totalLebihanKredit);
+    
+    return {
+      noAhli: m.noAhli,
+      status: m.status,
+      dues: actualDues
+    };
+  });
+
+  const countSemua = state.members.length;
+  const countInaktif = memberStats.filter(m => m.status !== 'Aktif').length;
+  const countAktif = memberStats.filter(m => m.status === 'Aktif').length;
+  const countTiada = memberStats.filter(m => m.status !== 'Aktif').length; 
+  const countLunas = memberStats.filter(m => m.status === 'Aktif' && m.dues === 0).length;
+  const countAdaTunggakan = memberStats.filter(m => m.status === 'Aktif' && m.dues > 0).length;
+  const countTunggakanLebih50 = memberStats.filter(m => m.status === 'Aktif' && m.dues > 50).length;
+
+  const categories = [
+    { id: 'all', label: 'Semua Ahli', count: countSemua },
+    { id: 'tidak_aktif', label: '1. Status Tidak Aktif', count: countInaktif },
+    { id: 'aktif', label: '2. Status Aktif', count: countAktif },
+    { id: 'tiada', label: '3. Tiada (Tidak Aktif)', count: countTiada },
+    { id: 'lunas', label: '4. Lunas / Cemerlang', count: countLunas },
+    { id: 'ada_tunggakan', label: '5. Ada Tunggakan', count: countAdaTunggakan },
+    { id: 'tunggakan_50', label: '6. Tunggakan > RM50', count: countTunggakanLebih50 },
+  ];
+
+  // Filter and sort members list based on query and group filter
   const filteredList = state.members
     .filter((member) => {
+      // 1. Text Search query filter
       const cleanSearch = searchQuery.trim().toLowerCase();
       const isNumericSearch = /^\d+$/.test(cleanSearch);
 
@@ -117,7 +151,35 @@ export default function ReportsSummary({ state, onViewProfile }: ReportsSummaryP
       const icMatch = member.ic && member.ic.includes(cleanSearch) && (!isNumericSearch || cleanSearch.length >= 4);
       const addrMatch = member.alamat ? member.alamat.toLowerCase().includes(cleanSearch) : false;
       
-      return nameMatch || idMatch || icMatch || addrMatch;
+      const passSearch = nameMatch || idMatch || icMatch || addrMatch;
+      if (!passSearch) return false;
+
+      // 2. Group Filter
+      if (filterGroup === 'all') return true;
+
+      const stats = memberStats.find(s => s.noAhli === member.noAhli);
+      if (!stats) return true;
+
+      if (filterGroup === 'tidak_aktif') {
+        return stats.status !== 'Aktif';
+      }
+      if (filterGroup === 'aktif') {
+        return stats.status === 'Aktif';
+      }
+      if (filterGroup === 'tiada') {
+        return stats.status !== 'Aktif';
+      }
+      if (filterGroup === 'lunas') {
+        return stats.status === 'Aktif' && stats.dues === 0;
+      }
+      if (filterGroup === 'ada_tunggakan') {
+        return stats.status === 'Aktif' && stats.dues > 0;
+      }
+      if (filterGroup === 'tunggakan_50') {
+        return stats.status === 'Aktif' && stats.dues > 50;
+      }
+
+      return true;
     })
     .sort((a, b) => {
       // Sort sequentially ascending by No. Ahli
@@ -375,6 +437,50 @@ export default function ReportsSummary({ state, onViewProfile }: ReportsSummaryP
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
+        </div>
+
+        {/* Kumpulan Tapis / Kriteria Carian */}
+        <div className="space-y-2 pt-1">
+          <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
+            Tapis Mengikut Kumpulan Ahli ({filteredList.length} Padanan):
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {categories.map((cat) => {
+              const isActive = filterGroup === cat.id;
+              
+              // Set separate subtle styles based on criteria type to make it visually pleasing
+              let badgeColor = 'bg-slate-200 text-slate-755';
+              if (isActive) {
+                badgeColor = 'bg-indigo-900 text-indigo-100';
+              } else if (cat.id === 'tidak_aktif' || cat.id === 'tiada') {
+                badgeColor = 'bg-rose-50 text-rose-700 hover:bg-rose-100/80 hover:text-rose-800';
+              } else if (cat.id === 'aktif' || cat.id === 'lunas') {
+                badgeColor = 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100/80 hover:text-emerald-800';
+              } else if (cat.id === 'ada_tunggakan') {
+                badgeColor = 'bg-amber-50 text-amber-700 hover:bg-amber-100/80 hover:text-amber-800';
+              } else if (cat.id === 'tunggakan_50') {
+                badgeColor = 'bg-red-50 text-red-700 hover:bg-red-100/80 hover:text-red-800';
+              }
+
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setFilterGroup(cat.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all duration-200 flex items-center gap-1.5 cursor-pointer select-none border border-slate-200/80 ${
+                    isActive
+                      ? 'bg-indigo-700 text-white border-indigo-800 shadow-md ring-2 ring-indigo-200 transform -translate-y-px scale-[1.02]'
+                      : 'bg-white hover:bg-slate-50 text-slate-700 hover:border-slate-350 shadow-xxs'
+                  }`}
+                >
+                  <span className="tracking-tight">{cat.label}</span>
+                  <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[9px] font-mono leading-none font-black ${badgeColor}`}>
+                    {cat.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Members Table */}

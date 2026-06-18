@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AppState, Member, Tanggungan, MONTH_KEYS, MONTH_LABELS } from '../types';
 import { calculateOutstandingDues, isSameMemberId, runKemaskiniMaklumatAhli } from '../lib/database';
 import { Search, User, ShieldCheck, CheckCircle2, AlertCircle, FileText, Printer, MapPin, CreditCard, PlusCircle, Trash2, Edit2, Users, Check, X } from 'lucide-react';
@@ -18,11 +18,15 @@ interface ProfileDashboardProps {
 
 export default function ProfileDashboard({ state, selectedMemberId, setSelectedMemberId, onChangeState, currentRole }: ProfileDashboardProps) {
   const [searchQuery, setSearchQuery] = useState(selectedMemberId || '');
+  
+  // Track the last ID synced up to the parent or received externally to prevent feedback loops
+  const lastSentIdRef = useRef<string>(selectedMemberId);
 
   // Synchronize internal query state with the incoming parent coordinate ONLY if it differs
   useEffect(() => {
-    if (selectedMemberId && searchQuery !== selectedMemberId) {
+    if (selectedMemberId && selectedMemberId !== lastSentIdRef.current) {
       setSearchQuery(selectedMemberId);
+      lastSentIdRef.current = selectedMemberId;
     }
   }, [selectedMemberId]);
 
@@ -45,6 +49,7 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
   // This breaks the feedback loop when typing partial unmatched characters or backspacing!
   useEffect(() => {
     if (finalMember && finalMember.noAhli !== selectedMemberId) {
+      lastSentIdRef.current = finalMember.noAhli;
       setSelectedMemberId(finalMember.noAhli);
     }
   }, [finalMember, selectedMemberId, setSelectedMemberId]);

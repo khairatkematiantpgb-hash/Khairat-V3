@@ -269,8 +269,8 @@ export function getDefaultAppState(): AppState {
   return {
     members: defaultMembers,
     ledger: defaultLedger,
-    useGoogleSheets: false,
-    appsScriptUrl: '',
+    useGoogleSheets: true,
+    appsScriptUrl: 'https://script.google.com/macros/s/AKfycbzWl9ccXM2e39h2rjYlezESn2Y-DOtQKxu3mqVZ45b64u_NtN6yeJWTGiy5eBWspo0T/exec',
     googleSheetsId: '',
     kadarYuranSebulan: 3,
     adminPassword: 'gongbadak123'
