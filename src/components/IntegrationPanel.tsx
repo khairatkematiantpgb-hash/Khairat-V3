@@ -14,9 +14,10 @@ interface IntegrationPanelProps {
   onChangeState: (state: AppState) => void;
   onRefresh: () => Promise<void>;
   syncLoading: boolean;
+  isServerConnected?: boolean | string;
 }
 
-export default function IntegrationPanel({ state, onChangeState, onRefresh, syncLoading }: IntegrationPanelProps) {
+export default function IntegrationPanel({ state, onChangeState, onRefresh, syncLoading, isServerConnected = false }: IntegrationPanelProps) {
   const [appsScriptUrlInput, setAppsScriptUrlInput] = useState(state.appsScriptUrl || '');
   const [testLoading, setTestLoading] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -240,16 +241,35 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
           {/* Central Live Server Sync Console */}
           <div className="bg-slate-900 text-white p-5 rounded-xl border border-slate-950 shadow-md space-y-4">
             <div className="flex items-center gap-2.5 pb-3 border-b border-slate-800">
-              <div className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
+              <div className={`h-2.5 w-2.5 rounded-full ${isServerConnected === true ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500 animate-pulse'}`}></div>
               <div>
-                <h3 className="text-xs font-black uppercase tracking-wider text-emerald-400">Peta Penyegerakan Server Pusat Masa Nyata (Live)</h3>
-                <p className="text-[10px] text-slate-400 font-sans mt-0.5">Sambungan secara langsung untuk menyelia dan menyegerak semua device tetamu & pelawat.</p>
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-205">Penyegerakan Fail Pusat (Kontena / Vercel)</h3>
+                <p className="text-[10px] text-slate-400 font-sans mt-0.5">Sistem memantau mod hubungan pelayan dan membimbing persediaan awan.</p>
               </div>
             </div>
 
-            <p className="text-[11px] text-slate-300 leading-relaxed font-sans">
-              Sistem ini membolehkan data anda disegerak secara langsung (real-time) antara peranti <strong>Pentadbir (Admin)</strong> dan peranti <strong>Tetamu/Pelawat</strong> menggunakan simpanan server kontena tanpa memerlukan persediaan manual Google Sheet.
-            </p>
+            {isServerConnected === 'HTTP 404' || String(isServerConnected).includes('404') ? (
+              <div className="bg-amber-950/70 border border-amber-850 p-4 rounded-xl space-y-3">
+                <div className="flex gap-2 text-amber-250 font-bold text-xs">
+                  <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                  <span>Sebab ralat HTTP 404 di Vercel:</span>
+                </div>
+                <p className="text-[11px] text-amber-200/90 leading-relaxed font-sans">
+                  Pautan <code className="bg-amber-950 px-1 py-0.5 rounded text-amber-300 font-mono">khairat-v3.vercel.app</code> dihoskan secara <strong>statik (serverless)</strong> di sistem cloud Vercel. Vercel secara lalai tiada pelayan backend Node.js yang aktif untuk menyimpan fail JSON. Oleh itu ralat status <strong>HTTP 404</strong> berlaku kerana pelayan kontena tempatan tidak berjalan di Vercel.
+                </p>
+                <div className="bg-amber-950/90 p-3 rounded-lg border border-amber-900/60 font-sans text-[11px] text-amber-100">
+                  <p className="font-semibold text-emerald-450 flex items-center gap-1.5 mb-1">
+                    <CheckCircle className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                    Penyelesaian Mudah & Kekal:
+                  </p>
+                  Sila aktifkan <strong>"Kefungsian Integrasi Google Sheets"</strong> di kotak sebelah kanan ini! Integrasi Google Sheets berjalan terus dari pelayar web (client-side) secara percuma untuk menyegerak dan berkongsi pangkalan data dengan lebih 333+ ahli serta peranti tetamu tanpa had.
+                </div>
+              </div>
+            ) : (
+              <p className="text-[11px] text-slate-300 leading-relaxed font-sans">
+                Sistem ini membolehkan data anda disegerak secara langsung (real-time) antara peranti <strong>Pentadbir (Admin)</strong> dan peranti <strong>Tetamu/Pelawat</strong> menggunakan simpanan server kontena tanpa memerlukan persediaan manual Google Sheet.
+              </p>
+            )}
 
             <div className="grid grid-cols-2 gap-3 bg-slate-950 p-3 rounded-lg border border-slate-800/80 font-mono text-[10px]">
               <div>
@@ -257,10 +277,10 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
                 <span className="text-xs font-bold text-white">{state.members?.length || 0} Orang Berdaftar</span>
               </div>
               <div>
-                <span className="text-slate-450 block uppercase tracking-tight">Status Pelayan (Live Server):</span>
-                <span className="text-xs font-bold text-emerald-300 flex items-center gap-1">
-                  <span className="inline-block h-2 w-2 rounded-full bg-emerald-400"></span>
-                  Sedia / Aktif
+                <span className="text-slate-450 block uppercase tracking-tight">Status Hubungan Pusat:</span>
+                <span className={`text-xs font-bold flex items-center gap-1 ${isServerConnected === true ? 'text-emerald-300' : 'text-rose-350'}`}>
+                  <span className={`inline-block h-2 w-2 rounded-full ${isServerConnected === true ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
+                  {isServerConnected === true ? 'Terhubung (Server Kontena)' : 'Mod Offline / Vercel (Lokal)'}
                 </span>
               </div>
             </div>
@@ -273,7 +293,7 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
                   onClick={handleForcePushToCentralServer}
                   disabled={centralLoading}
                   className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold text-[10px] uppercase rounded-lg tracking-wider transition border-b-2 border-emerald-900 cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
-                  title="Tekan ini untuk hantar data 333 ahli anda ke server supaya peranti tetamu mendapat data yang sama"
+                  title="Tekan ini untuk hantar data ahli anda ke server"
                 >
                   <RefreshCw className={`h-3 w-3 ${centralLoading ? 'animate-spin' : ''}`} />
                   <span>Tolak Data ke Server (Push)</span>
@@ -283,14 +303,14 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
                   onClick={handleForcePullFromCentralServer}
                   disabled={centralLoading}
                   className="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-100 font-extrabold text-[10px] uppercase rounded-lg tracking-wider transition border-b-2 border-slate-950 cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
-                  title="Ambil data terbaharu dari server untuk disimpan dalam pelayar ini"
+                  title="Ambil data terbaharu dari server"
                 >
                   <RefreshCw className="h-3 w-3 text-slate-400" />
                   <span>Tarik Data Server (Pull)</span>
                 </button>
               </div>
               <span className="text-[9px] text-slate-450 block leading-relaxed font-sans italic">
-                *Nota: Peranti tetamu/pelawat mengemas kini skrin mereka secara automatik setiap 8 saat daripada data Server Pusat ini.
+                *Nota: Sekiranya menggunakan Vercel, sila abaikan butang "Tolak/Tarik Data Server" ini dan gunakan Google Sheets di sebelah kanan.
               </span>
             </div>
 

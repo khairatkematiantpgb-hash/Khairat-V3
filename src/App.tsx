@@ -493,6 +493,7 @@ export default function App() {
               state={state}
               onChangeState={handleChangeState}
               onRefresh={handleRefreshFromSheets}
+              isServerConnected={isServerConnected}
               syncLoading={syncLoading}
             />
           )}
