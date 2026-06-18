@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { AppState } from '../types';
 import { fetchFromAppsScript, writeToAppsScript } from '../lib/appsScript';
 import { getAppsScriptGoogleCode } from '../lib/appsScript';
-import { Radio, ToggleLeft, ToggleRight, Check, CheckCircle, Info, Key, AlertTriangle, RefreshCw, Layers, ExternalLink, HelpCircle, FileText, CheckCircle2 } from 'lucide-react';
+import { Radio, ToggleLeft, ToggleRight, Check, CheckCircle, Info, Key, AlertTriangle, RefreshCw, Layers, ExternalLink, HelpCircle, FileText, CheckCircle2, Share2 } from 'lucide-react';
 
 interface IntegrationPanelProps {
   state: AppState;
@@ -404,6 +404,41 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
                 Akses ini wajib mengandungi pengenal-maklumat web app `exec` hujung Google Sheet anda.
               </span>
             </div>
+
+            {/* Pautan Perkongsian Tetamu (Untuk Vercel / Tanpa Server) */}
+            {state.useGoogleSheets && state.appsScriptUrl && (
+              <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-200/60 space-y-2 font-sans">
+                <div className="flex items-center gap-1.5 font-bold text-[11px] text-emerald-950 uppercase tracking-wide">
+                  <Share2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span>Pautan Kongsi Ahli / Tetamu (Sangat Penting):</span>
+                </div>
+                <p className="text-[10px] text-emerald-900 leading-relaxed font-sans">
+                  Gunakan pautan khas di bawah untuk dikongsi kepada <strong>333+ ahli kariah atau peranti tetamu</strong> (contohnya di WhatsApp kelompok). Peranti mereka akan disambung terus ke data Google Sheets secara langsung (live) tanpa memerlukan pelayan backend Vercel yang mengalami ralat 404:
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    onClick={(e) => (e.target as HTMLInputElement).select()}
+                    className="flex-grow bg-white border border-emerald-300 text-emerald-950 text-[10px] rounded px-3 py-2 focus:outline-none font-mono"
+                    value={`${window.location.origin}${window.location.pathname}?s=${encodeURIComponent(state.appsScriptUrl)}`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?s=${encodeURIComponent(state.appsScriptUrl)}`);
+                      alert('Pautan perkongsian tetamu telah disalin ke papan klip!');
+                    }}
+                    className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] uppercase rounded transition cursor-pointer select-none shrink-0"
+                  >
+                    Salin Pautan
+                  </button>
+                </div>
+                <span className="text-[9px] text-slate-500 font-sans block leading-snug">
+                  *Nota: Sesiapa sahaja yang membuka pautan ini akan masuk secara automatik sebagai Pelawat (Read-Only) dan disederhanakan dengan data Google Sheets anda secara terus.
+                </span>
+              </div>
+            )}
 
             {/* Sync Action Controllers */}
             {state.useGoogleSheets && (

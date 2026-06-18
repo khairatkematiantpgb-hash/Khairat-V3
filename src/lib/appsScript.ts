@@ -143,10 +143,10 @@ function doPost(e) {
   if (action === "padamSemuaData") {
     // Kosongkan seluruh rekod kecuali baris pengepala (header)
     if (sheetAhli.getLastRow() > 1) {
-      sheetAhli.deleteRows(2, sheetAhli.getLastRow() - 1);
+      sheetAhli.getRange(2, 1, sheetAhli.getLastRow() - 1, sheetAhli.getLastColumn()).clearContent();
     }
     if (sheetLejar.getLastRow() > 1) {
-      sheetLejar.deleteRows(2, sheetLejar.getLastRow() - 1);
+      sheetLejar.getRange(2, 1, sheetLejar.getLastRow() - 1, sheetLejar.getLastColumn()).clearContent();
     }
     
     return getDirectData(ss, "Seluruh pangkalan data telah dikosongkan.");
@@ -154,12 +154,12 @@ function doPost(e) {
   
   if (action === "syncLocalToSheets") {
     try {
-      // 1. Kosongkan semua data lama terlebih dahulu
+      // 1. Kosongkan semua data lama terlebih dahulu menggunakan clearContent bagi mengelakkan ralat Google Sheets
       if (sheetAhli.getLastRow() > 1) {
-        sheetAhli.deleteRows(2, sheetAhli.getLastRow() - 1);
+        sheetAhli.getRange(2, 1, sheetAhli.getLastRow() - 1, sheetAhli.getLastColumn()).clearContent();
       }
       if (sheetLejar.getLastRow() > 1) {
-        sheetLejar.deleteRows(2, sheetLejar.getLastRow() - 1);
+        sheetLejar.getRange(2, 1, sheetLejar.getLastRow() - 1, sheetLejar.getLastColumn()).clearContent();
       }
       
       // 2. Tulis Senarai Ahli Baru

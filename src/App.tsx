@@ -99,6 +99,43 @@ export default function App() {
 
   // Load centralized shared state from the server on startup so all devices display raw up-to-date live data
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const scriptUrlParam = params.get('script') || params.get('s');
+    if (scriptUrlParam) {
+      try {
+        const decodedUrl = decodeURIComponent(scriptUrlParam);
+        if (decodedUrl.startsWith('https://script.google.com/')) {
+          console.log('Auto-configuring Google Apps Script URL from query parameter:', decodedUrl);
+          
+          let saved = localStorage.getItem('khairat_gong_badak') || localStorage.getItem('khairat_gong_badak_state_v1');
+          let currentState = state;
+          if (saved) {
+            try {
+              currentState = JSON.parse(saved);
+            } catch (e) {}
+          }
+
+          const updatedState = {
+            ...currentState,
+            useGoogleSheets: true,
+            appsScriptUrl: decodedUrl
+          };
+          
+          setState(updatedState);
+          localStorage.setItem('khairat_gong_badak', JSON.stringify(updatedState));
+          localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(updatedState));
+          
+          // Force guest role access to bypass the admin password screen immediately for easy sharing
+          setCurrentRole('user');
+          localStorage.setItem('khairat_gong_badak_role_v1', 'user');
+        }
+      } catch (err) {
+        console.error('Failed to parse URL query script URL parameter:', err);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     const loadSharedStateOnBoot = async () => {
       try {
         const res = await fetch('/api/state');
@@ -196,6 +233,37 @@ export default function App() {
 
     return () => clearInterval(pollInterval);
   }, [currentRole]);
+
+  // Background polling untuk Google Sheets apabila berjalan di persekitaran offline / tanpa server (Vercel)
+  useEffect(() => {
+    if (currentRole === 'admin' || !state.useGoogleSheets || !state.appsScriptUrl) return;
+
+    const sheetsPollInterval = setInterval(async () => {
+      try {
+        console.log('Sedang menyegerak latar belakang dari Google Sheets...');
+        const result = await fetchFromAppsScript(state.appsScriptUrl!);
+        if (result.success && result.data) {
+          const mergedState = {
+            ...state,
+            members: result.data.members || state.members,
+            ledger: result.data.ledger || state.ledger
+          };
+          
+          const currentString = localStorage.getItem('khairat_gong_badak');
+          const newString = JSON.stringify(mergedState);
+          if (currentString !== newString) {
+            setState(mergedState);
+            localStorage.setItem('khairat_gong_badak', newString);
+            localStorage.setItem('khairat_gong_badak_state_v1', newString);
+          }
+        }
+      } catch (e) {
+        console.warn('Gagal melakukan segelong latar belakang Google Sheets:', e);
+      }
+    }, 25000); // Segelong setiap 25 saat
+
+    return () => clearInterval(sheetsPollInterval);
+  }, [currentRole, state.useGoogleSheets, state.appsScriptUrl]);
 
   // Pull remote data on load if configured
   useEffect(() => {
