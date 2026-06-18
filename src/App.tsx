@@ -105,19 +105,52 @@ export default function App() {
         if (res.ok) {
           const data = await res.json();
           setIsServerConnected(true);
+          
+          const localSaved = localStorage.getItem('khairat_gong_badak');
+          let localState: AppState | null = null;
+          if (localSaved) {
+            try {
+              localState = JSON.parse(localSaved);
+            } catch (e) {}
+          }
+
           if (data.success && data.state) {
-            setState(data.state);
-            localStorage.setItem('khairat_gong_badak', JSON.stringify(data.state));
-            localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(data.state));
+            // Check if local state is richer/newer (e.g., admin device which has 333 members, while server has default 11)
+            const localCount = localState?.members?.length || 0;
+            const remoteCount = data.state?.members?.length || 0;
+            
+            if (currentRole === 'admin' && localState && localCount > remoteCount) {
+              console.log('Admin local state has more records than server state. Up-syncing local database...');
+              await fetch('/api/state', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ state: localState }),
+              });
+              setState(localState);
+            } else {
+              // Adopt remote centered live database
+              setState(data.state);
+              localStorage.setItem('khairat_gong_badak', JSON.stringify(data.state));
+              localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(data.state));
+            }
           } else {
-            // Server has no state file yet (first time or starting up). Save current state.
+            // Server has no state file yet (first time or starting up). 
+            // If we are admin or we have a richer local state, push it. Otherwise, initialize.
+            const localCount = localState?.members?.length || 0;
+            const activeStateToIncept = (localState && localCount > 11) ? localState : state;
+            
             await fetch('/api/state', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify({ state }),
+              body: JSON.stringify({ state: activeStateToIncept }),
             });
+            if (activeStateToIncept !== state) {
+              setState(activeStateToIncept);
+            }
           }
         } else {
           setIsServerConnected(false);
@@ -128,7 +161,7 @@ export default function App() {
       }
     };
     loadSharedStateOnBoot();
-  }, []);
+  }, [currentRole]);
 
   // Setup standard dynamic polling for guest/visitor devices to get live database updates automatically
   useEffect(() => {
@@ -169,12 +202,40 @@ export default function App() {
   }, [currentRole]);
 
   // Handle simulated login
-  const handleLogin = (role: 'admin' | 'user') => {
+  const handleLogin = async (role: 'admin' | 'user') => {
     setCurrentRole(role);
     localStorage.setItem('khairat_gong_badak_role_v1', role);
     // If user is visitor (read-only), safety-switch tab to overview if it was integrasi or payment
     if (role === 'user') {
       setActiveTab('overview');
+    }
+
+    if (role === 'admin') {
+      try {
+        const res = await fetch('/api/state');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.state) {
+            const localSaved = localStorage.getItem('khairat_gong_badak');
+            if (localSaved) {
+              const localState: AppState = JSON.parse(localSaved);
+              const localCount = localState?.members?.length || 0;
+              const remoteCount = data.state?.members?.length || 0;
+              if (localState && localCount > remoteCount) {
+                console.log('Pushing local admin state on login:', localCount, 'vs remote', remoteCount);
+                await fetch('/api/state', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ state: localState }),
+                });
+                setState(localState);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Silent local state sync on admin login failed:', e);
+      }
     }
   };
 
