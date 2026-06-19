@@ -254,7 +254,7 @@ export default function ReportsSummary({ state, onViewProfile }: ReportsSummaryP
       
       {/* Printable Preview Overlay */}
       {isPrinting && (
-        <div className="fixed inset-0 bg-white z-[99999] p-10 overflow-y-auto text-slate-900 font-sans print:p-0 print:m-0">
+        <div id="print-area-outlet" className="fixed inset-0 bg-white z-[99999] p-10 overflow-y-auto text-slate-900 font-sans print:relative print:inset-auto print:p-0 print:m-0 print:overflow-visible print:bg-white print:block print:h-auto print:w-full">
           
           {/* Print Controls Ribbon - Hides in print */}
           <div className="mb-8 flex justify-between items-center bg-amber-50 border border-amber-200 p-4 rounded-xl print:hidden">
@@ -296,7 +296,7 @@ export default function ReportsSummary({ state, onViewProfile }: ReportsSummaryP
               <p className="text-[10px] text-slate-500 font-medium mt-1">Pangkalan data ahli kariah Kampung Gong Badak setakat {formattedDate} ({formattedTime})</p>
             </div>
             <div className="text-right text-[10px] font-mono text-slate-500">
-              Muka Surat: 1 / 1
+              Jumlah Ahli Dipamerkan: {filteredList.length} Orang
             </div>
           </div>
 

@@ -28,3 +28,62 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Print styles for ReportsSummary and general PDF print layouts */
+@media print {
+  html, body {
+    background-color: white !important;
+    color: black !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide regular elements on print */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Show only the print area and its contents */
+  #print-area-outlet,
+  #print-area-outlet * {
+    visibility: visible;
+  }
+
+  /* Position print area as normal static flow on the paper */
+  #print-area-outlet {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    z-index: 999999 !important;
+    background-color: white !important;
+    box-shadow: none !important;
+  }
+
+  /* Hide the close/print buttons during physical print */
+  .print\:hidden,
+  #print-area-outlet .print\:hidden,
+  #print-area-outlet button,
+  #print-area-outlet .no-print {
+    display: none !important;
+    visibility: hidden !important;
+  }
+  
+  /* Avoid breaking inside table rows across pages */
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+}
+
