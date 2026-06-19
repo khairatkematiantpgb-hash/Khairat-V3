@@ -284,7 +284,7 @@ export default function ReportsSummary({ state, onViewProfile }: ReportsSummaryP
 
           {/* Letter Head */}
           <div className="text-center border-b-2 border-slate-900 pb-5 mb-6 text-black">
-            <h1 className="text-xl font-black tracking-tight uppercase font-display">PERSATUAN KHAIRAT KEMATIAN KARIAH KAMPUNG GONG BADAK</h1>
+            <h1 className="text-xl font-black tracking-tight uppercase font-display">Pertubuhan Khairat Kematian Dan Kebajikan Kampung Gong Badak</h1>
             <p className="text-xs text-slate-600 font-medium mt-1">21300 Kuala Nerus, Terengganu Darul Iman</p>
             <p className="text-[10px] text-slate-400 font-mono mt-1">Sistem Pengurusan Khairat Kematian Tambahan | Hubungi: khairatkematiantpgb@gmail.com</p>
           </div>
