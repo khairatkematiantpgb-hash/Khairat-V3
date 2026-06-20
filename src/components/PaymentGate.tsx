@@ -90,7 +90,8 @@ export default function PaymentGate({ state, onChangeState }: PaymentGateProps) 
         const uploadPayload = {
           action: 'syncLocalToSheets',
           members: newState.members,
-          ledger: newState.ledger
+          ledger: newState.ledger,
+          kewangan: state.kewangan || []
         };
 
         const result = await writeToAppsScript(state.appsScriptUrl, uploadPayload);
@@ -98,7 +99,8 @@ export default function PaymentGate({ state, onChangeState }: PaymentGateProps) 
           onChangeState({
             ...state,
             members: result.data.members,
-            ledger: result.data.ledger
+            ledger: result.data.ledger,
+            kewangan: result.data.kewangan || state.kewangan || []
           });
           setSuccessMsg(`Resit ${noResit} berjaya disimpan di Google Sheets! ${calculatedMonths} bulan sumbangan berjaya dialokasikan.`);
           

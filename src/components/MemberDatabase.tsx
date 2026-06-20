@@ -512,7 +512,8 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
           onChangeState({
             ...state,
             members: result.data.members,
-            ledger: result.data.ledger
+            ledger: result.data.ledger,
+            kewangan: result.data.kewangan || state.kewangan || []
           });
           showToast('success', `Berjaya memadam ahli ${targetNoAhli} daripada Google Sheet secara langsung!`);
         } else {
@@ -548,7 +549,8 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
         onChangeState({
           ...state,
           members: result.data.members,
-          ledger: result.data.ledger
+          ledger: result.data.ledger,
+          kewangan: result.data.kewangan || state.kewangan || []
         });
         triggerAlert('Google Sheets berjaya dikosongkan secara sepenuhnya!');
       } else {

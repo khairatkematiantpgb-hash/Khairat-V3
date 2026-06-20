@@ -262,11 +262,12 @@ export default function App() {
       try {
         console.log('Sedang menyegerak latar belakang dari Google Sheets...');
         const result = await fetchFromAppsScript(state.appsScriptUrl!);
-        if (result.success && result.data) {
+         if (result.success && result.data) {
           const mergedState = {
             ...state,
             members: result.data.members || state.members,
-            ledger: result.data.ledger || state.ledger
+            ledger: result.data.ledger || state.ledger,
+            kewangan: result.data.kewangan || state.kewangan || []
           };
           
           const currentString = localStorage.getItem('khairat_gong_badak');

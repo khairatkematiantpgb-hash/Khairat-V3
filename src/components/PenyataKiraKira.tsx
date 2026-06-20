@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { AppState, KewanganTransaction } from '../types';
-import { PlusCircle, Trash2, Printer, Search, Calendar, FileSpreadsheet, ArrowDownCircle, ArrowUpCircle, Info, Pencil, X } from 'lucide-react';
+import { PlusCircle, Trash2, Printer, Search, Calendar, FileSpreadsheet, ArrowDownCircle, ArrowUpCircle, Info, Pencil, X, Loader2 } from 'lucide-react';
+import { writeToAppsScript } from '../lib/database';
 
 interface PenyataKiraKiraProps {
   state: AppState;
@@ -38,6 +39,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
   const [deletingTransaction, setDeletingTransaction] = useState<KewanganTransaction | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Search/Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -225,7 +227,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
   };
 
   // Handle transaction creation & update
-  const handleAddTransaction = (e: React.FormEvent) => {
+  const handleAddTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
     setFormSuccess(null);
@@ -281,19 +283,49 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
         return t;
       });
 
-      onChangeState({
-        ...state,
-        kewangan: updatedKewangan
-      });
-
-      setEditingTransactionId(null);
-      setKenyataan('');
-      setAmaunStr('');
-      setFormSuccess('Sukses! Rekod transaksi penyata kewangan telah berjaya dikemaskini.');
+      if (state.useGoogleSheets && state.appsScriptUrl) {
+        setIsSyncing(true);
+        try {
+          const uploadPayload = {
+            action: 'syncLocalToSheets',
+            members: state.members,
+            ledger: state.ledger,
+            kewangan: updatedKewangan
+          };
+          const result = await writeToAppsScript(state.appsScriptUrl, uploadPayload);
+          if (result.success && result.data) {
+            onChangeState({
+              ...state,
+              members: result.data.members || state.members,
+              ledger: result.data.ledger || state.ledger,
+              kewangan: result.data.kewangan || updatedKewangan
+            });
+            setEditingTransactionId(null);
+            setKenyataan('');
+            setAmaunStr('');
+            setFormSuccess('Sukses! Rekod transaksi penyata kewangan telah berjaya dikemaskini dan disegerakkan ke Google Sheets.');
+          } else {
+            setFormError(`Gagal dikemaskini di Google Sheet: ${result.message}`);
+          }
+        } catch (err: any) {
+          setFormError(`Gagal mensegerakkan: ${err.message || 'Ralat sambungan'}`);
+        } finally {
+          setIsSyncing(false);
+        }
+      } else {
+        onChangeState({
+          ...state,
+          kewangan: updatedKewangan
+        });
+        setEditingTransactionId(null);
+        setKenyataan('');
+        setAmaunStr('');
+        setFormSuccess('Sukses! Rekod transaksi penyata kewangan telah berjaya dikemaskini.');
+      }
     } else {
       // Add Mode
       const newTx: KewanganTransaction = {
-        id: `k-user-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        id: `k-user-${Date.now()}-${Math.floor(Math.random() * 1005)}`,
         tarikh,
         kenyataan: cleanKenyataan,
         kategoriAkaun,
@@ -302,30 +334,90 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
       };
 
       const updatedKewangan = [...transactions, newTx];
-      onChangeState({
-        ...state,
-        kewangan: updatedKewangan
-      });
 
-      setKenyataan('');
-      setAmaunStr('');
-      setFormSuccess('Sukses! Rekod transaksi penyata kewangan baharu telah berjaya ditambah.');
+      if (state.useGoogleSheets && state.appsScriptUrl) {
+        setIsSyncing(true);
+        try {
+          const uploadPayload = {
+            action: 'syncLocalToSheets',
+            members: state.members,
+            ledger: state.ledger,
+            kewangan: updatedKewangan
+          };
+          const result = await writeToAppsScript(state.appsScriptUrl, uploadPayload);
+          if (result.success && result.data) {
+            onChangeState({
+              ...state,
+              members: result.data.members || state.members,
+              ledger: result.data.ledger || state.ledger,
+              kewangan: result.data.kewangan || updatedKewangan
+            });
+            setKenyataan('');
+            setAmaunStr('');
+            setFormSuccess('Sukses! Rekod transaksi penyata kewangan baharu telah berjaya ditambah dan disegerakkan ke Google Sheets.');
+          } else {
+            setFormError(`Gagal dimuat naik ke Google Sheet: ${result.message}`);
+          }
+        } catch (err: any) {
+          setFormError(`Gagal mensegerakkan: ${err.message || 'Ralat sambungan'}`);
+        } finally {
+          setIsSyncing(false);
+        }
+      } else {
+        onChangeState({
+          ...state,
+          kewangan: updatedKewangan
+        });
+        setKenyataan('');
+        setAmaunStr('');
+        setFormSuccess('Sukses! Rekod transaksi penyata kewangan baharu telah berjaya ditambah.');
+      }
     }
   };
 
   // Handle single transaction deletion (called after custom modal confirmation)
-  const handleDeleteTransaction = (id: string) => {
+  const handleDeleteTransaction = async (id: string) => {
     if (currentRole !== 'admin') {
       setFormError('Hanya pentadbir (Admin) yang dibenarkan untuk memadam rekod transaksi.');
       return;
     }
     const updated = transactions.filter(t => t.id !== id);
-    onChangeState({
-      ...state,
-      kewangan: updated
-    });
-    setFormSuccess('Rekod transaksi dipilih telah dipadam.');
-    setDeletingTransaction(null);
+
+    if (state.useGoogleSheets && state.appsScriptUrl) {
+      setIsSyncing(true);
+      try {
+        const uploadPayload = {
+          action: 'syncLocalToSheets',
+          members: state.members,
+          ledger: state.ledger,
+          kewangan: updated
+        };
+        const result = await writeToAppsScript(state.appsScriptUrl, uploadPayload);
+        if (result.success && result.data) {
+          onChangeState({
+            ...state,
+            members: result.data.members || state.members,
+            ledger: result.data.ledger || state.ledger,
+            kewangan: result.data.kewangan || updated
+          });
+          setFormSuccess('Sukses! Rekod transaksi telah dipadam dan disegerakkan dari Google Sheets.');
+          setDeletingTransaction(null);
+        } else {
+          setFormError(`Gagal memadam di Google Sheet: ${result.message}`);
+        }
+      } catch (err: any) {
+        setFormError(`Gagal mensegerakkan: ${err.message || 'Ralat sambungan'}`);
+      } finally {
+        setIsSyncing(false);
+      }
+    } else {
+      onChangeState({
+        ...state,
+        kewangan: updated
+      });
+      setFormSuccess('Rekod transaksi dipilih telah dipadam.');
+      setDeletingTransaction(null);
+    }
   };
 
   // Format ID for Malaysian localization Currency
@@ -532,16 +624,21 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
             <div className="flex flex-col gap-2">
               <button
                 type="submit"
-                disabled={currentRole !== 'admin'}
-                className={`w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer select-none ${
+                disabled={currentRole !== 'admin' || isSyncing}
+                className={`w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer select-none flex items-center justify-center gap-2 ${
                   currentRole === 'admin'
-                    ? editingTransactionId
-                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-2xs active:scale-[0.98]'
-                      : 'bg-emerald-700 hover:bg-emerald-800 text-white shadow-2xs active:scale-[0.98]'
+                    ? isSyncing
+                      ? 'bg-slate-400 text-white cursor-not-allowed'
+                      : editingTransactionId
+                        ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-2xs active:scale-[0.98]'
+                        : 'bg-emerald-700 hover:bg-emerald-800 text-white shadow-2xs active:scale-[0.98]'
                     : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                 }`}
               >
-                {currentRole === 'admin' ? (editingTransactionId ? 'Simpan Pindaan' : 'Simpan Transaksi') : 'Sesi Pelawat (Kunci)'}
+                {isSyncing && <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />}
+                <span>
+                  {isSyncing ? 'Sedang Menyimpan...' : currentRole === 'admin' ? (editingTransactionId ? 'Simpan Pindaan' : 'Simpan Transaksi') : 'Sesi Pelawat (Kunci)'}
+                </span>
               </button>
 
               {editingTransactionId && (
@@ -1013,17 +1110,20 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
             <div className="flex items-center gap-3">
               <button
                 type="button"
+                disabled={isSyncing}
                 onClick={() => setDeletingTransaction(null)}
-                className="flex-1 py-2.5 bg-slate-150 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase rounded-xl transition-all cursor-pointer text-center select-none"
+                className="flex-1 py-2.5 bg-slate-155 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase rounded-xl transition-all cursor-pointer text-center select-none disabled:opacity-50"
               >
                 Batal
               </button>
               <button
                 type="button"
+                disabled={isSyncing}
                 onClick={() => handleDeleteTransaction(deletingTransaction.id)}
-                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs uppercase rounded-xl shadow-md active:scale-[0.98] transition-all cursor-pointer text-center select-none"
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs uppercase rounded-xl shadow-md active:scale-[0.98] transition-all cursor-pointer text-center select-none disabled:bg-slate-400 flex items-center justify-center gap-1.5"
               >
-                Ya, Padam!
+                {isSyncing && <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />}
+                <span>{isSyncing ? 'Memadam...' : 'Ya, Padam!'}</span>
               </button>
             </div>
           </div>
