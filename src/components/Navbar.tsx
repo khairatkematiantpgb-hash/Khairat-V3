@@ -30,10 +30,17 @@ export default function Navbar({ activeTab, onTabChange, state, currentRole, onL
   ];
 
   // Helper to trim down Sheet ID to look exactly like the screenshot: G1-hdkw...zg9A
-  const getDisplaySheetId = (id: string) => {
-    if (!id) return '';
-    if (id.length <= 12) return id;
-    return `${id.substring(0, 6)}...${id.substring(id.length - 4)}`;
+  const getDisplaySheetId = (id: string, appsScriptUrl?: string) => {
+    let activeId = id;
+    if (!activeId && appsScriptUrl) {
+      const match = appsScriptUrl.match(/\/s\/([^/]+)\/exec/);
+      if (match && match[1]) {
+        activeId = match[1];
+      }
+    }
+    if (!activeId) return 'Aktif';
+    if (activeId.length <= 12) return activeId;
+    return `${activeId.substring(0, 6)}...${activeId.substring(activeId.length - 4)}`;
   };
 
   return (
@@ -62,7 +69,7 @@ export default function Navbar({ activeTab, onTabChange, state, currentRole, onL
             <span className={`inline-block h-2 w-2 rounded-full ${(state.useGoogleSheets && state.appsScriptUrl) || isServerConnected === true ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
             <span>
               {state.useGoogleSheets && state.appsScriptUrl 
-                ? `Penyambungan: Google Sheets (ID: ${getDisplaySheetId(state.googleSheetsId)})`
+                ? `Penyambungan: Google Sheets (ID: ${getDisplaySheetId(state.googleSheetsId, state.appsScriptUrl)})`
                 : isServerConnected === true
                   ? 'Penyambungan: Server Pusat Bersama (Masa Nyata/Live)'
                   : typeof isServerConnected === 'string'

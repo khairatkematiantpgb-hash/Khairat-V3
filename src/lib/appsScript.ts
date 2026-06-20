@@ -127,6 +127,7 @@ function doGet(e) {
       
       return replyJSON({
         status: "success",
+        spreadsheetId: ss.getId(),
         members: members,
         ledger: ledger,
         kewangan: kewangan
@@ -312,6 +313,7 @@ function getDirectData(ss, infoMessage) {
   return replyJSON({
     status: "success",
     message: infoMessage,
+    spreadsheetId: ss.getId(),
     data: {
       members: members,
       ledger: ledger,

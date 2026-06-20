@@ -291,7 +291,7 @@ export default function App() {
     if (currentRole && state.useGoogleSheets && state.appsScriptUrl) {
       handleRefreshFromSheets();
     }
-  }, [currentRole]);
+  }, [currentRole, state.useGoogleSheets, state.appsScriptUrl]);
 
   // Handle simulated login
   const handleLogin = async (role: 'admin' | 'user') => {
