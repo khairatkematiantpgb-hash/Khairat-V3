@@ -697,7 +697,7 @@ export default function PaymentLedger({ state, onChangeState, onRefresh, syncLoa
             <p className="text-[10px] text-slate-400">Lejar bulanan yang menjejaki rekod sumbangan RM{state.kadarYuranSebulan || 3}/bulan daripada ahli berserta rujukan nombor resit. Row bermula dari Row 3.</p>
           </div>
           <div className="flex gap-2">
-            {currentRole !== 'user' && (
+            {currentRole === 'admin' && (
               <>
                 <button
                   onClick={() => {

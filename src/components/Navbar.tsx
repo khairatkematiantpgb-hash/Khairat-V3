@@ -101,8 +101,8 @@ export default function Navbar({ activeTab, onTabChange, state, currentRole, onL
         {tabs.map((tab) => {
           const isAllowed = 
             currentRole === 'admin' || 
-            tab.role === 'both' || 
-            (currentRole === 'ajk' && tab.id === 'kewangan');
+            (currentRole === 'ajk' && (tab.role === 'both' || tab.id === 'kewangan')) ||
+            (currentRole === 'user' && tab.role === 'both' && tab.id !== 'ledger');
           if (!isAllowed) return null;
 
           const isActive = activeTab === tab.id;

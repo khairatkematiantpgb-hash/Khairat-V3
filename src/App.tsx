@@ -49,6 +49,8 @@ export default function App() {
   // Admin authentication state
   const [showAdminPassInput, setShowAdminPassInput] = useState(false);
   const [adminPassAttempt, setAdminPassAttempt] = useState('');
+  const [showAjkPassInput, setShowAjkPassInput] = useState(false);
+  const [ajkPassAttempt, setAjkPassAttempt] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
 
   // 2. State Persister & Server Synchronization Hook
@@ -337,6 +339,8 @@ export default function App() {
     localStorage.removeItem('khairat_gong_badak_role_v1');
     setShowAdminPassInput(false);
     setAdminPassAttempt('');
+    setShowAjkPassInput(false);
+    setAjkPassAttempt('');
     setLoginError(null);
   };
 
@@ -350,6 +354,19 @@ export default function App() {
       setAdminPassAttempt('');
     } else {
       setLoginError('Kata laluan salah! Sila hubungi ketua pentadbir.');
+    }
+  };
+
+  const handleAjkAuthSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+    const correctPassword = state.ajkPassword || 'khairat123';
+    if (ajkPassAttempt === correctPassword) {
+      handleLogin('ajk');
+      setShowAjkPassInput(false);
+      setAjkPassAttempt('');
+    } else {
+      setLoginError('Kata laluan salah! Sila hubungi urus setia / bendahari.');
     }
   };
 
@@ -380,7 +397,7 @@ export default function App() {
             </p>
           </div>
 
-          {!showAdminPassInput ? (
+          {!showAdminPassInput && !showAjkPassInput ? (
             <div className="space-y-3 pt-3">
               <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Sila Pilih Sesi Akses Portal:</span>
               
@@ -390,6 +407,7 @@ export default function App() {
                 <button
                   onClick={() => {
                     setShowAdminPassInput(true);
+                    setShowAjkPassInput(false);
                     setAdminPassAttempt('');
                     setLoginError(null);
                   }}
@@ -406,7 +424,12 @@ export default function App() {
 
                 {/* Ahli Jawatankuasa (AJK) Button option */}
                 <button
-                  onClick={() => handleLogin('ajk')}
+                  onClick={() => {
+                    setShowAjkPassInput(true);
+                    setShowAdminPassInput(false);
+                    setAjkPassAttempt('');
+                    setLoginError(null);
+                  }}
                   className="p-3.5 bg-slate-900 hover:bg-[#1e1b4b] border border-slate-800 hover:border-amber-600/40 text-left rounded-xl group transition-all duration-150 cursor-pointer text-slate-300 hover:text-white"
                 >
                   <div className="flex justify-between items-center">
@@ -426,7 +449,7 @@ export default function App() {
                   <div className="flex justify-between items-center">
                     <div>
                       <span className="font-extrabold text-xs block group-hover:text-indigo-400">TETAMU (BACA SAHAJA)</span>
-                      <p className="text-[10px] text-slate-505 mt-0.5 leading-relaxed">Akses telus: Menyaring & menyemak status tunggakan keahlian peribadi, melihat lejar am, serta cetak Sijil Perakuan.</p>
+                      <p className="text-[10px] text-slate-555 mt-0.5 leading-relaxed">Akses telus: Menyaring & menyemak status tunggakan keahlian peribadi, melihat lejar am, serta cetak Sijil Perakuan.</p>
                     </div>
                     <LogIn className="h-4 w-4 shrink-0 text-slate-500 group-hover:text-indigo-400 transition" />
                   </div>
@@ -434,7 +457,7 @@ export default function App() {
 
               </div>
             </div>
-          ) : (
+          ) : showAdminPassInput ? (
             <form onSubmit={handleAdminAuthSubmit} className="space-y-4 pt-3 text-left">
               <div className="flex items-center gap-2 pb-1 border-b border-slate-800">
                 <button
@@ -489,6 +512,67 @@ export default function App() {
                 <button
                   type="submit"
                   className="flex-1 py-2 bg-[#047857] hover:bg-emerald-700 text-white transition rounded-xl text-[10px] font-black uppercase cursor-pointer flex items-center justify-center gap-1.5 shadow-md"
+                >
+                  <LogIn className="h-3.5 w-3.5" />
+                  Sahkan & Masuk
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form onSubmit={handleAjkAuthSubmit} className="space-y-4 pt-3 text-left">
+              <div className="flex items-center gap-2 pb-1 border-b border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAjkPassInput(false);
+                    setLoginError(null);
+                  }}
+                  className="p-1 text-slate-400 hover:text-white transition rounded cursor-pointer"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </button>
+                <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider text-amber-400">Log Masuk Ahli Jawatankuasa (AJK)</span>
+              </div>
+
+              {loginError && (
+                <div className="p-2.5 bg-rose-950/50 border border-rose-800 text-rose-300 text-[10px] font-semibold rounded-lg flex items-center gap-2">
+                  <ShieldAlert className="h-4 w-4 text-rose-500 shrink-0" />
+                  <span>{loginError}</span>
+                </div>
+              )}
+
+              <div className="space-y-1.5 focus-within:text-amber-400">
+                <label className="block text-[9.5px] font-bold text-slate-400 uppercase tracking-wider">Kata Laluan AJK (Lalai: khairat123)</label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
+                    <Lock className="h-3.8 w-3.8" />
+                  </span>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Masukkan kata laluan AJK..."
+                    className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-800 text-slate-100 text-xs rounded-xl focus:outline-none focus:border-amber-500 font-bold tracking-wider"
+                    value={ajkPassAttempt}
+                    onChange={(e) => setAjkPassAttempt(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAjkPassInput(false);
+                    setLoginError(null);
+                  }}
+                  className="flex-1 py-2 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white transition rounded-xl text-[10px] font-bold uppercase cursor-pointer text-center border border-slate-800"
+                >
+                  Kembali
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 bg-amber-600 hover:bg-amber-700 text-white transition rounded-xl text-[10px] font-black uppercase cursor-pointer flex items-center justify-center gap-1.5 shadow-md"
                 >
                   <LogIn className="h-3.5 w-3.5" />
                   Sahkan & Masuk
@@ -561,7 +645,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'ledger' && (
+          {activeTab === 'ledger' && currentRole !== 'user' && (
             <PaymentLedger
               state={state}
               onChangeState={handleChangeState}

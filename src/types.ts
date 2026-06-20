@@ -55,6 +55,7 @@ export interface AppState {
   useGoogleSheets: boolean;
   kadarYuranSebulan: number;
   adminPassword?: string;
+  ajkPassword?: string;
   kewangan?: KewanganTransaction[];
 }
 

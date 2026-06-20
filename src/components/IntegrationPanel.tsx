@@ -27,6 +27,7 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
 
   const [kadarYuranInput, setKadarYuranInput] = useState(state.kadarYuranSebulan.toString());
   const [adminPasswordInput, setAdminPasswordInput] = useState(state.adminPassword || 'gongbadak123');
+  const [ajkPasswordInput, setAjkPasswordInput] = useState(state.ajkPassword || 'khairat123');
   const [saveSettingsSuccess, setSaveSettingsSuccess] = useState(false);
   const [guestDomainChoice, setGuestDomainChoice] = useState<'vercel' | 'shared_app' | 'current'>('vercel');
   const [shortenedUrls, setShortenedUrls] = useState<Record<string, string>>({});
@@ -127,15 +128,17 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
     }
   };
 
-  // Save custom portal parameters (fee & admin password)
+  // Save custom portal parameters (fee & passwords)
   const handleUpdatePortalSettings = () => {
     const fee = parseFloat(kadarYuranInput) || 3;
     const pass = adminPasswordInput.trim() || 'gongbadak123';
+    const ajkPass = ajkPasswordInput.trim() || 'khairat123';
     
     const newState = {
       ...state,
       kadarYuranSebulan: fee,
-      adminPassword: pass
+      adminPassword: pass,
+      ajkPassword: ajkPass
     };
     onChangeState(newState);
     localStorage.setItem('khairat_gong_badak', JSON.stringify(newState));
@@ -758,14 +761,14 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
               <p className="text-[10px] text-slate-400">Konfigurasi kadar yuran semasa dan kata laluan keselamatan admin.</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {/* Fee Rate field */}
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide font-sans">
                   Kadar Yuran Bulanan (RM)
                 </label>
                 <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-505 font-bold text-xs">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-105 font-bold text-xs">
                     RM
                   </span>
                   <input
@@ -801,6 +804,28 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
                 </div>
                 <span className="text-xxs text-slate-400 block font-sans">
                   Menukar kata laluan akses pentadbir dalam gerbang log masuk.
+                </span>
+              </div>
+
+              {/* AJK security password changing */}
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide font-sans">
+                  Kata Laluan Ahli Jawatankuasa (AJK)
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                    <Key className="h-3.5 w-3.5 animate-pulse text-amber-500" />
+                  </span>
+                  <input
+                    type="text"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 text-xs rounded-lg pl-9 pr-3 py-2 outline-none focus:bg-white focus:ring-1 focus:ring-amber-500 font-bold font-mono text-[11px]"
+                    value={ajkPasswordInput}
+                    onChange={(e) => setAjkPasswordInput(e.target.value)}
+                    placeholder="khairat123"
+                  />
+                </div>
+                <span className="text-xxs text-slate-400 block font-sans">
+                  Menukar kata laluan akses Ahli Jawatankuasa (AJK).
                 </span>
               </div>
             </div>
