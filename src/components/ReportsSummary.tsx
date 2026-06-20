@@ -18,6 +18,7 @@ export default function ReportsSummary({ state, onViewProfile }: ReportsSummaryP
   const [searchQuery, setSearchQuery] = useState('');
   const [isPrinting, setIsPrinting] = useState(false);
   const [filterGroup, setFilterGroup] = useState<string>('all');
+  const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
 
   const kadarYuran = state.kadarYuranSebulan || 3;
 
@@ -258,29 +259,52 @@ export default function ReportsSummary({ state, onViewProfile }: ReportsSummaryP
         <div id="print-area-outlet" className="fixed inset-0 bg-white z-[99999] p-10 overflow-y-auto text-slate-900 font-sans print:relative print:inset-auto print:p-0 print:m-0 print:overflow-visible print:bg-white print:block print:h-auto print:w-full">
           
           {/* Print Controls Ribbon - Hides in print */}
-          <div className="mb-8 flex justify-between items-center bg-amber-50 border border-amber-200 p-4 rounded-xl print:hidden">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500 animate-pulse" />
-              <div>
-                <span className="text-xs font-bold text-amber-900 block">Mod Pratonton Dokumen (PDF)</span>
-                <span className="text-[10px] text-amber-700 block mt-0.5">Laporan sedia dicetak. Klik butang cetak di sebelah kanan untuk memilih pencetak atau simpan sebagai PDF.</span>
+          <div className="mb-8 bg-amber-50 border border-amber-200 p-5 rounded-xl print:hidden flex flex-col gap-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-550 animate-pulse shrink-0" />
+                <div>
+                  <span className="text-xs font-bold text-amber-900 block font-sans uppercase tracking-wide">Mod Pratonton Dokumen (PDF)</span>
+                  <span className="text-[10px] text-amber-700 block mt-0.5 font-sans">Laporan sedia dicetak. Klik butang cetak di sebelah kanan untuk memilih pencetak atau simpan sebagai PDF.</span>
+                </div>
+              </div>
+              <div className="flex gap-2 self-stretch md:self-auto justify-end">
+                <button
+                  onClick={() => {
+                    try {
+                      window.print();
+                    } catch (e) {
+                      console.error(e);
+                    }
+                  }}
+                  className="px-4 py-2.5 bg-slate-900 border border-slate-950 text-white rounded-lg text-xs font-black hover:bg-slate-800 cursor-pointer transition flex items-center gap-1.5 shadow-sm"
+                >
+                  <Printer className="h-4 w-4" />
+                  Cetak / Simpan PDF
+                </button>
+                <button
+                  onClick={() => setIsPrinting(false)}
+                  className="px-4 py-2.5 bg-white border border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded-lg text-xs font-bold cursor-pointer transition shadow-xxs"
+                >
+                  Batal / Tutup
+                </button>
               </div>
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => window.print()}
-                className="px-4 py-2 bg-slate-900 border border-slate-950 text-white rounded-lg text-xs font-black hover:bg-slate-800 cursor-pointer transition flex items-center gap-1.5 shadow-sm"
-              >
-                <Printer className="h-4 w-4" />
-                Cetak / Simpan PDF
-              </button>
-              <button
-                onClick={() => setIsPrinting(false)}
-                className="px-4 py-2 bg-white border border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded-lg text-xs font-bold cursor-pointer transition shadow-xxs"
-              >
-                Batal / Tutup
-              </button>
-            </div>
+
+            {isInIframe && (
+              <div className="bg-red-50 border border-red-200 text-red-900 p-4 rounded-lg text-xs leading-relaxed shadow-sm">
+                <p className="font-extrabold text-[11px] mb-1.5 uppercase tracking-wide flex items-center gap-1">
+                  🛑 MAKLUMAN PENTING (BACA JIKA TIADA PENERIMAAN POPUP MENU):
+                </p>
+                <p className="mb-2">
+                  Memandangkan aplikasi ini sedang berjalan di dalam panel <strong>Pratonton (IFrame Sandbox)</strong> AI Studio, pelayar web (browser) menghalang arahan cetakan fizikal secara langsung atas faktor keselamatan.
+                </p>
+                <ul className="list-decimal pl-5 space-y-1 font-semibold text-[11px] text-red-950">
+                  <li>Sila klik butang ikon anak panah <strong className="bg-red-100 px-1 py-0.5 rounded text-red-900 border border-red-250">"Open in a new tab"</strong> di bahagian atas kanan skrin kelabu AI Studio (luar bingkai putih aplikasi).</li>
+                  <li>Selepas aplikasi dibuka di tab berasingan, anda boleh menekan semula butang di atas untuk memanggil menu cetakan rasmi atau menyimpan terus sebagai dokumen PDF!</li>
+                </ul>
+              </div>
+            )}
           </div>
 
           {/* Letter Head */}

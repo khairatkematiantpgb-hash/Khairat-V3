@@ -29,6 +29,7 @@ export const SHORT_NAMES: { [key: string]: string } = {
 
 export default function PenyataKiraKira({ state, onChangeState, currentRole }: PenyataKiraKiraProps) {
   const transactions = state.kewangan || [];
+  const isInIframe = typeof window !== "undefined" && window.self !== window.top;
 
   // Form states
   const [tarikh, setTarikh] = useState('2026-06-20');
@@ -902,28 +903,51 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
         <div id="print-area-outlet" className="fixed inset-0 bg-white z-[99999] p-10 overflow-y-auto text-slate-900 font-sans print:relative print:inset-auto print:p-0 print:m-0 print:overflow-visible print:bg-white print:block print:h-auto print:w-full">
           
           {/* Print controls Ribbon */}
-          <div className="mb-6 flex justify-between items-center bg-amber-50 border border-amber-200 p-4 rounded-xl print:hidden">
-            <div className="flex items-center gap-2">
-              <span className="p-1 bg-amber-550 text-amber-900 rounded-lg shrink-0">⚠️</span>
-              <div>
-                <strong className="text-slate-800 text-xs block font-extrabold uppercase">Mod Pratonton Cetak Laporan Penyata</strong>
-                <p className="text-[10px] text-slate-500">Tekan butang hijau di sebelah kanan untuk memulakan dialog cetakan fizikal atau simpan sebagai dokumen PDF.</p>
+          <div className="mb-6 bg-amber-50 border border-amber-200 p-5 rounded-xl print:hidden flex flex-col gap-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="flex items-center gap-3">
+                <span className="p-2 bg-amber-500 text-amber-950 font-black rounded-lg shrink-0 text-sm">⚠️</span>
+                <div>
+                  <strong className="text-slate-800 text-xs block font-extrabold uppercase tracking-wide font-sans">Mod Pratonton Cetak Laporan Penyata</strong>
+                  <p className="text-[10px] text-slate-500 font-sans mt-0.5 animate-pulse">Sila ambil perhatian: pencetakan tidak dibenarkan terus dari dalam bingkai pratonton sandboxed.</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-stretch md:self-auto justify-end">
+                <button
+                  onClick={() => {
+                    try {
+                      window.print();
+                    } catch (e) {
+                      console.error(e);
+                    }
+                  }}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs tracking-wide uppercase rounded-xl cursor-pointer shrink-0 transition"
+                >
+                  Cetak Fizikal / Muat Turun PDF
+                </button>
+                <button
+                  onClick={() => setIsPrinting(false)}
+                  className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs tracking-wide uppercase rounded-xl cursor-pointer shrink-0 transition"
+                >
+                  Tutup Pratonton
+                </button>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => window.print()}
-                className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs tracking-wide uppercase px-4 py-2.5 rounded-xl cursor-pointer"
-              >
-                Cetak Fizikal / Muat Turun PDF
-              </button>
-              <button
-                onClick={() => setIsPrinting(false)}
-                className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs tracking-wide uppercase px-4 py-2.5 rounded-xl cursor-pointer"
-              >
-                Tutup Pratonton
-              </button>
-            </div>
+
+            {isInIframe && (
+              <div className="bg-red-50 border border-red-200 text-red-900 p-4 rounded-lg text-xs leading-relaxed shadow-sm">
+                <p className="font-extrabold text-[11px] mb-1.5 uppercase tracking-wide flex items-center gap-1">
+                  🛑 MAKLUMAN PENTING (BACA JIKA TIADA PENERIMAAN POPUP MENU):
+                </p>
+                <p className="mb-2">
+                  Memandangkan aplikasi ini sedang berjalan di dalam panel <strong>Pratonton (IFrame Sandbox)</strong> AI Studio, pelayar web (browser) menghalang arahan cetakan fizikal secara langsung atas faktor keselamatan.
+                </p>
+                <ul className="list-decimal pl-5 space-y-1 font-semibold text-[11px] text-red-950">
+                  <li>Sila klik butang ikon anak panah <strong className="bg-red-100 px-1 py-0.5 rounded text-red-900 border border-red-250">"Open in a new tab"</strong> di bahagian atas kanan skrin kelabu AI Studio (luar bingkai putih aplikasi).</li>
+                  <li>Selepas aplikasi dibuka di tab berasingan, anda boleh menekan semula butang hijau di atas untuk memanggil menu cetakan rasmi atau menyimpan terus sebagai dokumen PDF!</li>
+                </ul>
+              </div>
+            )}
           </div>
 
           {/* Letter Head */}
