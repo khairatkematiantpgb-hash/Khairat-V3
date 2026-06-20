@@ -31,47 +31,49 @@ body {
 
 /* Print styles for ReportsSummary and general PDF print layouts */
 @media print {
+  /* Hide the main React root elements entirely to prevent extra/blank pages */
+  #root,
+  .print-hide,
+  .no-print {
+    display: none !important;
+    height: 0 !important;
+    overflow: hidden !important;
+  }
+
   html, body {
     background-color: white !important;
     color: black !important;
     overflow: visible !important;
     height: auto !important;
-    min-height: 0 !important;
+    min-height: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  /* Hide regular elements on print */
-  body * {
-    visibility: hidden;
-  }
-
-  /* Show only the print area and its contents */
-  #print-area-outlet,
-  #print-area-outlet * {
-    visibility: visible;
-  }
-
-  /* Position print area as normal static flow on the paper */
+  /* Show only the print area portal container and ensure visible children */
   #print-area-outlet {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+    display: block !important;
+    position: relative !important;
+    visibility: visible !important;
     width: 100% !important;
     height: auto !important;
     max-height: none !important;
     overflow: visible !important;
-    display: block !important;
     padding: 0 !important;
     margin: 0 !important;
-    z-index: 999999 !important;
     background-color: white !important;
     box-shadow: none !important;
+    border: none !important;
+    float: none !important;
   }
 
-  /* Hide the close/print buttons during physical print */
+  #print-area-outlet * {
+    visibility: visible !important;
+  }
+
+  /* Hide print controls, headers and buttons */
   .print\:hidden,
   #print-area-outlet .print\:hidden,
   #print-area-outlet button,
@@ -80,8 +82,14 @@ body {
     visibility: hidden !important;
   }
   
-  /* Avoid breaking inside table rows across pages */
-  tr {
+  /* Avoid table rows being split across pages layout */
+  tr, .page-break-inside-avoid {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Ensure signature fields keep together where possible */
+  .grid {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }

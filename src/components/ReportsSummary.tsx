@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { AppState } from '../types';
 import { calculateOutstandingDues, isSameMemberId } from '../lib/database';
 import { FileText, AlertTriangle, Eye, Search, FileSpreadsheet, Download, Printer } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 interface ReportsSummaryProps {
   state: AppState;
@@ -253,7 +254,7 @@ export default function ReportsSummary({ state, onViewProfile }: ReportsSummaryP
     <div className="space-y-6 font-sans text-slate-800" id="reports-summary-component">
       
       {/* Printable Preview Overlay */}
-      {isPrinting && (
+      {isPrinting && createPortal(
         <div id="print-area-outlet" className="fixed inset-0 bg-white z-[99999] p-10 overflow-y-auto text-slate-900 font-sans print:relative print:inset-auto print:p-0 print:m-0 print:overflow-visible print:bg-white print:block print:h-auto print:w-full">
           
           {/* Print Controls Ribbon - Hides in print */}
@@ -376,7 +377,8 @@ export default function ReportsSummary({ state, onViewProfile }: ReportsSummaryP
             Laporan ini dijana komputer melalui Sistem Pengurusan Khairat Kematian Gong Badak tambahan pada {formattedDate} {formattedTime}. Cetakan rasmi.
           </div>
 
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Prominent Overall Arrears Panel */}

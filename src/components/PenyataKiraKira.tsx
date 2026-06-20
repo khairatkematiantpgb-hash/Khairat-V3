@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { AppState, KewanganTransaction } from '../types';
 import { PlusCircle, Trash2, Printer, Search, Calendar, FileSpreadsheet, ArrowDownCircle, ArrowUpCircle, Info, Pencil, X, Loader2 } from 'lucide-react';
 import { writeToAppsScript } from '../lib/database';
+import { createPortal } from 'react-dom';
 
 interface PenyataKiraKiraProps {
   state: AppState;
@@ -897,7 +898,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
       </div>
 
       {/* -------------------- PRINT VIEW LAPORAN PREVIEW OVERLAY -------------------- */}
-      {isPrinting && (
+      {isPrinting && createPortal(
         <div id="print-area-outlet" className="fixed inset-0 bg-white z-[99999] p-10 overflow-y-auto text-slate-900 font-sans print:relative print:inset-auto print:p-0 print:m-0 print:overflow-visible print:bg-white print:block print:h-auto print:w-full">
           
           {/* Print controls Ribbon */}
@@ -1063,7 +1064,8 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
             </div>
           </div>
 
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Custom Deletion Confirmation Modal */}
