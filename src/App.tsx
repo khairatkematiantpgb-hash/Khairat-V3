@@ -35,9 +35,9 @@ export default function App() {
     return getDefaultAppState();
   });
 
-  const [currentRole, setCurrentRole] = useState<'admin' | 'user' | null>(() => {
+  const [currentRole, setCurrentRole] = useState<'admin' | 'user' | 'ajk' | null>(() => {
     const cachedRole = localStorage.getItem('khairat_gong_badak_role_v1');
-    return (cachedRole === 'admin' || cachedRole === 'user') ? cachedRole : null; // null triggers Login Gate view
+    return (cachedRole === 'admin' || cachedRole === 'user' || cachedRole === 'ajk') ? cachedRole as any : null; // null triggers Login Gate view
   });
 
   const [activeTab, setActiveTab] = useState('overview');
@@ -294,11 +294,11 @@ export default function App() {
   }, [currentRole, state.useGoogleSheets, state.appsScriptUrl]);
 
   // Handle simulated login
-  const handleLogin = async (role: 'admin' | 'user') => {
+  const handleLogin = async (role: 'admin' | 'user' | 'ajk') => {
     setCurrentRole(role);
     localStorage.setItem('khairat_gong_badak_role_v1', role);
-    // If user is visitor (read-only), safety-switch tab to overview if it was integrasi or payment
-    if (role === 'user') {
+    // If user is visitor (read-only) or AJK (read-only with financial statement), safety-switch tab to overview if it was integrasi or payment
+    if (role === 'user' || role === 'ajk') {
       setActiveTab('overview');
     }
 
@@ -401,6 +401,20 @@ export default function App() {
                       <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">Akses penuh: Mendaftar ahli, merekod kutipan resit yuran RM3, import Excel pukal, dan menyelaraskan Google Sheets.</p>
                     </div>
                     <LogIn className="h-4 w-4 shrink-0 text-slate-500 group-hover:text-emerald-400 transition" />
+                  </div>
+                </button>
+
+                {/* Ahli Jawatankuasa (AJK) Button option */}
+                <button
+                  onClick={() => handleLogin('ajk')}
+                  className="p-3.5 bg-slate-900 hover:bg-[#1e1b4b] border border-slate-800 hover:border-amber-600/40 text-left rounded-xl group transition-all duration-150 cursor-pointer text-slate-300 hover:text-white"
+                >
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <span className="font-extrabold text-xs block group-hover:text-amber-400">AHLI JAWATANKUASA (AJK)</span>
+                      <p className="text-[10px] text-slate-550 mt-0.5 leading-relaxed font-sans">Akses laporan: Semua tab tetamu ditambah dengan Penyata Kira-Kira, serta dibenarkan mencetak PDF dan mengeksport Excel.</p>
+                    </div>
+                    <LogIn className="h-4 w-4 shrink-0 text-slate-500 group-hover:text-amber-400 transition" />
                   </div>
                 </button>
 
@@ -570,6 +584,7 @@ export default function App() {
           {activeTab === 'rumusan' && (
             <ReportsSummary
               state={state}
+              currentRole={currentRole}
               onViewProfile={(noAhli) => {
                 setSelectedMemberId(noAhli);
                 setActiveTab('profile');
@@ -577,7 +592,7 @@ export default function App() {
             />
           )}
 
-          {activeTab === 'kewangan' && currentRole === 'admin' && (
+          {activeTab === 'kewangan' && (currentRole === 'admin' || currentRole === 'ajk') && (
             <PenyataKiraKira
               state={state}
               onChangeState={handleChangeState}

@@ -13,7 +13,7 @@ interface PaymentLedgerProps {
   onChangeState: (state: AppState) => void;
   onRefresh: () => Promise<void>;
   syncLoading: boolean;
-  currentRole: 'admin' | 'user';
+  currentRole: 'admin' | 'user' | 'ajk' | null;
 }
 
 export default function PaymentLedger({ state, onChangeState, onRefresh, syncLoading, currentRole }: PaymentLedgerProps) {
@@ -784,24 +784,26 @@ export default function PaymentLedger({ state, onChangeState, onRefresh, syncLoa
           <div className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">
             Memaparkan <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-150">{filteredLedger.length} Rekod</span> untuk penapisan semasa
           </div>
-          <div className="flex gap-2 w-full sm:w-auto">
-            <button
-              onClick={downloadExcel}
-              className="flex-1 sm:flex-none px-3 py-1.5 bg-emerald-50 hover:bg-emerald-105 border border-emerald-200 text-emerald-850 text-[10px] font-black rounded transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase shadow-3xs"
-              title="Muat turun jadual lejar ke bentuk fail Excel (CSV)"
-            >
-              <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-650" />
-              <span>Muat Turun Excel</span>
-            </button>
-            <button
-              onClick={downloadPDF}
-              className="flex-1 sm:flex-none px-3 py-1.5 bg-rose-50 hover:bg-rose-105 border border-rose-200 text-rose-850 text-[10px] font-black rounded transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase shadow-3xs"
-              title="Cetak atau simpan jadual lejar ke bentuk dokumen PDF"
-            >
-              <FileText className="h-3.5 w-3.5 text-rose-655" />
-              <span>Muat Turun PDF / Cetak</span>
-            </button>
-          </div>
+          {currentRole !== 'user' && (
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button
+                onClick={downloadExcel}
+                className="flex-1 sm:flex-none px-3 py-1.5 bg-emerald-50 hover:bg-emerald-105 border border-emerald-200 text-emerald-850 text-[10px] font-black rounded transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase shadow-3xs"
+                title="Muat turun jadual lejar ke bentuk fail Excel (CSV)"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-650" />
+                <span>Muat Turun Excel</span>
+              </button>
+              <button
+                onClick={downloadPDF}
+                className="flex-1 sm:flex-none px-3 py-1.5 bg-rose-50 hover:bg-rose-105 border border-rose-200 text-rose-850 text-[10px] font-black rounded transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase shadow-3xs"
+                title="Cetak atau simpan jadual lejar ke bentuk dokumen PDF"
+              >
+                <FileText className="h-3.5 w-3.5 text-rose-655" />
+                <span>Muat Turun PDF / Cetak</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Main ledger grid table */}

@@ -11,7 +11,7 @@ interface NavbarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
   state: AppState;
-  currentRole: 'admin' | 'user';
+  currentRole: 'admin' | 'user' | 'ajk' | null;
   onLogout: () => void;
   isServerConnected?: boolean | string;
 }
@@ -81,7 +81,7 @@ export default function Navbar({ activeTab, onTabChange, state, currentRole, onL
 
           {/* Access status Indicator */}
           <div className="bg-[#022c22]/70 border border-emerald-700 px-3 py-1.5 rounded-md text-[10px] uppercase font-black tracking-wider text-emerald-300">
-            {currentRole === 'admin' ? 'Akses: Admin (Utama)' : 'Akses: Pelawat (Baca Sahaja)'}
+            {currentRole === 'admin' ? 'Akses: Admin (Utama)' : currentRole === 'ajk' ? 'Akses: Ahli Jawatankuasa' : 'Akses: Pelawat (Baca Sahaja)'}
           </div>
 
           {/* Log Out Control */}
@@ -99,7 +99,10 @@ export default function Navbar({ activeTab, onTabChange, state, currentRole, onL
       {/* Tabs Navigation panel */}
       <div className="bg-[#0f172a] text-slate-300 px-4 py-1.5 flex overflow-x-auto select-none gap-1 scrollbar-none border-b border-slate-950">
         {tabs.map((tab) => {
-          const isAllowed = tab.role === 'both' || currentRole === 'admin';
+          const isAllowed = 
+            currentRole === 'admin' || 
+            tab.role === 'both' || 
+            (currentRole === 'ajk' && tab.id === 'kewangan');
           if (!isAllowed) return null;
 
           const isActive = activeTab === tab.id;

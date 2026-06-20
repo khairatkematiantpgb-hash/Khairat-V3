@@ -12,9 +12,10 @@ import { createPortal } from 'react-dom';
 interface ReportsSummaryProps {
   state: AppState;
   onViewProfile?: (noAhli: string) => void;
+  currentRole: 'admin' | 'user' | 'ajk' | null;
 }
 
-export default function ReportsSummary({ state, onViewProfile }: ReportsSummaryProps) {
+export default function ReportsSummary({ state, onViewProfile, currentRole }: ReportsSummaryProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isPrinting, setIsPrinting] = useState(false);
   const [filterGroup, setFilterGroup] = useState<string>('all');
@@ -431,24 +432,26 @@ export default function ReportsSummary({ state, onViewProfile }: ReportsSummaryP
           </div>
 
           {/* Action buttons on the right - Merged with only "Semua Ahli" layout */}
-          <div className="flex items-center gap-1.5 self-stretch sm:self-auto ml-auto">
-            <button
-              onClick={() => setIsPrinting(true)}
-              className="px-2.5 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 text-[10px] font-bold rounded-lg cursor-pointer transition flex items-center gap-1"
-              title="Cetak Laporan Keseluruhan atau Simpan sebagai PDF"
-            >
-              <Printer className="h-3.5 w-3.5" />
-              Laporan PDF
-            </button>
-            <button
-              onClick={handleExportExcel}
-              className="px-2.5 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 text-[10px] font-bold rounded-lg cursor-pointer transition flex items-center gap-1"
-              title="Eksport data ini ke dalam fail Spreadsheet Excel/CSV"
-            >
-              <FileSpreadsheet className="h-3.5 w-3.5" />
-              Eksport Excel (CSV)
-            </button>
-          </div>
+          {currentRole !== 'user' && (
+            <div className="flex items-center gap-1.5 self-stretch sm:self-auto ml-auto">
+              <button
+                onClick={() => setIsPrinting(true)}
+                className="px-2.5 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 text-[10px] font-bold rounded-lg cursor-pointer transition flex items-center gap-1"
+                title="Cetak Laporan Keseluruhan atau Simpan sebagai PDF"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                Laporan PDF
+              </button>
+              <button
+                onClick={handleExportExcel}
+                className="px-2.5 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 text-[10px] font-bold rounded-lg cursor-pointer transition flex items-center gap-1"
+                title="Eksport data ini ke dalam fail Spreadsheet Excel/CSV"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                Eksport Excel (CSV)
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Search Filter input */}

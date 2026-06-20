@@ -7,7 +7,7 @@ import { createPortal } from 'react-dom';
 interface PenyataKiraKiraProps {
   state: AppState;
   onChangeState: (newState: AppState) => void;
-  currentRole: 'admin' | 'user' | null;
+  currentRole: 'admin' | 'user' | 'ajk' | null;
 }
 
 export const ACCOUNTS_LIST = [

@@ -13,7 +13,7 @@ interface MemberDatabaseProps {
   onChangeState: (state: AppState) => void;
   onRefresh: () => Promise<void>;
   syncLoading: boolean;
-  currentRole: 'admin' | 'user';
+  currentRole: 'admin' | 'user' | 'ajk' | null;
   onViewProfile?: (noAhli: string) => void;
 }
 
@@ -584,7 +584,7 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
             <p className="text-[10px] text-slate-400">Melihat, menapis, menyaring, dan mengemas kini senarai ahli Khairat.</p>
           </div>
           <div className="flex items-center gap-2">
-            {currentRole !== 'user' && (
+            {currentRole === 'admin' && (
               <button
                 onClick={() => {
                   setShowBulkPasteModal(true);
@@ -653,7 +653,7 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
           <div className="text-[10px] font-bold text-slate-500 uppercase tracking-tight font-sans">
             Memaparkan <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-150">{filteredMembers.length} Rekod Ahli</span> untuk penapisan semasa
           </div>
-          {currentRole === 'admin' && (
+          {currentRole !== 'user' && (
             <div className="flex gap-2 w-full sm:w-auto">
               <button
                 onClick={downloadExcel}
