@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { AppState, KewanganTransaction } from '../types';
-import { PlusCircle, Trash2, Printer, Search, Calendar, FileSpreadsheet, ArrowDownCircle, ArrowUpCircle, Info } from 'lucide-react';
+import { PlusCircle, Trash2, Printer, Search, Calendar, FileSpreadsheet, ArrowDownCircle, ArrowUpCircle, Info, Pencil, X } from 'lucide-react';
 
 interface PenyataKiraKiraProps {
   state: AppState;
@@ -36,6 +36,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
   const [amaunStr, setAmaunStr] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
+  const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
 
   // Search/Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -197,7 +198,32 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
     return Array.from(years).sort((a, b) => b.localeCompare(a));
   }, [transactions]);
 
-  // Handle transaction creation
+  // Handle entering edit mode
+  const handleStartEdit = (tx: KewanganTransaction) => {
+    if (currentRole !== 'admin') {
+      alert('Hanya pentadbir (Admin) yang dibenarkan untuk memotong atau mengedit rekod transaksi.');
+      return;
+    }
+    setEditingTransactionId(tx.id);
+    setTarikh(tx.tarikh);
+    setKenyataan(tx.kenyataan);
+    setKategoriAkaun(tx.kategoriAkaun);
+    setJenisTransaksi(tx.jenisTransaksi);
+    setAmaunStr(tx.amaun.toString());
+    setFormError(null);
+    setFormSuccess(null);
+  };
+
+  // Cancel editing mode
+  const handleCancelEdit = () => {
+    setEditingTransactionId(null);
+    setKenyataan('');
+    setAmaunStr('');
+    setFormError(null);
+    setFormSuccess(null);
+  };
+
+  // Handle transaction creation & update
   const handleAddTransaction = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -228,8 +254,8 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
     const cleanKenyataan = kenyataan.trim();
 
     // Check custom instruction rules: "Kenyataan pertama untuk setiap tahun mestilah bermula dengan 'Baki pada 1 Jan [Tahun Tersebut]'"
-    // We can inform user or check if this year has any transactions yet. If it does not, suggest or validate.
-    const yearTxs = transactions.filter(t => new Date(t.tarikh).getFullYear() === tYear);
+    // Compare with transactions excluding the one being edited
+    const yearTxs = transactions.filter(t => new Date(t.tarikh).getFullYear() === tYear && t.id !== editingTransactionId);
     if (yearTxs.length === 0) {
       const lowerKenyataan = cleanKenyataan.toLowerCase();
       if (!lowerKenyataan.startsWith('baki pada 1 jan')) {
@@ -238,24 +264,52 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
       }
     }
 
-    const newTx: KewanganTransaction = {
-      id: `k-user-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      tarikh,
-      kenyataan: cleanKenyataan,
-      kategoriAkaun,
-      jenisTransaksi,
-      amaun: value
-    };
+    if (editingTransactionId) {
+      // Update Mode
+      const updatedKewangan = transactions.map(t => {
+        if (t.id === editingTransactionId) {
+          return {
+            ...t,
+            tarikh,
+            kenyataan: cleanKenyataan,
+            kategoriAkaun,
+            jenisTransaksi,
+            amaun: value
+          };
+        }
+        return t;
+      });
 
-    const updatedKewangan = [...transactions, newTx];
-    onChangeState({
-      ...state,
-      kewangan: updatedKewangan
-    });
+      onChangeState({
+        ...state,
+        kewangan: updatedKewangan
+      });
 
-    setKenyataan('');
-    setAmaunStr('');
-    setFormSuccess('Sukses! Rekod transaksi penyata kewangan baharu telah berjaya ditambah.');
+      setEditingTransactionId(null);
+      setKenyataan('');
+      setAmaunStr('');
+      setFormSuccess('Sukses! Rekod transaksi penyata kewangan telah berjaya dikemaskini.');
+    } else {
+      // Add Mode
+      const newTx: KewanganTransaction = {
+        id: `k-user-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        tarikh,
+        kenyataan: cleanKenyataan,
+        kategoriAkaun,
+        jenisTransaksi,
+        amaun: value
+      };
+
+      const updatedKewangan = [...transactions, newTx];
+      onChangeState({
+        ...state,
+        kewangan: updatedKewangan
+      });
+
+      setKenyataan('');
+      setAmaunStr('');
+      setFormSuccess('Sukses! Rekod transaksi penyata kewangan baharu telah berjaya ditambah.');
+    }
   };
 
   // Handle single transaction deletion
@@ -325,15 +379,21 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
         </div>
       </div>
 
-      {/* Main Grid View */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      {/* Top Section Grid: Form + Ringkasan Baki */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
         
-        {/* LEFT COLUMN: Input Form */}
-        <div className="lg:col-span-4 bg-slate-50 border border-slate-100 p-5 rounded-2xl shadow-xs self-start">
+        {/* LEFT CARD: Input Form */}
+        <div className={`lg:col-span-4 border p-5 rounded-2xl shadow-xs self-start transition-colors duration-300 ${
+          editingTransactionId ? 'bg-amber-50/50 border-amber-200' : 'bg-slate-50 border-slate-100'
+        }`}>
           <div className="flex items-center gap-2 mb-4">
-            <PlusCircle className="h-4.5 w-4.5 text-emerald-600 shrink-0" />
+            {editingTransactionId ? (
+              <Pencil className="h-4.5 w-4.5 text-amber-600 shrink-0" />
+            ) : (
+              <PlusCircle className="h-4.5 w-4.5 text-emerald-600 shrink-0" />
+            )}
             <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider">
-              Daftar Transaksi Baharu
+              {editingTransactionId ? 'Kemaskini Transaksi' : 'Daftar Transaksi Baharu'}
             </h3>
           </div>
 
@@ -468,45 +528,108 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
               </div>
             )}
 
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={currentRole !== 'admin'}
-              className={`w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer select-none ${
-                currentRole === 'admin'
-                  ? 'bg-emerald-700 hover:bg-emerald-800 text-white shadow-2xs active:scale-[0.98]'
-                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-              }`}
-            >
-              {currentRole === 'admin' ? 'Simpan Transaksi' : 'Sesi Pelawat (Kunci)'}
-            </button>
+            {/* Submit & Cancel Buttons */}
+            <div className="flex flex-col gap-2">
+              <button
+                type="submit"
+                disabled={currentRole !== 'admin'}
+                className={`w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer select-none ${
+                  currentRole === 'admin'
+                    ? editingTransactionId
+                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-2xs active:scale-[0.98]'
+                      : 'bg-emerald-700 hover:bg-emerald-800 text-white shadow-2xs active:scale-[0.98]'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                }`}
+              >
+                {currentRole === 'admin' ? (editingTransactionId ? 'Simpan Pindaan' : 'Simpan Transaksi') : 'Sesi Pelawat (Kunci)'}
+              </button>
+
+              {editingTransactionId && (
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="w-full py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs uppercase rounded-xl transition-all cursor-pointer select-none"
+                >
+                  Batal Pindaan
+                </button>
+              )}
+            </div>
           </form>
         </div>
 
-        {/* RIGHT COLUMN: Ledger Table & Search Filters */}
-        <div className="lg:col-span-8 flex flex-col space-y-4 overflow-hidden">
+        {/* RIGHT CARD: Quick Stats Summary Cards + General Instructions */}
+        <div className="lg:col-span-8 flex flex-col justify-between bg-slate-50/60 border border-slate-150 p-6 rounded-2xl">
+          <div>
+            <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-2">
+              <span className="p-1 px-1.5 bg-emerald-100 text-emerald-800 rounded-md">✓</span>
+              Ringkasan Baki Semasa (RM) & Aliran Tunai
+            </h3>
+            <p className="text-xs text-slate-500 leading-relaxed max-w-2xl mb-4">
+              Nilai di bawah merupakan baki bersih terkini yang terkumpul bagi setiap akaun aktif khairat Kampung Gong Badak. Formulasi dijana secara berterusan berdasarkan jurnal lejar.
+            </p>
+          </div>
+
+          {/* Large, beautiful Quick Stats Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 my-2">
+            {ACCOUNTS_LIST.map((acc, keyIdx) => {
+              const bal = processedData.finalBalances[acc];
+              return (
+                <div key={keyIdx} className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-3xs hover:border-emerald-300 transition-all">
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block truncate" title={acc}>
+                    {SHORT_NAMES[acc]}
+                  </span>
+                  <strong className={`block text-xs md:text-sm font-mono font-black mt-2 ${bal < 0 ? 'text-rose-600' : 'text-emerald-850'}`}>
+                    RM {formatCur(bal)}
+                  </strong>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 bg-emerald-50/50 border border-emerald-100 p-4 rounded-xl flex items-start gap-3 text-xs text-emerald-850">
+            <Info className="h-4.5 w-4.5 shrink-0 mt-0.5 text-emerald-600" />
+            <div>
+              <strong className="block font-bold">Gerbang Buku Lejar Aliran Tunai & Pelaburan:</strong>
+              <p className="text-[11px] leading-relaxed text-emerald-700 mt-0.5">
+                Formulari lejar ini mengira aliran bersih (Masuk, Keluar, Baki) bagi 5 saluran akaun secara automatik mengikut aturan kronologi tarikh. Klik butang <strong className="bg-[#1e293b]/5 px-1 rounded inline-flex items-center gap-0.5 text-slate-800 font-semibold">Pencil</strong> pada senarai di bawah sekiranya ingin meminda kenyataan atau amaun sekiranya berlaku kesilapan merekod secara terus.
+              </p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Bottom Section: Wider Full-Width Ledger Table */}
+      <div className="border border-slate-200/80 rounded-2xl p-6 bg-white shadow-xs flex flex-col space-y-4">
+        
+        {/* Ribbon Header of table */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div>
+            <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Katalog Aliran Tunai & Buku Lejar Sejarah</h3>
+            <p className="text-xs text-slate-400 mt-0.5">Sejarah kronologi kemasukan, pengeluaran & baki harian bagi lima akaun pertubuhan.</p>
+          </div>
           
           {/* Filtering Ribbon */}
-          <div className="bg-slate-50 border border-slate-100 p-3 rounded-2xl flex flex-col md:flex-row gap-3 items-center justify-between">
+          <div className="flex flex-col sm:flex-row gap-3 items-center shrink-0">
             {/* Search */}
-            <div className="relative w-full md:max-w-xs">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Cari dalam kenyataan..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.8 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-400"
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-400"
               />
             </div>
 
             {/* Year Filter */}
-            <div className="flex items-center gap-2 w-full md:w-auto shrink-0 justify-end">
+            <div className="flex items-center gap-2 shrink-0 justify-end w-full sm:w-auto">
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tapis Tahun:</span>
               <select
                 value={selectedYearFilter}
                 onChange={(e) => setSelectedYearFilter(e.target.value)}
-                className="text-xs bg-white border border-slate-200 p-1.5 px-3 rounded-md focus:outline-none"
+                className="text-xs bg-slate-50 border border-slate-200 p-1.5 px-3 rounded-md focus:outline-none shadow-3xs"
               >
                 <option value="semua">Semua Transaksi</option>
                 {yearsList.map(yr => (
@@ -515,163 +638,165 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
               </select>
             </div>
           </div>
+        </div>
 
-          {/* Ledger Table with horizontal scroll */}
-          <div className="overflow-x-auto border border-slate-200/60 rounded-2xl shadow-2xs max-h-[580px]">
-            <table className="w-full text-left border-collapse table-fixed min-w-[1300px]">
-              
-              {/* Table Group Titles Column Headers */}
-              <thead className="bg-[#1e293b] text-white font-sans text-[10px] font-extrabold uppercase sticky top-0 z-10 border-b border-slate-900 shadow-xs">
+        {/* Dynamic Ledger Table Wrapper */}
+        <div className="overflow-x-auto border border-slate-200 rounded-xl shadow-2xs max-h-[640px]">
+          <table className="w-full text-left border-collapse table-fixed min-w-[1600px]">
+            
+            {/* Table Group Titles Column Headers with slightly larger typography */}
+            <thead className="bg-[#1e293b] text-white font-sans text-xs font-bold uppercase sticky top-0 z-10 border-b border-slate-900 shadow-xs">
+              <tr>
+                <th className="px-2.5 py-4.5 text-center border-r border-slate-700 w-[55px]" rowSpan={2}>BIL.</th>
+                <th className="px-2.5 py-4.5 text-center border-r border-slate-700 w-[110px]" rowSpan={2}>TARIKH</th>
+                <th className="px-4 py-4.5 border-r border-slate-700 w-[290px]" rowSpan={2}>KENYATAAN</th>
+                
+                {/* Account Header Groupings - w-[245px] is extremely roomier and prevents wrapping */}
+                {ACCOUNTS_LIST.map((acc, keyIdx) => (
+                  <th 
+                    key={keyIdx} 
+                    className="px-2 py-2.5 text-center border-r border-slate-700 w-[245px]" 
+                    colSpan={3}
+                  >
+                    <div className="truncate text-[11px] tracking-wide font-black" title={acc}>
+                      {SHORT_NAMES[acc]}
+                    </div>
+                  </th>
+                ))}
+                
+                {/* Action Column for delete */}
+                {currentRole === 'admin' && (
+                  <th className="px-3 py-4.5 text-center w-[65px] bg-[#0f172a]" rowSpan={2}>SUNTING</th>
+                )}
+              </tr>
+              <tr className="bg-[#334155] text-slate-100 text-[10px] font-bold">
+                {/* Sub Header row: Masuk | Keluar | Baki */}
+                {ACCOUNTS_LIST.map((_, idx) => (
+                  <React.Fragment key={idx}>
+                    <th className="px-2 py-2 text-right border-r border-slate-600 tracking-tight">Masuk</th>
+                    <th className="px-2 py-2 text-right border-r border-slate-600 tracking-tight text-rose-200">Keluar</th>
+                    <th className="px-2 py-2 text-right border-r border-slate-500 tracking-tight font-black bg-[#475569]">Baki</th>
+                  </React.Fragment>
+                ))}
+              </tr>
+            </thead>
+
+            {/* Table Body rows with larger font size for superb reading and clarity */}
+            <tbody className="divide-y divide-slate-100 text-[12px] font-sans font-medium text-slate-700 bg-white">
+              {filteredDisplayRows.length === 0 ? (
                 <tr>
-                  <th className="px-2 py-3 text-center border-r border-slate-700 w-[45px]" rowSpan={2}>BIL.</th>
-                  <th className="px-2 py-3 text-center border-r border-slate-700 w-[90px]" rowSpan={2}>TARIKH</th>
-                  <th className="px-3 py-3 border-r border-slate-700 w-[240px]" rowSpan={2}>KENYATAAN</th>
+                  <td colSpan={currentRole === 'admin' ? 19 : 18} className="px-10 py-20 text-center text-slate-400 italic text-sm">
+                    ⚠️ Tiada rekod transaksi dijumpai mengikut tapisan anda.
+                  </td>
+                </tr>
+              ) : (
+                filteredDisplayRows.map((row, rowIdx) => {
+                  const parsedDate = parseDateMalay(row.tarikh);
                   
-                  {/* Account Header Groupings */}
-                  {ACCOUNTS_LIST.map((acc, keyIdx) => (
-                    <th 
-                      key={keyIdx} 
-                      className="px-2 py-2 text-center border-r border-slate-700 w-[180px]" 
-                      colSpan={3}
+                  return (
+                    <tr 
+                      key={rowIdx} 
+                      className={`hover:bg-slate-50/70 transition-colors ${rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}
                     >
-                      <div className="truncate text-[9px] tracking-tight font-black" title={acc}>
-                        {SHORT_NAMES[acc]}
-                      </div>
-                    </th>
-                  ))}
-                  
-                  {/* Action Column for delete */}
-                  {currentRole === 'admin' && (
-                    <th className="px-2 py-3 text-center w-[50px] bg-[#0f172a]" rowSpan={2}>SUNTING</th>
-                  )}
-                </tr>
-                <tr className="bg-[#334155] text-slate-100 text-[8.5px]">
-                  {/* Sub Header row: Masuk | Keluar | Baki */}
-                  {ACCOUNTS_LIST.map((_, idx) => (
-                    <React.Fragment key={idx}>
-                      <th className="px-1.5 py-1.5 text-right border-r border-slate-650 tracking-tight">Masuk</th>
-                      <th className="px-1.5 py-1.5 text-right border-r border-slate-650 tracking-tight text-rose-200">Keluar</th>
-                      <th className="px-1.5 py-1.5 text-right border-r border-slate-500 tracking-tight font-black bg-[#475569]">Baki</th>
-                    </React.Fragment>
-                  ))}
-                </tr>
-              </thead>
-
-              {/* Table Body rows */}
-              <tbody className="divide-y divide-slate-100 text-[10px] font-sans font-medium text-slate-700 bg-white">
-                {filteredDisplayRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={currentRole === 'admin' ? 19 : 18} className="px-10 py-16 text-center text-slate-400 italic">
-                      Tiada rekod transaksi dijumpai mengikut tapisan anda.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredDisplayRows.map((row, rowIdx) => {
-                    const parsedDate = parseDateMalay(row.tarikh);
-                    
-                    return (
-                      <tr 
-                        key={rowIdx} 
-                        className={`hover:bg-slate-50 transition-colors ${rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/25'}`}
-                      >
-                        <td className="px-2 py-2.5 text-center font-mono text-slate-400 border-r border-slate-100">{rowIdx + 1}</td>
-                        <td className="px-2 py-2.5 text-center font-mono font-bold text-slate-600 border-r border-slate-100">{parsedDate}</td>
-                        <td className="px-3 py-2.5 text-left font-sans font-bold text-slate-800 leading-tight border-r border-slate-100">
-                          {row.kenyataan}
-                        </td>
+                      <td className="px-2.5 py-3 text-center font-mono text-slate-400 border-r border-slate-100">{rowIdx + 1}</td>
+                      <td className="px-2 py-3 text-center font-mono font-bold text-slate-600 border-r border-slate-100">{parsedDate}</td>
+                      <td className="px-4 py-3 text-left font-sans font-extrabold text-slate-800 leading-normal border-r border-slate-100">
+                        {row.kenyataan}
+                      </td>
+                      
+                      {/* 5 Accounts Columns Render */}
+                      {ACCOUNTS_LIST.map((acc, keyIdx) => {
+                        const data = row.accountsData[acc];
                         
-                        {/* 5 Accounts Columns Render */}
-                        {ACCOUNTS_LIST.map((acc, keyIdx) => {
-                          const data = row.accountsData[acc];
-                          
-                          // Custom rule for opening balance: don't show under Masuk/Keluar columns, only show directly in Baki!
-                          const showInBakiOnly = data.isBakiAwal;
-                          
-                          return (
-                            <React.Fragment key={keyIdx}>
-                              {/* MASUK column */}
-                              <td className="px-1.5 py-2.5 text-right border-r border-slate-100 font-mono font-bold text-emerald-600">
-                                {!showInBakiOnly && data.masuk ? formatCur(data.masuk) : ''}
-                              </td>
-                              {/* KELUAR column */}
-                              <td className="px-1.5 py-2.5 text-right border-r border-slate-100 font-mono font-bold text-rose-500">
-                                {!showInBakiOnly && data.keluar ? formatCur(data.keluar) : ''}
-                              </td>
-                              {/* BAKI column */}
-                              <td className="px-1.5 py-2.5 text-right border-r border-slate-200 font-mono font-black text-slate-900 bg-slate-50/60 shadow-inner">
-                                {data.hasTx ? formatCur(data.baki) : ''}
-                              </td>
-                            </React.Fragment>
-                          );
-                        })}
+                        // Custom rule for opening balance: don't show under Masuk/Keluar columns, only show directly in Baki!
+                        const showInBakiOnly = data.isBakiAwal;
+                        
+                        return (
+                          <React.Fragment key={keyIdx}>
+                            {/* MASUK column */}
+                            <td className="px-2 py-3 text-right border-r border-slate-100 font-mono font-bold text-emerald-650">
+                              {!showInBakiOnly && data.masuk ? formatCur(data.masuk) : ''}
+                            </td>
+                            {/* KELUAR column */}
+                            <td className="px-2 py-3 text-right border-r border-slate-100 font-mono font-bold text-rose-550 row-cell-keluar">
+                              {!showInBakiOnly && data.keluar ? formatCur(data.keluar) : ''}
+                            </td>
+                            {/* BAKI column */}
+                            <td className="px-2 py-3 text-right border-r border-slate-200 font-mono font-black text-slate-900 bg-slate-50/50 shadow-inner">
+                              {data.hasTx ? formatCur(data.baki) : ''}
+                            </td>
+                          </React.Fragment>
+                        );
+                      })}
 
-                        {/* Action column */}
-                        {currentRole === 'admin' && (
-                          <td className="px-2 py-2 text-center align-middle bg-slate-50 border-l border-slate-200">
-                            <div className="flex items-center justify-center gap-1.5">
-                              {row.originalTxs.map((otx) => (
+                      {/* Action column */}
+                      {currentRole === 'admin' && (
+                        <td className="px-2.5 py-2 text-center align-middle bg-slate-50 border-l border-slate-200">
+                          <div className="flex flex-col gap-1.5 items-center justify-center">
+                            {row.originalTxs.map((otx) => (
+                              <div 
+                                key={otx.id} 
+                                className={`flex items-center gap-1.5 border rounded-lg p-1 bg-white shadow-3xs hover:shadow-2xs transition-all ${
+                                  editingTransactionId === otx.id ? 'border-amber-400 ring-2 ring-amber-250 bg-amber-50/50' : 'border-slate-150'
+                                }`}
+                              >
+                                {/* Edit button */}
                                 <button
-                                  key={otx.id}
+                                  onClick={() => handleStartEdit(otx)}
+                                  className={`p-1 rounded transition-colors cursor-pointer ${
+                                    editingTransactionId === otx.id 
+                                      ? 'bg-amber-100 text-amber-800' 
+                                      : 'hover:bg-amber-50 text-amber-650'
+                                  }`}
+                                  title={`Kemaskini pergerakan ${SHORT_NAMES[otx.kategoriAkaun]} - RM ${formatCur(otx.amaun)}`}
+                                >
+                                  <Pencil className="h-3.2 w-3.2" />
+                                </button>
+                                
+                                {/* Delete button */}
+                                <button
                                   onClick={() => handleDeleteTransaction(otx.id)}
-                                  className="p-1 hover:bg-rose-100 text-rose-500 rounded transition-colors cursor-pointer"
-                                  title={`Padam pergerakan akaun ${SHORT_NAMES[otx.kategoriAkaun]} - RM ${otx.amaun}`}
+                                  className="p-1 hover:bg-rose-50 text-rose-500 rounded transition-colors cursor-pointer"
+                                  title={`Padam pergerakan ${SHORT_NAMES[otx.kategoriAkaun]} - RM ${formatCur(otx.amaun)}`}
                                 >
                                   <Trash2 className="h-3.2 w-3.2" />
                                 </button>
-                              ))}
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-
-              {/* Cumulative balance Footer */}
-              <tfoot className="bg-slate-100 font-bold border-t-2 border-slate-300 text-[10px] text-slate-800 sticky bottom-0 z-5">
-                <tr className="bg-slate-200 text-[#0f172a] uppercase font-black">
-                  <td className="px-2 py-3 text-center border-r border-slate-300" colSpan={3}>BAKI TERKUMPUL SECARA AUTOMATIK (RM)</td>
-                  
-                  {ACCOUNTS_LIST.map((acc, keyIdx) => {
-                    const currentBal = processedData.finalBalances[acc];
-                    return (
-                      <React.Fragment key={keyIdx}>
-                        <td className="px-1.5 py-3 text-right bg-slate-150 border-r border-slate-250 italic text-[8px] text-slate-500">Kutipan</td>
-                        <td className="px-1.5 py-3 text-right bg-slate-150 border-r border-slate-250 italic text-[8px] text-slate-500">Belanja</td>
-                        <td className="px-2 py-3 text-right font-mono font-black text-xs text-emerald-900 bg-emerald-100 border-r border-slate-300">
-                          {formatCur(currentBal)}
+                              </div>
+                            ))}
+                          </div>
                         </td>
-                      </React.Fragment>
-                    );
-                  })}
-                  
-                  {currentRole === 'admin' && (
-                    <td className="bg-slate-300"></td>
-                  )}
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+                      )}
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
 
-          {/* Quick Stats Grid summary cards */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            {ACCOUNTS_LIST.map((acc, keyIdx) => {
-              const bal = processedData.finalBalances[acc];
-              return (
-                <div key={keyIdx} className="bg-emerald-50/50 border border-emerald-100/70 p-3 rounded-xl flex flex-col justify-between">
-                  <span className="text-[8.5px] font-black text-slate-500 uppercase tracking-wider block truncate" title={acc}>
-                    {SHORT_NAMES[acc]}
-                  </span>
-                  <strong className={`block text-xs font-mono font-black mt-1.5 ${bal < 0 ? 'text-rose-600' : 'text-emerald-900'}`}>
-                    RM {formatCur(bal)}
-                  </strong>
-                </div>
-              );
-            })}
-          </div>
+            {/* Cumulative balance Footer */}
+            <tfoot className="bg-slate-100 font-bold border-t-2 border-slate-300 text-xs text-slate-850 sticky bottom-0 z-5">
+              <tr className="bg-slate-200 text-[#0f172a] uppercase font-black">
+                <td className="px-3 py-4 text-center border-r border-slate-300" colSpan={3}>BAKI TERKUMPUL SECARA AUTOMATIK (RM)</td>
+                
+                {ACCOUNTS_LIST.map((acc, keyIdx) => {
+                  const currentBal = processedData.finalBalances[acc];
+                  return (
+                    <React.Fragment key={keyIdx}>
+                      <td className="px-2 py-4 text-right bg-slate-150 border-r border-slate-250 italic text-[9.5px] text-slate-500">Kutipan</td>
+                      <td className="px-2 py-4 text-right bg-slate-150 border-r border-slate-250 italic text-[9.5px] text-slate-500">Belanja</td>
+                      <td className="px-2 py-4 text-right font-mono font-black text-sm text-emerald-955 bg-emerald-100/90 border-r border-slate-300 shadow-inner">
+                        {formatCur(currentBal)}
+                      </td>
+                    </React.Fragment>
+                  );
+                })}
+                
+                {currentRole === 'admin' && (
+                  <td className="bg-slate-300"></td>
+                )}
+              </tr>
+            </tfoot>
+          </table>
         </div>
-
       </div>
 
       {/* -------------------- PRINT VIEW LAPORAN PREVIEW OVERLAY -------------------- */}
