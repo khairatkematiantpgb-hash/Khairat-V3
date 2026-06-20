@@ -271,12 +271,12 @@ export default function PaymentGate({ state, onChangeState }: PaymentGateProps) 
               <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 font-bold text-xs pointer-events-none">RM</span>
               <input
                 type="number"
-                min={kadarYuran}
-                step={kadarYuran}
+                min={1}
+                step="any"
                 required
                 className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-355 text-slate-905 text-xs rounded-lg outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 font-mono font-bold"
                 value={jumlahBayaran}
-                onChange={(e) => setJumlahBayaran(Number(e.target.value) || kadarYuran)}
+                onChange={(e) => setJumlahBayaran(e.target.value === '' ? '' as any : Number(e.target.value))}
               />
             </div>
           </div>
