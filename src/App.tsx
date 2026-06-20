@@ -415,7 +415,7 @@ export default function App() {
                 >
                   <div className="flex justify-between items-center">
                     <div>
-                      <span className="font-extrabold text-xs block group-hover:text-emerald-400">PENGURUS JAWATANKUASA (ADMIN)</span>
+                      <span className="font-extrabold text-xs block group-hover:text-emerald-400">BENDAHARI (ADMIN)</span>
                       <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">Akses penuh: Mendaftar ahli, merekod kutipan resit yuran RM3, import Excel pukal, dan menyelaraskan Google Sheets.</p>
                     </div>
                     <LogIn className="h-4 w-4 shrink-0 text-slate-500 group-hover:text-emerald-400 transition" />
