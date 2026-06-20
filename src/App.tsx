@@ -15,6 +15,7 @@ import PaymentLedger from './components/PaymentLedger';
 import ProfileDashboard from './components/ProfileDashboard';
 import ReportsSummary from './components/ReportsSummary';
 import IntegrationPanel from './components/IntegrationPanel';
+import PenyataKiraKira from './components/PenyataKiraKira';
 import { ShieldAlert, LogIn, Users, HelpCircle, FileText, CheckCircle2, Lock, ArrowLeft } from 'lucide-react';
 
 export default function App() {
@@ -571,6 +572,14 @@ export default function App() {
                 setSelectedMemberId(noAhli);
                 setActiveTab('profile');
               }}
+            />
+          )}
+
+          {activeTab === 'kewangan' && currentRole === 'admin' && (
+            <PenyataKiraKira
+              state={state}
+              onChangeState={handleChangeState}
+              currentRole={currentRole}
             />
           )}
 

@@ -25,6 +25,7 @@ export default function Navbar({ activeTab, onTabChange, state, currentRole, onL
     { id: 'ledger', label: 'Rekod Jadual Pembayaran', icon: Table, role: 'both' },
     { id: 'profile', label: 'Dashboard Carian Ahli', icon: Search, role: 'both' },
     { id: 'rumusan', label: 'Rumusan Khairat', icon: FileText, role: 'both' },
+    { id: 'kewangan', label: 'Penyata Kira-Kira', icon: Table, role: 'admin' },
     { id: 'integrasi', label: 'Integrasi', icon: Settings, role: 'admin' },
   ];
 

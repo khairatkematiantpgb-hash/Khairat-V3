@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Member, LedgerRow, AppState } from '../types';
+import { Member, LedgerRow, AppState, KewanganTransaction } from '../types';
 
 export const defaultMembers: Member[] = [
   {
@@ -265,10 +265,48 @@ export const defaultLedger: LedgerRow[] = [
   }
 ];
 
+export const defaultKewangan: KewanganTransaction[] = [
+  // Baki awal pada 1 Jan 2026
+  { id: 'k-1', tarikh: '2026-01-01', kenyataan: 'Baki pada 1 Januari 2026', kategoriAkaun: 'Pelaburan Bank Rakyat (33007456390002/2024/TM/ 10.11.2026)', jenisTransaksi: 'masuk', amaun: 13579.01 },
+  { id: 'k-2', tarikh: '2026-01-01', kenyataan: 'Baki pada 1 Januari 2026', kategoriAkaun: 'Pelaburan Bank Rakyat (33007456390003/2024/TM/ 28.04.2026)', jenisTransaksi: 'masuk', amaun: 11906.00 },
+  { id: 'k-3', tarikh: '2026-01-01', kenyataan: 'Baki pada 1 Januari 2026', kategoriAkaun: 'Pelaburan Bank Rakyat (33007456390004/2024/TM/ 28.01.2026)', jenisTransaksi: 'masuk', amaun: 51729.73 },
+  { id: 'k-4', tarikh: '2026-01-01', kenyataan: 'Baki pada 1 Januari 2026', kategoriAkaun: 'Bank', jenisTransaksi: 'masuk', amaun: 13695.49 },
+  { id: 'k-5', tarikh: '2026-01-01', kenyataan: 'Baki pada 1 Januari 2026', kategoriAkaun: 'Tunai', jenisTransaksi: 'masuk', amaun: 850.79 },
+
+  // Transaksi-transaksi lain
+  { id: 'k-6', tarikh: '2026-01-09', kenyataan: 'Kematian/Kebajikan: Mohamad Nor Adzlee bin Isa', kategoriAkaun: 'Tunai', jenisTransaksi: 'keluar', amaun: 700.00 },
+  { id: 'k-7', tarikh: '2026-01-15', kenyataan: 'Kutipan Yuran Ahli: Zakaria bin Jusoh', kategoriAkaun: 'Tunai', jenisTransaksi: 'masuk', amaun: 819.00 },
+  { id: 'k-8', tarikh: '2026-01-18', kenyataan: 'Kematian/Kebajikan: Hj.Mustaffa @Abd.Rahman b.Abdullah', kategoriAkaun: 'Tunai', jenisTransaksi: 'keluar', amaun: 500.00 },
+  { id: 'k-9', tarikh: '2026-01-18', kenyataan: 'Warded: Hj.Mustaffa @Abd.Rahman b.Abdullah', kategoriAkaun: 'Tunai', jenisTransaksi: 'keluar', amaun: 50.00 },
+  { id: 'k-10', tarikh: '2026-02-05', kenyataan: 'Photostat: Mohamad bin Alias', kategoriAkaun: 'Tunai', jenisTransaksi: 'keluar', amaun: 21.60 },
+  { id: 'k-11', tarikh: '2026-02-15', kenyataan: 'Abdul Quddus b Che Abdullah', kategoriAkaun: 'Tunai', jenisTransaksi: 'keluar', amaun: 100.00 },
+  { id: 'k-12', tarikh: '2026-02-26', kenyataan: 'Kematian/Kebajikan: Muhammad Al-Ariff b.Atab', kategoriAkaun: 'Tunai', jenisTransaksi: 'keluar', amaun: 400.00 },
+  { id: 'k-13', tarikh: '2026-03-09', kenyataan: 'Kematian/Kebajikan: Azmi b. Bidin', kategoriAkaun: 'Tunai', jenisTransaksi: 'keluar', amaun: 400.00 },
+  { id: 'k-14', tarikh: '2026-03-09', kenyataan: 'Kutipan Yuran Ahli: Mohamad bin Alias', kategoriAkaun: 'Tunai', jenisTransaksi: 'masuk', amaun: 948.00 },
+  { id: 'k-15', tarikh: '2026-04-12', kenyataan: 'Warded: Sulaiman bin Ngah', kategoriAkaun: 'Tunai', jenisTransaksi: 'keluar', amaun: 80.00 },
+  { id: 'k-16', tarikh: '2026-04-23', kenyataan: 'Photostat: Mohamad bin Alias', kategoriAkaun: 'Tunai', jenisTransaksi: 'keluar', amaun: 20.40 },
+  { id: 'k-17', tarikh: '2026-05-10', kenyataan: 'Warded: Hj Abd Ghani bin Mat Amin', kategoriAkaun: 'Tunai', jenisTransaksi: 'keluar', amaun: 100.00 },
+  { id: 'k-18', tarikh: '2026-05-22', kenyataan: 'Kematian/Kebajikan: Mohd Failani bin Ismail', kategoriAkaun: 'Tunai', jenisTransaksi: 'keluar', amaun: 400.00 },
+  { id: 'k-19', tarikh: '2026-06-04', kenyataan: 'Kutipan Yuran Ahli: Mohamad bin Alias', kategoriAkaun: 'Tunai', jenisTransaksi: 'masuk', amaun: 929.00 },
+  { id: 'k-20', tarikh: '2026-06-04', kenyataan: 'Saguhati Setiausaha: Zakaria bin Jusoh (2025-2026)', kategoriAkaun: 'Tunai', jenisTransaksi: 'keluar', amaun: 600.00 },
+  { id: 'k-21', tarikh: '2026-06-04', kenyataan: 'Photostat: Zakaria bin Jusoh', kategoriAkaun: 'Tunai', jenisTransaksi: 'keluar', amaun: 73.63 },
+  { id: 'k-22', tarikh: '2026-06-06', kenyataan: 'Kutipan Yuran Ahli: Hj. Rani bin Mat', kategoriAkaun: 'Tunai', jenisTransaksi: 'masuk', amaun: 346.00 },
+  { id: 'k-23', tarikh: '2026-06-09', kenyataan: 'Kutipan Yuran Ahli: Hj. Latif bin Sulong', kategoriAkaun: 'Tunai', jenisTransaksi: 'masuk', amaun: 974.00 },
+  { id: 'k-24', tarikh: '2026-06-09', kenyataan: 'Kutipan Yuran Ahli: Hj. Mamat bin Bakar', kategoriAkaun: 'Tunai', jenisTransaksi: 'masuk', amaun: 964.00 },
+  { id: 'k-25', tarikh: '2026-06-10', kenyataan: 'Kutipan Yuran Ahli: Zakaria bin Jusoh', kategoriAkaun: 'Tunai', jenisTransaksi: 'masuk', amaun: 1629.00 },
+  { id: 'k-26', tarikh: '2026-06-11', kenyataan: 'Pengurusan: Cop Pertubuhan', kategoriAkaun: 'Tunai', jenisTransaksi: 'keluar', amaun: 90.00 },
+  { id: 'k-27', tarikh: '2026-06-11', kenyataan: 'Dividen (31.12.25-11.06.26)', kategoriAkaun: 'Bank', jenisTransaksi: 'masuk', amaun: 66.94 },
+  { id: 'k-28', tarikh: '2026-06-13', kenyataan: 'Kutipan Yuran Ahli: Hj. Wahab bin Daud', kategoriAkaun: 'Tunai', jenisTransaksi: 'masuk', amaun: 572.00 },
+  { id: 'k-29', tarikh: '2026-06-14', kenyataan: 'Kutipan Yuran Ahli: Mohamad Ghazali bin Ismail', kategoriAkaun: 'Tunai', jenisTransaksi: 'masuk', amaun: 36.00 },
+  { id: 'k-30', tarikh: '2026-06-17', kenyataan: 'Yuran Ahli :Waris Fadilas bin Shafie - PIC Zakaria Jusoh', kategoriAkaun: 'Tunai', jenisTransaksi: 'masuk', amaun: 50.00 },
+  { id: 'k-31', tarikh: '2026-06-17', kenyataan: 'Yuran Ahli : Mohamad Syafiq bin Mohamad Kabidi - PIC Zakaria Jusoh', kategoriAkaun: 'Tunai', jenisTransaksi: 'masuk', amaun: 36.00 }
+];
+
 export function getDefaultAppState(): AppState {
   return {
     members: defaultMembers,
     ledger: defaultLedger,
+    kewangan: defaultKewangan,
     useGoogleSheets: true,
     appsScriptUrl: 'https://script.google.com/macros/s/AKfycbzWl9ccXM2e39h2rjYlezESn2Y-DOtQKxu3mqVZ45b64u_NtN6yeJWTGiy5eBWspo0T/exec',
     googleSheetsId: '',

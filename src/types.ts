@@ -38,6 +38,15 @@ export interface LedgerRow {
   lebihanKredit: number;
 }
 
+export interface KewanganTransaction {
+  id: string;
+  tarikh: string; // YYYY-MM-DD
+  kenyataan: string;
+  kategoriAkaun: string; // One of the 5 categories
+  jenisTransaksi: 'masuk' | 'keluar';
+  amaun: number;
+}
+
 export interface AppState {
   members: Member[];
   ledger: LedgerRow[];
@@ -46,6 +55,7 @@ export interface AppState {
   useGoogleSheets: boolean;
   kadarYuranSebulan: number;
   adminPassword?: string;
+  kewangan?: KewanganTransaction[];
 }
 
 export const MONTH_KEYS: (keyof LedgerRow)[] = [
