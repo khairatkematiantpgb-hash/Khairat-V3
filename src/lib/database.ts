@@ -4,7 +4,7 @@
  */
 
 import { Member, LedgerRow, AppState, MONTH_KEYS } from '../types';
-import { defaultMembers, defaultLedger } from './defaultData';
+import { defaultMembers, defaultLedger, defaultKewangan } from './defaultData';
 
 const STATE_KEY = 'khairat_gong_badak';
 
@@ -169,6 +169,7 @@ export function getInitialState(): AppState {
         return {
           members,
           ledger,
+          kewangan: parsed.kewangan || defaultKewangan,
           googleSheetsId: parsed.googleSheetsId || '1sQWxn0TVSjwUZa8KkwzZi0Uv1z7CdW3O-D8rN4kJ6zI',
           appsScriptUrl: parsed.appsScriptUrl || '',
           useGoogleSheets: parsed.useGoogleSheets || false,
@@ -186,6 +187,7 @@ export function getInitialState(): AppState {
   return {
     members,
     ledger,
+    kewangan: defaultKewangan,
     googleSheetsId: '1sQWxn0TVSjwUZa8KkwzZi0Uv1z7CdW3O-D8rN4kJ6zI',
     appsScriptUrl: '',
     useGoogleSheets: false,
@@ -745,7 +747,7 @@ export function calculateOutstandingDues(noAhli: string, ledger: LedgerRow[], me
 // LIVE GOOGLE SHEET SYNC ACTIONS (FOR CALLING GOOGLE APPS SCRIPT WEB APP)
 // ============================================
 
-export async function fetchFromAppsScript(url: string): Promise<{ members: Member[]; ledger: LedgerRow[] } | null> {
+export async function fetchFromAppsScript(url: string): Promise<{ members: Member[]; ledger: LedgerRow[]; kewangan?: any[] } | null> {
   try {
     const fetchUrl = `${url}?action=getData`;
     const res = await fetch(fetchUrl);
@@ -755,7 +757,8 @@ export async function fetchFromAppsScript(url: string): Promise<{ members: Membe
       const { members, ledger } = mergeDuplicateMembersAndLedgers(data.members, data.ledger);
       return {
         members,
-        ledger
+        ledger,
+        kewangan: data.kewangan || []
       };
     }
     return null;
@@ -768,7 +771,7 @@ export async function fetchFromAppsScript(url: string): Promise<{ members: Membe
 export async function writeToAppsScript(
   url: string,
   payload: any
-): Promise<{ success: boolean; data?: { members: Member[]; ledger: LedgerRow[] }; message?: string }> {
+): Promise<{ success: boolean; data?: { members: Member[]; ledger: LedgerRow[]; kewangan?: any[] }; message?: string }> {
   try {
     const res = await fetch(url, {
       method: 'POST',

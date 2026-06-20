@@ -85,6 +85,7 @@ export default function App() {
           ...state,
           members: result.data.members || state.members,
           ledger: result.data.ledger || state.ledger,
+          kewangan: result.data.kewangan || state.kewangan || [],
           googleSheetsId: result.data.spreadsheetId || state.googleSheetsId
         };
         await handleChangeState(mergedState);

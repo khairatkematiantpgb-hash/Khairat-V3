@@ -12,6 +12,7 @@ export const APPS_SCRIPT_CODE = `/**
  * Pastikan nama tab atau helaian anda di Google Sheets adalah:
  * 1. "Pangkalan Data Ahli"  - (Mengandungi Lajur: No. Ahli, Nama, No. IC, Alamat, Status, Catatan)
  * 2. "Rekod Jadual Pembayaran (Lejar)" - (Mengandungi Lajur: No. Ahli, Nama, Tahun, JAN, FEB, MAC, APR, MEI, JUN, JUL, OGO, SEP, OKT, NOV, DIS, Lebih)
+ * 3. "Penyata Kira-Kira (Kewangan)" - (Mengandungi Lajur: ID, Tarikh, Kenyataan, Kategori Akaun, Jenis Transaksi, Amaun)
  */
 
 function setupSheets() {
@@ -34,6 +35,15 @@ function setupSheets() {
     sheetLejar.getRange("A1:P1").setBackground("#1e293b").setFontColor("#ffffff").setFontWeight("bold");
     sheetLejar.setFrozenRows(1);
   }
+
+  // 3. Setup Tab Penyata Kira-Kira jika belum ada
+  let sheetKewangan = ss.getSheetByName("Penyata Kira-Kira (Kewangan)");
+  if (!sheetKewangan) {
+    sheetKewangan = ss.insertSheet("Penyata Kira-Kira (Kewangan)");
+    sheetKewangan.appendRow(["ID", "Tarikh", "Kenyataan", "Kategori Akaun", "Jenis Transaksi", "Amaun"]);
+    sheetKewangan.getRange("A1:F1").setBackground("#475569").setFontColor("#ffffff").setFontWeight("bold");
+    sheetKewangan.setFrozenRows(1);
+  }
 }
 
 // Buka akses CORS dengan membalas respons yang betul
@@ -51,6 +61,7 @@ function doGet(e) {
     try {
       const sheetAhli = ss.getSheetByName("Pangkalan Data Ahli");
       const sheetLejar = ss.getSheetByName("Rekod Jadual Pembayaran (Lejar)");
+      const sheetKewangan = ss.getSheetByName("Penyata Kira-Kira (Kewangan)");
       
       // Ambil Rekod Ahli
       const dataAhli = sheetAhli.getDataRange().getValues();
@@ -89,11 +100,36 @@ function doGet(e) {
         }
         ledger.push(row);
       }
+
+      // Ambil Rekod Penyata Kira-Kira (Kewangan)
+      const kewangan = [];
+      if (sheetKewangan) {
+        const dataKewangan = sheetKewangan.getDataRange().getValues();
+        for (let i = 1; i < dataKewangan.length; i++) {
+          if (!dataKewangan[i][0]) continue;
+          let tarikhVal = dataKewangan[i][1];
+          let tarikhStr = "";
+          if (tarikhVal instanceof Date) {
+            tarikhStr = Utilities.formatDate(tarikhVal, Session.getScriptTimeZone(), "yyyy-MM-dd");
+          } else {
+            tarikhStr = String(tarikhVal);
+          }
+          kewangan.push({
+            id: String(dataKewangan[i][0]),
+            tarikh: tarikhStr,
+            kenyataan: String(dataKewangan[i][2]),
+            kategoriAkaun: String(dataKewangan[i][3]),
+            jenisTransaksi: String(dataKewangan[i][4]),
+            amaun: Number(dataKewangan[i][5]) || 0
+          });
+        }
+      }
       
       return replyJSON({
         status: "success",
         members: members,
-        ledger: ledger
+        ledger: ledger,
+        kewangan: kewangan
       });
     } catch (err) {
       return replyJSON({ status: "error", message: err.toString() });
@@ -117,6 +153,7 @@ function doPost(e) {
   const action = payload.action;
   const sheetAhli = ss.getSheetByName("Pangkalan Data Ahli");
   const sheetLejar = ss.getSheetByName("Rekod Jadual Pembayaran (Lejar)");
+  const sheetKewangan = ss.getSheetByName("Penyata Kira-Kira (Kewangan)");
   
   if (action === "padamAhli") {
     const noAhli = String(payload.noAhli);
@@ -148,6 +185,9 @@ function doPost(e) {
     if (sheetLejar.getLastRow() > 1) {
       sheetLejar.getRange(2, 1, sheetLejar.getLastRow() - 1, sheetLejar.getLastColumn()).clearContent();
     }
+    if (sheetKewangan && sheetKewangan.getLastRow() > 1) {
+      sheetKewangan.getRange(2, 1, sheetKewangan.getLastRow() - 1, sheetKewangan.getLastColumn()).clearContent();
+    }
     
     return getDirectData(ss, "Seluruh pangkalan data telah dikosongkan.");
   }
@@ -160,6 +200,9 @@ function doPost(e) {
       }
       if (sheetLejar.getLastRow() > 1) {
         sheetLejar.getRange(2, 1, sheetLejar.getLastRow() - 1, sheetLejar.getLastColumn()).clearContent();
+      }
+      if (sheetKewangan && sheetKewangan.getLastRow() > 1) {
+        sheetKewangan.getRange(2, 1, sheetKewangan.getLastRow() - 1, sheetKewangan.getLastColumn()).clearContent();
       }
       
       // 2. Tulis Senarai Ahli Baru
@@ -185,6 +228,15 @@ function doPost(e) {
         });
         sheetLejar.getRange(2, 1, rowsLejar.length, 16).setValues(rowsLejar);
       }
+
+      // 4. Tulis Rekod Kewangan (Penyata Kira-Kira) Baru
+      const kewangan = payload.kewangan || [];
+      if (kewangan.length > 0 && sheetKewangan) {
+        const rowsKewangan = kewangan.map(k => [
+          k.id, k.tarikh, k.kenyataan, k.kategoriAkaun, k.jenisTransaksi, Number(k.amaun) || 0
+        ]);
+        sheetKewangan.getRange(2, 1, rowsKewangan.length, 6).setValues(rowsKewangan);
+      }
       
       return getDirectData(ss, "Penyegerakan tempatan ke Cloud dwi-hala berjaya.");
     } catch (err) {
@@ -199,6 +251,7 @@ function doPost(e) {
 function getDirectData(ss, infoMessage) {
   const sheetAhli = ss.getSheetByName("Pangkalan Data Ahli");
   const sheetLejar = ss.getSheetByName("Rekod Jadual Pembayaran (Lejar)");
+  const sheetKewangan = ss.getSheetByName("Penyata Kira-Kira (Kewangan)");
   
   const dataAhli = sheetAhli.getDataRange().getValues();
   const members = [];
@@ -232,13 +285,37 @@ function getDirectData(ss, infoMessage) {
     }
     ledger.push(row);
   }
+
+  const kewangan = [];
+  if (sheetKewangan) {
+    const dataKewangan = sheetKewangan.getDataRange().getValues();
+    for (let i = 1; i < dataKewangan.length; i++) {
+      if (!dataKewangan[i][0]) continue;
+      let tarikhVal = dataKewangan[i][1];
+      let tarikhStr = "";
+      if (tarikhVal instanceof Date) {
+        tarikhStr = Utilities.formatDate(tarikhVal, Session.getScriptTimeZone(), "yyyy-MM-dd");
+      } else {
+        tarikhStr = String(tarikhVal);
+      }
+      kewangan.push({
+        id: String(dataKewangan[i][0]),
+        tarikh: tarikhStr,
+        kenyataan: String(dataKewangan[i][2]),
+        kategoriAkaun: String(dataKewangan[i][3]),
+        jenisTransaksi: String(dataKewangan[i][4]),
+        amaun: Number(dataKewangan[i][5]) || 0
+      });
+    }
+  }
   
   return replyJSON({
     status: "success",
     message: infoMessage,
     data: {
       members: members,
-      ledger: ledger
+      ledger: ledger,
+      kewangan: kewangan
     }
   });
 }

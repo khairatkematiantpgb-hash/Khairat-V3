@@ -211,7 +211,8 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
     const payload = {
       action: 'syncLocalToSheets',
       members: state.members,
-      ledger: state.ledger
+      ledger: state.ledger,
+      kewangan: state.kewangan || []
     };
 
     try {
@@ -220,7 +221,8 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
         onChangeState({
           ...state,
           members: result.data.members,
-          ledger: result.data.ledger
+          ledger: result.data.ledger,
+          kewangan: result.data.kewangan || state.kewangan || []
         });
         setTestResult({
           success: true,
