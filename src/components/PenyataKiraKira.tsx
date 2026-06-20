@@ -37,6 +37,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
+  const [deletingTransaction, setDeletingTransaction] = useState<KewanganTransaction | null>(null);
 
   // Search/Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -312,20 +313,19 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
     }
   };
 
-  // Handle single transaction deletion
+  // Handle single transaction deletion (called after custom modal confirmation)
   const handleDeleteTransaction = (id: string) => {
     if (currentRole !== 'admin') {
-      alert('Hanya pentadbir (Admin) yang dibenarkan untuk memadam rekod transaksi.');
+      setFormError('Hanya pentadbir (Admin) yang dibenarkan untuk memadam rekod transaksi.');
       return;
     }
-    if (window.confirm('Adakah anda pasti untuk memadam rekod transaksi kewangan ini?')) {
-      const updated = transactions.filter(t => t.id !== id);
-      onChangeState({
-        ...state,
-        kewangan: updated
-      });
-      setFormSuccess('Rekod transaksi dipilih telah dipadam.');
-    }
+    const updated = transactions.filter(t => t.id !== id);
+    onChangeState({
+      ...state,
+      kewangan: updated
+    });
+    setFormSuccess('Rekod transaksi dipilih telah dipadam.');
+    setDeletingTransaction(null);
   };
 
   // Format ID for Malaysian localization Currency
@@ -755,7 +755,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
                                 
                                 {/* Delete button */}
                                 <button
-                                  onClick={() => handleDeleteTransaction(otx.id)}
+                                  onClick={() => setDeletingTransaction(otx)}
                                   className="p-1 hover:bg-rose-50 text-rose-500 rounded transition-colors cursor-pointer"
                                   title={`Padam pergerakan ${SHORT_NAMES[otx.kategoriAkaun]} - RM ${formatCur(otx.amaun)}`}
                                 >
@@ -966,6 +966,67 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
             </div>
           </div>
 
+        </div>
+      )}
+
+      {/* Custom Deletion Confirmation Modal */}
+      {deletingTransaction && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 transition-opacity">
+          <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-xl max-w-md w-full animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 text-rose-650 mb-4">
+              <div className="p-2.5 bg-rose-50 text-rose-600 rounded-xl">
+                <Trash2 className="h-5 w-5 shrink-0" />
+              </div>
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">Sahkan Padam Transaksi</h4>
+                <p className="text-[10px] text-slate-400 font-sans">Tindakan ini tidak boleh dikembalikan</p>
+              </div>
+            </div>
+            
+            <p className="text-xs text-slate-655 leading-relaxed mb-4">
+              Adakah anda benar-benar pasti untuk memadamkan rekod transaksi lejar ini dari simpanan?
+            </p>
+
+            <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-150 text-[11px] space-y-2 mb-5">
+              <div className="flex justify-between">
+                <span className="text-slate-400 font-bold">Tarikh Relevan:</span>
+                <span className="font-mono font-bold text-slate-700">{parseDateMalay(deletingTransaction.tarikh)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400 font-bold">Butiran Kenyataan:</span>
+                <span className="font-extrabold text-slate-800 text-right max-w-[220px] truncate" title={deletingTransaction.kenyataan}>
+                  {deletingTransaction.kenyataan}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400 font-bold">Saluran/Akaun:</span>
+                <span className="font-black text-slate-750">{SHORT_NAMES[deletingTransaction.kategoriAkaun]}</span>
+              </div>
+              <div className="flex justify-between border-t border-slate-200 pt-2 mt-2">
+                <span className="text-slate-500 font-extrabold">Amaun Terlibat:</span>
+                <strong className={`font-mono font-black text-xs ${deletingTransaction.jenisTransaksi === 'masuk' ? 'text-emerald-700' : 'text-rose-650'}`}>
+                  {deletingTransaction.jenisTransaksi === 'masuk' ? 'MASUK' : 'KELUAR'} (RM {formatCur(deletingTransaction.amaun)})
+                </strong>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setDeletingTransaction(null)}
+                className="flex-1 py-2.5 bg-slate-150 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase rounded-xl transition-all cursor-pointer text-center select-none"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteTransaction(deletingTransaction.id)}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs uppercase rounded-xl shadow-md active:scale-[0.98] transition-all cursor-pointer text-center select-none"
+              >
+                Ya, Padam!
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
