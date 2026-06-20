@@ -848,7 +848,7 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
               
               <div className="space-y-1">
                 <span className="font-bold text-slate-800 block">Langkah A: Bina File Google Sheet</span>
-                <p className="text-slate-500 text-[11px]">Bina satu helaian Spreadsheet baru di akaun Google Drive anda. Namakan tab pertama sebagai <code className="bg-slate-100 px-1 py-0.2 rounded font-mono text-xs">Members</code> dan tab kedua sebagai <code className="bg-slate-100 px-1 py-0.2 rounded font-mono text-xs">Ledger</code>.</p>
+                <p className="text-slate-500 text-[11px]">Bina satu helaian Google Sheets kosong di Google Drive anda. Anda tidak perlu mencipta sebarang tab secara manual kerana enjin Apps Script akan menjana tab <strong>"Pangkalan Data Ahli"</strong>, <strong>"Rekod Jadual Pembayaran (Lejar)"</strong>, dan <strong>"Penyata Kira-Kira (Kewangan)"</strong> secara automatik pada larian pertama!</p>
               </div>
 
               <div className="space-y-1">
