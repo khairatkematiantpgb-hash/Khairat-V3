@@ -822,7 +822,7 @@ export default function PaymentLedger({ state, onChangeState, onRefresh, syncLoa
                 <th className="px-3 py-2 text-center min-w-[90px]">Baki Lebihan</th>
                 <th className="px-3 py-2 text-center min-w-[90px]">Tunggakan</th>
                 <th className="px-3 py-2 min-w-[120px]">Catatan</th>
-                {currentRole !== 'user' && (
+                {currentRole === 'admin' && (
                   <th className="px-3 py-2 text-center min-w-[170px]">Tindakan</th>
                 )}
               </tr>
@@ -830,7 +830,7 @@ export default function PaymentLedger({ state, onChangeState, onRefresh, syncLoa
             <tbody className="divide-y divide-slate-150 text-xs">
               {filteredLedger.length === 0 ? (
                 <tr>
-                  <td colSpan={currentRole === 'user' ? 18 : 19} className="text-center py-8 text-slate-400 font-sans italic">
+                  <td colSpan={currentRole === 'admin' ? 19 : 18} className="text-center py-8 text-slate-400 font-sans italic">
                     Tiada sebarang baris lejar yang dijumpai sepadan dengan penapisan semasa.
                   </td>
                 </tr>
@@ -917,7 +917,7 @@ export default function PaymentLedger({ state, onChangeState, onRefresh, syncLoa
                       </td>
 
                        {/* Row Specific Actions */}
-                      {currentRole !== 'user' && (
+                      {currentRole === 'admin' && (
                         <td className="px-3 py-2 text-center">
                           <div className="flex gap-1.5 justify-center items-center">
                             <button
