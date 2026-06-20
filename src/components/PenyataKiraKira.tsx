@@ -642,14 +642,14 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
 
         {/* Dynamic Ledger Table Wrapper */}
         <div className="overflow-x-auto border border-slate-200 rounded-xl shadow-2xs max-h-[640px]">
-          <table className="w-full text-left border-collapse table-fixed min-w-[1600px]">
+          <table className="w-full text-left border-collapse table-fixed min-w-[1500px]">
             
             {/* Table Group Titles Column Headers with slightly larger typography */}
             <thead className="bg-[#1e293b] text-white font-sans text-xs font-bold uppercase sticky top-0 z-10 border-b border-slate-900 shadow-xs">
               <tr>
                 <th className="px-2.5 py-4.5 text-center border-r border-slate-700 w-[55px]" rowSpan={2}>BIL.</th>
-                <th className="px-2.5 py-4.5 text-center border-r border-slate-700 w-[110px]" rowSpan={2}>TARIKH</th>
-                <th className="px-4 py-4.5 border-r border-slate-700 w-[290px]" rowSpan={2}>KENYATAAN</th>
+                <th className="px-2.5 py-4.5 text-center border-r border-slate-700 w-[95px]" rowSpan={2}>TARIKH</th>
+                <th className="px-4 py-4.5 border-r border-slate-700 w-[220px]" rowSpan={2}>KENYATAAN</th>
                 
                 {/* Account Header Groupings - w-[245px] is extremely roomier and prevents wrapping */}
                 {ACCOUNTS_LIST.map((acc, keyIdx) => (
