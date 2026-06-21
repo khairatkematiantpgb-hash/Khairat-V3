@@ -477,187 +477,189 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
         
         {/* LEFT CARD: Input Form */}
-        <div className={`lg:col-span-4 border p-5 rounded-2xl shadow-xs self-start transition-colors duration-300 ${
-          editingTransactionId ? 'bg-amber-50/50 border-amber-200' : 'bg-slate-50 border-slate-100'
-        }`}>
-          <div className="flex items-center gap-2 mb-4">
-            {editingTransactionId ? (
-              <Pencil className="h-4.5 w-4.5 text-amber-600 shrink-0" />
-            ) : (
-              <PlusCircle className="h-4.5 w-4.5 text-emerald-600 shrink-0" />
-            )}
-            <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider">
-              {editingTransactionId ? 'Kemaskini Transaksi' : 'Daftar Transaksi Baharu'}
-            </h3>
-          </div>
-
-          <form onSubmit={handleAddTransaction} className="space-y-4">
-            {/* Tarikh Input */}
-            <div>
-              <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">
-                Tarikh <span className="text-rose-500">*</span>
-              </label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
-                <input
-                  type="date"
-                  value={tarikh}
-                  onChange={(e) => setTarikh(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Kenyanyan Input */}
-            <div>
-              <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">
-                Kenyataan Perkara <span className="text-rose-500">*</span>
-              </label>
-              <textarea
-                value={kenyataan}
-                onChange={(e) => setKenyataan(e.target.value)}
-                placeholder="cth: Kutipan Yuran Ahli, Dividen, Saguhati, Kebajikan..."
-                rows={3}
-                className="w-full p-3 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none font-medium text-slate-850"
-                required
-              />
-              <div className="mt-1 bg-amber-50/70 border border-amber-200/50 p-2 rounded-lg flex items-start gap-1.5">
-                <Info className="h-3 w-3 text-amber-600 shrink-0 mt-0.5" />
-                <p className="text-[9px] text-amber-800 leading-normal">
-                  <strong>Syarat khas:</strong> Kenyataan pertama setiap tahun baru mesti bermula dengan perkataan <span className="font-mono font-bold bg-amber-100 px-1 rounded">Baki pada 1 Jan</span> untuk menetapkan baki baki pembukaan akaun.
-                </p>
-              </div>
-            </div>
-
-            {/* Kategori Akaun Dropdown */}
-            <div>
-              <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">
-                Saluran Kategori Akaun <span className="text-rose-500">*</span>
-              </label>
-              <select
-                value={kategoriAkaun}
-                onChange={(e) => setKategoriAkaun(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-              >
-                {ACCOUNTS_LIST.map((acc, idx) => (
-                  <option key={idx} value={acc}>
-                    {idx + 1}. {acc}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Jenis Transaksi Radio Button */}
-            <div>
-              <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">
-                Jenis Transaksi <span className="text-rose-500">*</span>
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <label className={`flex items-center justify-center gap-1.5 p-2 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
-                  jenisTransaksi === 'masuk'
-                    ? 'bg-emerald-50 border-emerald-500 text-emerald-800 shadow-2xs'
-                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-100'
-                }`}>
-                  <input
-                    type="radio"
-                    name="jenisTransaksi"
-                    value="masuk"
-                    checked={jenisTransaksi === 'masuk'}
-                    onChange={() => setJenisTransaksi('masuk')}
-                    className="sr-only"
-                  />
-                  <ArrowDownCircle className="h-3.5 w-3.5" />
-                  <span>Masuk</span>
-                </label>
-
-                <label className={`flex items-center justify-center gap-1.5 p-2 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
-                  jenisTransaksi === 'keluar'
-                    ? 'bg-rose-50 border-rose-500 text-rose-800 shadow-2xs'
-                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-100'
-                }`}>
-                  <input
-                    type="radio"
-                    name="jenisTransaksi"
-                    value="keluar"
-                    checked={jenisTransaksi === 'keluar'}
-                    onChange={() => setJenisTransaksi('keluar')}
-                    className="sr-only"
-                  />
-                  <ArrowUpCircle className="h-3.5 w-3.5" />
-                  <span>Keluar</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Amaun/Nilai Input */}
-            <div>
-              <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">
-                Amaun Pindahan (RM) <span className="text-rose-500">*</span>
-              </label>
-              <div className="relative">
-                <span className="absolute left-3.5 top-2 py-0.5 text-xs font-bold text-slate-400">RM</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={amaunStr}
-                  onChange={(e) => setAmaunStr(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full pl-10 pr-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono font-bold"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Alerts */}
-            {formError && (
-              <div className="bg-rose-50 border border-rose-200 text-rose-800 p-2.5 rounded-xl text-[11px] leading-relaxed font-semibold">
-                ⚠️ {formError}
-              </div>
-            )}
-
-            {formSuccess && (
-              <div className="bg-emerald-50 border border-emerald-200 text-emerald-850 p-2.5 rounded-xl text-[11px] leading-relaxed font-semibold">
-                ✅ {formSuccess}
-              </div>
-            )}
-
-            {/* Submit & Cancel Buttons */}
-            <div className="flex flex-col gap-2">
-              <button
-                type="submit"
-                disabled={currentRole !== 'admin' || isSyncing}
-                className={`w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer select-none flex items-center justify-center gap-2 ${
-                  currentRole === 'admin'
-                    ? isSyncing
-                      ? 'bg-slate-400 text-white cursor-not-allowed'
-                      : editingTransactionId
-                        ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-2xs active:scale-[0.98]'
-                        : 'bg-emerald-700 hover:bg-emerald-800 text-white shadow-2xs active:scale-[0.98]'
-                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                }`}
-              >
-                {isSyncing && <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />}
-                <span>
-                  {isSyncing ? 'Sedang Menyimpan...' : currentRole === 'admin' ? (editingTransactionId ? 'Simpan Pindaan' : 'Simpan Transaksi') : 'Sesi Pelawat (Kunci)'}
-                </span>
-              </button>
-
-              {editingTransactionId && (
-                <button
-                  type="button"
-                  onClick={handleCancelEdit}
-                  className="w-full py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs uppercase rounded-xl transition-all cursor-pointer select-none"
-                >
-                  Batal Pindaan
-                </button>
+        {currentRole === 'admin' && (
+          <div className={`lg:col-span-4 border p-5 rounded-2xl shadow-xs self-start transition-colors duration-300 ${
+            editingTransactionId ? 'bg-amber-50/50 border-amber-200' : 'bg-slate-50 border-slate-100'
+          }`}>
+            <div className="flex items-center gap-2 mb-4">
+              {editingTransactionId ? (
+                <Pencil className="h-4.5 w-4.5 text-amber-600 shrink-0" />
+              ) : (
+                <PlusCircle className="h-4.5 w-4.5 text-emerald-600 shrink-0" />
               )}
+              <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                {editingTransactionId ? 'Kemaskini Transaksi' : 'Daftar Transaksi Baharu'}
+              </h3>
             </div>
-          </form>
-        </div>
+
+            <form onSubmit={handleAddTransaction} className="space-y-4">
+              {/* Tarikh Input */}
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">
+                  Tarikh <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
+                  <input
+                    type="date"
+                    value={tarikh}
+                    onChange={(e) => setTarikh(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Kenyanyan Input */}
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">
+                  Kenyataan Perkara <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  value={kenyataan}
+                  onChange={(e) => setKenyataan(e.target.value)}
+                  placeholder="cth: Kutipan Yuran Ahli, Dividen, Saguhati, Kebajikan..."
+                  rows={3}
+                  className="w-full p-3 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none font-medium text-slate-850"
+                  required
+                />
+                <div className="mt-1 bg-amber-50/70 border border-amber-200/50 p-2 rounded-lg flex items-start gap-1.5">
+                  <Info className="h-3 w-3 text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-[9px] text-amber-800 leading-normal">
+                    <strong>Syarat khas:</strong> Kenyataan pertama setiap tahun baru mesti bermula dengan perkataan <span className="font-mono font-bold bg-amber-100 px-1 rounded">Baki pada 1 Jan</span> untuk menetapkan baki baki pembukaan akaun.
+                  </p>
+                </div>
+              </div>
+
+              {/* Kategori Akaun Dropdown */}
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">
+                  Saluran Kategori Akaun <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={kategoriAkaun}
+                  onChange={(e) => setKategoriAkaun(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                >
+                  {ACCOUNTS_LIST.map((acc, idx) => (
+                    <option key={idx} value={acc}>
+                      {idx + 1}. {acc}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Jenis Transaksi Radio Button */}
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase mb-1.5">
+                  Jenis Transaksi <span className="text-rose-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className={`flex items-center justify-center gap-1.5 p-2 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
+                    jenisTransaksi === 'masuk'
+                      ? 'bg-emerald-50 border-emerald-500 text-emerald-800 shadow-2xs'
+                      : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-100'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="jenisTransaksi"
+                      value="masuk"
+                      checked={jenisTransaksi === 'masuk'}
+                      onChange={() => setJenisTransaksi('masuk')}
+                      className="sr-only"
+                    />
+                    <ArrowDownCircle className="h-3.5 w-3.5" />
+                    <span>Masuk</span>
+                  </label>
+
+                  <label className={`flex items-center justify-center gap-1.5 p-2 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
+                    jenisTransaksi === 'keluar'
+                      ? 'bg-rose-50 border-rose-500 text-rose-800 shadow-2xs'
+                      : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-100'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="jenisTransaksi"
+                      value="keluar"
+                      checked={jenisTransaksi === 'keluar'}
+                      onChange={() => setJenisTransaksi('keluar')}
+                      className="sr-only"
+                    />
+                    <ArrowUpCircle className="h-3.5 w-3.5" />
+                    <span>Keluar</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Amaun/Nilai Input */}
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase mb-1">
+                  Amaun Pindahan (RM) <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-2 py-0.5 text-xs font-bold text-slate-400">RM</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={amaunStr}
+                    onChange={(e) => setAmaunStr(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full pl-10 pr-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono font-bold"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Alerts */}
+              {formError && (
+                <div className="bg-rose-50 border border-rose-200 text-rose-800 p-2.5 rounded-xl text-[11px] leading-relaxed font-semibold">
+                  ⚠️ {formError}
+                </div>
+              )}
+
+              {formSuccess && (
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-850 p-2.5 rounded-xl text-[11px] leading-relaxed font-semibold">
+                  ✅ {formSuccess}
+                </div>
+              )}
+
+              {/* Submit & Cancel Buttons */}
+              <div className="flex flex-col gap-2">
+                <button
+                  type="submit"
+                  disabled={currentRole !== 'admin' || isSyncing}
+                  className={`w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer select-none flex items-center justify-center gap-2 ${
+                    currentRole === 'admin'
+                      ? isSyncing
+                        ? 'bg-slate-400 text-white cursor-not-allowed'
+                        : editingTransactionId
+                          ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-2xs active:scale-[0.98]'
+                          : 'bg-emerald-700 hover:bg-emerald-800 text-white shadow-2xs active:scale-[0.98]'
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                  }`}
+                >
+                  {isSyncing && <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />}
+                  <span>
+                    {isSyncing ? 'Sedang Menyimpan...' : currentRole === 'admin' ? (editingTransactionId ? 'Simpan Pindaan' : 'Simpan Transaksi') : 'Sesi Pelawat (Kunci)'}
+                  </span>
+                </button>
+
+                {editingTransactionId && (
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    className="w-full py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs uppercase rounded-xl transition-all cursor-pointer select-none"
+                  >
+                    Batal Pindaan
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+        )}
 
         {/* RIGHT CARD: Quick Stats Summary Cards + General Instructions */}
-        <div className="lg:col-span-8 flex flex-col justify-between bg-slate-50/60 border border-slate-150 p-6 rounded-2xl">
+        <div className={`${currentRole === 'admin' ? 'lg:col-span-8' : 'lg:col-span-12'} flex flex-col justify-between bg-slate-50/60 border border-slate-150 p-6 rounded-2xl`}>
           <div>
             <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-2">
               <span className="p-1 px-1.5 bg-emerald-100 text-emerald-800 rounded-md">✓</span>
