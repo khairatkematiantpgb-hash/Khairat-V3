@@ -20,6 +20,44 @@ export default function PaymentLedger({ state, onChangeState, onRefresh, syncLoa
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedYear, setSelectedYear] = useState<string>('Semua');
 
+  // PAGINATION & SCROLLING PILOT VALUES
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
+  const tableContainerRef = React.useRef<HTMLDivElement>(null);
+  const [scrollProgress, setScrollProgress] = useState(0);
+
+  // Reset page to 1 when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedYear]);
+
+  const handleTableScroll = () => {
+    if (tableContainerRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current;
+      const maxScroll = scrollWidth - clientWidth;
+      if (maxScroll > 0) {
+        setScrollProgress((scrollLeft / maxScroll) * 100);
+      }
+    }
+  };
+
+  const scrollTableByAmount = (amount: number) => {
+    if (tableContainerRef.current) {
+      tableContainerRef.current.scrollBy({ left: amount, behavior: 'smooth' });
+    }
+  };
+
+  const handleSliderScroll = (val: number) => {
+    if (tableContainerRef.current) {
+      const { scrollWidth, clientWidth } = tableContainerRef.current;
+      const maxScroll = scrollWidth - clientWidth;
+      if (maxScroll > 0) {
+        tableContainerRef.current.scrollLeft = (val / 100) * maxScroll;
+        setScrollProgress(val);
+      }
+    }
+  };
+
   // EDIT STATE DEFINITIONS
   const [editingRow, setEditingRow] = useState<LedgerRow | null>(null);
   const [originalRowKey, setOriginalRowKey] = useState<{ noAhli: string; tahun: number } | null>(null);
@@ -387,6 +425,18 @@ export default function PaymentLedger({ state, onChangeState, onRefresh, syncLoa
       const matchesYear = selectedYear === 'Semua' || row.tahun.toString() === selectedYear;
       return matchesYear;
     });
+
+  // PAGINATION CALCULATIONS FOR LEDGER TABLE
+  const totalItems = filteredLedger.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedLedger = filteredLedger.slice(startIndex, startIndex + itemsPerPage);
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
 
   // Export table content to Excel/CSV format
   const downloadExcel = () => {
@@ -806,9 +856,48 @@ export default function PaymentLedger({ state, onChangeState, onRefresh, syncLoa
           )}
         </div>
 
+        {/* Horizontal Navigation Pilot / Scroll range slider helper */}
+        <div className="bg-slate-100/60 border-b border-slate-200 px-4 py-2 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5 text-[10px] uppercase font-black text-slate-500 tracking-wider font-sans">
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse"></span>
+            <span>Navigasi Lajur Terselindung</span>
+          </div>
+          <div className="flex items-center gap-3 w-full sm:max-w-md">
+            <button
+              type="button"
+              onClick={() => scrollTableByAmount(-200)}
+              className="p-1 px-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-200 rounded-md transition-all cursor-pointer flex items-center justify-center border border-slate-200 bg-white shadow-2xs font-sans"
+              title="Skrol Kiri"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={scrollProgress}
+              onChange={(e) => handleSliderScroll(Number(e.target.value))}
+              className="flex-1 accent-indigo-650 h-1.5 bg-slate-200 rounded-lg cursor-pointer appearance-none hover:bg-slate-350 transition-all"
+              title="Syaf Penggerak Lajur (Tarik untuk ke Kiri-Kanan)"
+            />
+            <button
+              type="button"
+              onClick={() => scrollTableByAmount(200)}
+              className="p-1 px-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-200 rounded-md transition-all cursor-pointer flex items-center justify-center border border-slate-200 bg-white shadow-2xs font-sans"
+              title="Skrol Kanan"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+
         {/* Main ledger grid table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left table-auto">
+        <div 
+          ref={tableContainerRef}
+          onScroll={handleTableScroll}
+          className="overflow-x-auto scroll-smooth pb-1"
+        >
+          <table className="w-full text-left table-auto min-w-[1250px]">
             <thead>
               <tr className="border-b border-slate-205 bg-slate-100/50 text-slate-650 text-[10px] font-bold uppercase tracking-wider font-sans">
                 <th className="px-3 py-2 text-center w-16">No. Ahli</th>
@@ -828,14 +917,14 @@ export default function PaymentLedger({ state, onChangeState, onRefresh, syncLoa
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-150 text-xs">
-              {filteredLedger.length === 0 ? (
+              {paginatedLedger.length === 0 ? (
                 <tr>
                   <td colSpan={currentRole === 'admin' ? 19 : 18} className="text-center py-8 text-slate-400 font-sans italic">
                     Tiada sebarang baris lejar yang dijumpai sepadan dengan penapisan semasa.
                   </td>
                 </tr>
               ) : (
-                filteredLedger.map((row) => {
+                paginatedLedger.map((row) => {
                   return (
                     <tr
                       key={`${row.noAhli}-${row.tahun}`}
@@ -952,6 +1041,82 @@ export default function PaymentLedger({ state, onChangeState, onRefresh, syncLoa
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Compact Table Pagination */}
+        <div className="bg-slate-55 p-2.5 border-t border-slate-150 flex flex-col sm:flex-row justify-between items-center gap-2">
+          <span className="text-[10px] text-slate-500 font-sans">
+            Menunjukkan <strong className="text-slate-800">{paginatedLedger.length}</strong> daripada{' '}
+            <strong className="text-slate-800">{totalItems}</strong> rekod pusingan pembayaran.
+          </span>
+          <div className="flex gap-1 font-sans">
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="p-1 px-1.5 text-xs text-slate-600 border border-slate-300 hover:bg-slate-100 bg-white disabled:opacity-40 rounded cursor-pointer"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+            {(() => {
+              const range: (number | string)[] = [];
+              const maxVisibleNeighbors = 1; // Show current, previous 1, next 1
+              
+              if (totalPages <= 5) {
+                for (let i = 1; i <= totalPages; i++) {
+                  range.push(i);
+                }
+              } else {
+                range.push(1);
+                
+                let start = Math.max(2, currentPage - maxVisibleNeighbors);
+                let end = Math.min(totalPages - 1, currentPage + maxVisibleNeighbors);
+                
+                if (currentPage - maxVisibleNeighbors > 2) {
+                  range.push('...');
+                }
+                
+                for (let i = start; i <= end; i++) {
+                  range.push(i);
+                }
+                
+                if (currentPage + maxVisibleNeighbors < totalPages - 1) {
+                  range.push('...');
+                }
+                
+                range.push(totalPages);
+              }
+              
+              return range.map((page, index) => {
+                if (page === '...') {
+                  return (
+                    <span key={`ellipsis-${index}`} className="px-2 py-1 text-[10px] font-bold text-slate-400 select-none flex items-center">
+                      ...
+                    </span>
+                  );
+                }
+                return (
+                  <button
+                    key={`page-${page}`}
+                    onClick={() => handlePageChange(page as number)}
+                    className={`px-2.5 py-0.5 text-[10px] font-bold rounded transition-all cursor-pointer ${
+                      currentPage === page
+                        ? 'bg-[#0f172a] text-white border border-slate-900'
+                        : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-100'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                );
+              });
+            })()}
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="p-1 px-1.5 text-xs text-slate-600 border border-slate-300 hover:bg-slate-105 bg-white disabled:opacity-40 rounded cursor-pointer"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* Ledger Bottom Summary Card */}
