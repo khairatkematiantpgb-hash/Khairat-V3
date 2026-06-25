@@ -505,7 +505,7 @@ export default function App() {
               )}
 
               <div className="space-y-1.5 focus-within:text-emerald-400">
-                <label className="block text-[9.5px] font-bold text-slate-400 uppercase tracking-wider">Kata Laluan Pentadbir (Lalai: gongbadak123)</label>
+                <label className="block text-[9.5px] font-bold text-slate-400 uppercase tracking-wider">Kata Laluan Pentadbir</label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
                     <Lock className="h-3.8 w-3.8" />
@@ -566,7 +566,7 @@ export default function App() {
               )}
 
               <div className="space-y-1.5 focus-within:text-amber-400">
-                <label className="block text-[9.5px] font-bold text-slate-400 uppercase tracking-wider">Kata Laluan AJK (Lalai: khairat123)</label>
+                <label className="block text-[9.5px] font-bold text-slate-400 uppercase tracking-wider">Kata Laluan AJK</label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
                     <Lock className="h-3.8 w-3.8" />
