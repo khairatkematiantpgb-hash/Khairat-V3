@@ -27,7 +27,26 @@ export default function App() {
     }
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        const OLD_URL_ID = 'AKfycbzWl9ccXM2e39h2rjYlezESn2Y-DOtQKxu3mqVZ45b64u_NtN6yeJWTGiy5eBWspo0T';
+        const NEW_URL = 'https://script.google.com/macros/s/AKfycbzyNGrOIKVN80Hcyb05LKTFxXCeLvzRVyF6YKKdtTYWVyyH0lCQF7otWmNfmb8rxK6r/exec';
+        const NEW_SHEET_ID = '1JLSTFs3fQ0fzZ6beESzchHbjQea0ucS4Y2gaoxRQakQ';
+        
+        let upgraded = false;
+        if (!parsed.appsScriptUrl || parsed.appsScriptUrl.includes(OLD_URL_ID) || parsed.appsScriptUrl.trim() === '') {
+          parsed.appsScriptUrl = NEW_URL;
+          upgraded = true;
+        }
+        if (!parsed.googleSheetsId || parsed.googleSheetsId.trim() === '' || parsed.googleSheetsId.startsWith('AKfycb')) {
+          parsed.googleSheetsId = NEW_SHEET_ID;
+          upgraded = true;
+        }
+        if (upgraded) {
+          console.log('Migrasi Automatik: Menetapkan Google Sheets ID & Apps Script URL terkini dalam localStorage.');
+          localStorage.setItem('khairat_gong_badak', JSON.stringify(parsed));
+          localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(parsed));
+        }
+        return parsed;
       } catch (e) {
         console.error('Error parsing cached state, resetting...', e);
       }
@@ -121,7 +140,7 @@ export default function App() {
       } catch (err) {
         console.error('Failed to parse URL query script URL parameter:', err);
       }
-    } else if (!state.appsScriptUrl || state.appsScriptUrl.trim() === '') {
+    } else if (!state.appsScriptUrl || state.appsScriptUrl.trim() === '' || state.appsScriptUrl.includes('AKfycbzWl9ccXM2e39h2rjYlezESn2Y-DOtQKxu3mqVZ45b64u_NtN6yeJWTGiy5eBWspo0T')) {
       // Jika pengguna melayari URL bersih (m.g. / sahaja) tanpa sebarang parametre, dan tiada pautan tersimpan,
       // kita setkan pautan Google Sheets lalai secara automatik supaya mereka tidak mendapat ralat 404!
       decodedUrl = DEFAULT_APPS_SCRIPT_URL;
@@ -142,7 +161,8 @@ export default function App() {
       const updatedState = {
         ...currentState,
         useGoogleSheets: true,
-        appsScriptUrl: decodedUrl
+        appsScriptUrl: decodedUrl,
+        googleSheetsId: '1JLSTFs3fQ0fzZ6beESzchHbjQea0ucS4Y2gaoxRQakQ'
       };
       
       setState(updatedState);
