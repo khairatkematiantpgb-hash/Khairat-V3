@@ -308,8 +308,8 @@ export function getDefaultAppState(): AppState {
     ledger: defaultLedger,
     kewangan: defaultKewangan,
     useGoogleSheets: true,
-    appsScriptUrl: 'https://script.google.com/macros/s/AKfycbzWl9ccXM2e39h2rjYlezESn2Y-DOtQKxu3mqVZ45b64u_NtN6yeJWTGiy5eBWspo0T/exec',
-    googleSheetsId: '',
+    appsScriptUrl: 'https://script.google.com/macros/s/AKfycbzyNGrOIKVN80Hcyb05LKTFxXCeLvzRVyF6YKKdtTYWVyyH0lCQF7otWmNfmb8rxK6r/exec',
+    googleSheetsId: '1JLSTFs3fQ0fzZ6beESzchHbjQea0ucS4Y2gaoxRQakQ',
     kadarYuranSebulan: 3,
     adminPassword: 'gongbadak123',
     ajkPassword: 'khairat123'

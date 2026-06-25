@@ -107,7 +107,7 @@ export default function App() {
     const scriptUrlParam = params.get('script') || params.get('s');
     
     // Default Apps Script URL terbaharu yang sahih dan aktif bagi Kampung Gong Badak
-    const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzWl9ccXM2e39h2rjYlezESn2Y-DOtQKxu3mqVZ45b64u_NtN6yeJWTGiy5eBWspo0T/exec';
+    const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzyNGrOIKVN80Hcyb05LKTFxXCeLvzRVyF6YKKdtTYWVyyH0lCQF7otWmNfmb8rxK6r/exec';
     
     let needsUpdate = false;
     let decodedUrl = '';
@@ -264,26 +264,30 @@ export default function App() {
       try {
         console.log('Sedang menyegerak latar belakang dari Google Sheets...');
         const result = await fetchFromAppsScript(state.appsScriptUrl!);
-         if (result.success && result.data) {
-          const mergedState = {
-            ...state,
-            members: result.data.members || state.members,
-            ledger: result.data.ledger || state.ledger,
-            kewangan: result.data.kewangan || state.kewangan || []
-          };
-          
-          const currentString = localStorage.getItem('khairat_gong_badak');
-          const newString = JSON.stringify(mergedState);
-          if (currentString !== newString) {
-            setState(mergedState);
-            localStorage.setItem('khairat_gong_badak', newString);
-            localStorage.setItem('khairat_gong_badak_state_v1', newString);
-          }
+        if (result.success && result.data) {
+          setState(prevState => {
+            const mergedState = {
+              ...prevState,
+              members: result.data.members || prevState.members,
+              ledger: result.data.ledger || prevState.ledger,
+              kewangan: result.data.kewangan || prevState.kewangan || [],
+              googleSheetsId: result.data.spreadsheetId || prevState.googleSheetsId
+            };
+            
+            const currentString = localStorage.getItem('khairat_gong_badak');
+            const newString = JSON.stringify(mergedState);
+            if (currentString !== newString) {
+              localStorage.setItem('khairat_gong_badak', newString);
+              localStorage.setItem('khairat_gong_badak_state_v1', newString);
+              return mergedState;
+            }
+            return prevState;
+          });
         }
       } catch (e) {
         console.warn('Gagal melakukan segelong latar belakang Google Sheets:', e);
       }
-    }, 25000); // Segelong setiap 25 saat
+    }, 15000); // Segelong setiap 15 saat
 
     return () => clearInterval(sheetsPollInterval);
   }, [currentRole, state.useGoogleSheets, state.appsScriptUrl]);
