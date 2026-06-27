@@ -879,6 +879,12 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
                     <option value="Anak">Anak</option>
                     <option value="Ibu">Ibu</option>
                     <option value="Bapa">Bapa</option>
+                    <option value="Adik">Adik</option>
+                    <option value="Abang">Abang</option>
+                    <option value="Kakak">Kakak</option>
+                    <option value="Nenek">Nenek</option>
+                    <option value="Datuk">Datuk</option>
+                    <option value="Mentua">Mentua</option>
                     <option value="Lain-lain">Lain-lain</option>
                   </select>
                 </div>
