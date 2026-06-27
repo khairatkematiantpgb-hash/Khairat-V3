@@ -22,6 +22,7 @@ export default function Overview({ state, onChangeState, onNavigate, currentRole
   const [ic, setIc] = useState('');
   const [alamat, setAlamat] = useState('');
   const [status, setStatus] = useState('Aktif');
+  const [tel, setTel] = useState('');
 
   const monthsMalay = [
     'Januari', 'Februari', 'Mac', 'April', 'Mei', 'Jun',
@@ -97,7 +98,8 @@ export default function Overview({ state, onChangeState, onNavigate, currentRole
       alamat,
       status,
       tanggungan: validTanggungan,
-      catatan: catatanPendaftaran
+      catatan: catatanPendaftaran,
+      tel
     });
 
     if (error) {
@@ -112,6 +114,7 @@ export default function Overview({ state, onChangeState, onNavigate, currentRole
       setIc('');
       setAlamat('');
       setStatus('Aktif');
+      setTel('');
       setBulanDaftar(new Date().getMonth());
       setTahunDaftar(new Date().getFullYear());
       setTanggunganList([
@@ -310,19 +313,37 @@ export default function Overview({ state, onChangeState, onNavigate, currentRole
                 />
               </div>
 
-              {/* No. IC */}
-              <div className="space-y-1 font-sans">
-                <label className="block text-[10px] font-bold text-slate-500 uppercase">
-                  No. Kad Pengenalan <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Contoh: 821012-11-5431"
-                  className="w-full bg-slate-50 border border-slate-300 text-slate-900 text-xs rounded px-3 py-2 outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 font-mono text-[11px]"
-                  value={ic}
-                  onChange={(e) => setIc(e.target.value)}
-                />
+              {/* No. IC & No. Telefon Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-sans">
+                {/* No. IC */}
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase">
+                    No. Kad Pengenalan <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: 821012-11-5431"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 text-xs rounded px-3 py-2 outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 font-mono text-[11px]"
+                    value={ic}
+                    onChange={(e) => setIc(e.target.value)}
+                  />
+                </div>
+
+                {/* No. Telefon */}
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase">
+                    No. Telefon <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="Contoh: 013-9876543"
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 text-xs rounded px-3 py-2 outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 font-mono text-[11px]"
+                    value={tel}
+                    onChange={(e) => setTel(e.target.value)}
+                  />
+                </div>
               </div>
 
               {/* Alamat */}

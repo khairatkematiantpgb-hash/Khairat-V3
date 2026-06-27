@@ -17,6 +17,7 @@ export interface Member {
   status: string; // 'Aktif' | 'Tidak Aktif'
   catatan?: string;
   tanggungan?: Tanggungan[];
+  tel?: string;
 }
 
 export interface LedgerRow {

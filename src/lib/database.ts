@@ -267,9 +267,9 @@ export function fillMissingLedgerRows(members: Member[], ledger: LedgerRow[]): L
 // 1. DAFTAR AHLI BARU (React state implementation)
 export function runDaftarAhliBaru(
   state: AppState,
-  params: { noAhli: string; nama: string; ic: string; alamat: string; status: string; tanggungan?: Tanggungan[]; catatan?: string }
+  params: { noAhli: string; nama: string; ic: string; alamat: string; status: string; tanggungan?: Tanggungan[]; catatan?: string; tel?: string }
 ): { newState: AppState; error?: string } {
-  const { nama, ic, alamat, status, tanggungan, catatan } = params;
+  const { nama, ic, alamat, status, tanggungan, catatan, tel } = params;
   const noAhli = normalizeMemberId(params.noAhli);
 
   // Validation
@@ -310,7 +310,8 @@ export function runDaftarAhliBaru(
     alamat: alamat.trim(),
     status: status || 'Aktif',
     tanggungan: tanggungan || [],
-    catatan: catatan || ''
+    catatan: catatan || '',
+    tel: tel?.trim() || ''
   };
 
   const currentYear = new Date().getFullYear();
@@ -478,9 +479,10 @@ export function runKemaskiniMaklumatAhli(
     statusBaru: string;
     catatanBaru?: string;
     tanggunganBaru?: Tanggungan[];
+    telBaru?: string;
   }
 ): { newState: AppState; error?: string } {
-  const { noAhli, namaBaru, icBaru, alamatBaru, statusBaru, catatanBaru, tanggunganBaru } = params;
+  const { noAhli, namaBaru, icBaru, alamatBaru, statusBaru, catatanBaru, tanggunganBaru, telBaru } = params;
 
   const cleanNoAhli = normalizeMemberId(noAhli);
   if (!cleanNoAhli) {
@@ -489,7 +491,8 @@ export function runKemaskiniMaklumatAhli(
 
   const isCatatanNew = catatanBaru !== undefined;
   const isTanggunganNew = tanggunganBaru !== undefined;
-  if (!namaBaru.trim() && !icBaru.trim() && !alamatBaru.trim() && !statusBaru.trim() && (!isCatatanNew) && (!isTanggunganNew)) {
+  const isTelNew = telBaru !== undefined;
+  if (!namaBaru.trim() && !icBaru.trim() && !alamatBaru.trim() && !statusBaru.trim() && (!isCatatanNew) && (!isTanggunganNew) && (!isTelNew)) {
     return { newState: state, error: 'Sila masukkan sekurang-kurangnya satu medan maklumat baru!' };
   }
 
@@ -507,6 +510,7 @@ export function runKemaskiniMaklumatAhli(
   if (statusBaru.trim()) targetMember.status = statusBaru.trim();
   if (catatanBaru !== undefined) targetMember.catatan = catatanBaru.trim();
   if (tanggunganBaru !== undefined) targetMember.tanggungan = tanggunganBaru;
+  if (telBaru !== undefined) targetMember.tel = telBaru.trim();
 
   updatedMembers[memberIndex] = targetMember;
 

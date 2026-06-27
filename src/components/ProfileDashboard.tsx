@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AppState, Member, Tanggungan, MONTH_KEYS, MONTH_LABELS } from '../types';
 import { calculateOutstandingDues, isSameMemberId, runKemaskiniMaklumatAhli } from '../lib/database';
-import { Search, User, ShieldCheck, CheckCircle2, AlertCircle, FileText, Printer, MapPin, CreditCard, PlusCircle, Trash2, Edit2, Users, Check, X, Plus } from 'lucide-react';
+import { Search, User, ShieldCheck, CheckCircle2, AlertCircle, FileText, Printer, MapPin, CreditCard, PlusCircle, Trash2, Edit2, Users, Check, X, Plus, Phone } from 'lucide-react';
 
 interface ProfileDashboardProps {
   state: AppState;
@@ -170,6 +170,7 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
   const [editAlamat, setEditAlamat] = useState('');
   const [editStatus, setEditStatus] = useState('');
   const [editCatatan, setEditCatatan] = useState('');
+  const [editTel, setEditTel] = useState('');
 
   const openEditMemberModal = () => {
     if (!finalMember) return;
@@ -178,6 +179,7 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
     setEditAlamat(finalMember.alamat);
     setEditStatus(finalMember.status);
     setEditCatatan(finalMember.catatan || '');
+    setEditTel(finalMember.tel || '');
     setShowEditMemberModal(true);
   };
 
@@ -191,7 +193,8 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
       icBaru: editIc,
       alamatBaru: editAlamat,
       statusBaru: editStatus,
-      catatanBaru: editCatatan
+      catatanBaru: editCatatan,
+      telBaru: editTel
     });
 
     if (error) {
@@ -519,6 +522,14 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
                 </div>
               </div>
 
+              <div className="flex gap-2.5">
+                <Phone className="h-4 w-4 text-slate-400 shrink-0" />
+                <div className="space-y-0.5">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">No. Telefon</span>
+                  <p className="text-slate-700 font-mono tracking-tight font-bold">{finalMember.tel || <span className="text-slate-400 italic font-normal">Tiada</span>}</p>
+                </div>
+              </div>
+
               {finalMember.catatan && (
                 <div className="p-2.5 bg-slate-50 border border-slate-100 rounded text-[11px] text-slate-600 mb-2">
                   <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider">Catatan Keanggotaan</span>
@@ -777,6 +788,17 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
                   required
                   value={editIc}
                   onChange={(e) => setEditIc(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-305 rounded p-2 text-xs font-mono tracking-tight focus:bg-white focus:ring-1 focus:ring-emerald-500 outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[10px] font-bold text-slate-500 uppercase">Nombor Telefon</label>
+                <input
+                  type="tel"
+                  required
+                  value={editTel}
+                  onChange={(e) => setEditTel(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-305 rounded p-2 text-xs font-mono tracking-tight focus:bg-white focus:ring-1 focus:ring-emerald-500 outline-none"
                 />
               </div>
