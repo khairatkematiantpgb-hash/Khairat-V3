@@ -110,6 +110,38 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
     return arrearsSegments.length > 0 ? arrearsSegments.join('; ') : 'Tiada';
   };
 
+  // Helper to find the latest month/year paid (Lunas Sehingga)
+  const getLatestPaidMonthYear = (m: any) => {
+    if (m.status !== 'Aktif') return 'N/A (Tidak Aktif)';
+    const cleanNoAhli = m.noAhli;
+    const memberLedgerRows = state.ledger.filter(r => isSameMemberId(r.noAhli, cleanNoAhli));
+    if (memberLedgerRows.length === 0) {
+      return 'Tiada Rekod';
+    }
+
+    const monthKeys: string[] = ['jan', 'feb', 'mac', 'apr', 'mei', 'jun', 'jul', 'ogo', 'sep', 'okt', 'nov', 'dis'];
+    const monthNames = ['Jan', 'Feb', 'Mac', 'Apr', 'Mei', 'Jun', 'Jul', 'Ogo', 'Sep', 'Okt', 'Nov', 'Dis'];
+
+    let maxPaidValue = -1;
+    let maxPaidLabel = '-';
+
+    for (const row of memberLedgerRows) {
+      const yr = row.tahun;
+      for (let i = 0; i < 12; i++) {
+        const key = monthKeys[i];
+        if ((row as any)[key]) {
+          const val = yr * 100 + i;
+          if (val > maxPaidValue) {
+            maxPaidValue = val;
+            maxPaidLabel = `${monthNames[i]}/${yr}`;
+          }
+        }
+      }
+    }
+
+    return maxPaidValue !== -1 ? maxPaidLabel : 'Belum Bayar';
+  };
+
   // Pre-calculate membership classifications for totals
   const memberStats = state.members.map(m => {
     const rows = state.ledger.filter(r => isSameMemberId(r.noAhli, m.noAhli));
@@ -196,9 +228,11 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
       'No. Ahli',
       'Nama Ahli',
       ...(showIc ? ['No. IC'] : []),
+      'No. Telefon',
       'Alamat Berdaftar',
       'Status Keahlian',
       'Jumlah Tunggakan (RM)',
+      'Lunas Sehingga',
       'Bulan/Tahun Tunggakan',
       'Catatan'
     ];
@@ -214,9 +248,11 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
         m.noAhli,
         m.nama,
         ...(showIc ? [m.ic || '-'] : []),
+        m.tel || '-',
         m.alamat || '-',
         m.status,
         actualDues,
+        getLatestPaidMonthYear(m),
         arrearsDetail,
         m.catatan || '-'
       ];
@@ -352,11 +388,13 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
                 <th className="px-3 py-2 text-center border-r border-slate-300 w-16">No. Ahli</th>
                 <th className="px-3 py-2 border-r border-slate-300 w-40">Nama Ahli</th>
                 {currentRole !== 'user' && <th className="px-3 py-2 text-center border-r border-slate-300 w-24">No. IC</th>}
+                <th className="px-3 py-2 border-r border-slate-300 w-24 text-center">No. Telefon</th>
                 <th className="px-3 py-2 border-r border-slate-300">Alamat Berdaftar</th>
                 <th className="px-3 py-2 text-center border-r border-slate-300 w-16">Status</th>
-                <th className="px-3 py-2 text-center w-20">Tunggakan</th>
-                <th className="px-3 py-2 border-l border-slate-300 w-36">Period Tertunggak</th>
-                <th className="px-3 py-2 border-l border-slate-300 w-36">Catatan</th>
+                <th className="px-3 py-2 text-center border-r border-slate-300 w-20">Lunas Sehingga</th>
+                <th className="px-3 py-2 text-center w-20 border-r border-slate-300">Tunggakan</th>
+                <th className="px-3 py-2 border-r border-slate-300 w-36">Period Tertunggak</th>
+                <th className="px-3 py-2 w-36">Catatan</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 text-slate-800">
@@ -372,13 +410,15 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
                     <td className="px-3 py-2 text-center font-mono font-bold border-r border-slate-300">{m.noAhli}</td>
                     <td className="px-3 py-2 font-bold text-slate-900 border-r border-slate-300">{m.nama}</td>
                     {currentRole !== 'user' && <td className="px-3 py-2 text-center font-mono border-r border-slate-300">{m.ic || '-'}</td>}
+                    <td className="px-3 py-2 text-center font-mono border-r border-slate-300">{m.tel || '-'}</td>
                     <td className="px-3 py-1.5 text-[9px] leading-relaxed border-r border-slate-300">{m.alamat || '-'}</td>
                     <td className="px-3 py-2 text-center border-r border-slate-300 font-bold text-[9px] uppercase">{m.status}</td>
-                    <td className="px-3 py-2 text-center font-mono font-bold text-slate-900">
+                    <td className="px-3 py-2 text-center font-mono font-bold border-r border-slate-300">{getLatestPaidMonthYear(m)}</td>
+                    <td className="px-3 py-2 text-center font-mono font-bold text-slate-900 border-r border-slate-300">
                       {actualDues > 0 ? `RM ${actualDues}` : 'LUNAS'}
                     </td>
-                    <td className="px-3 py-2 text-[9px] text-slate-600 border-l border-slate-300 max-w-xs">{actualDues > 0 ? arrearsDetails : 'Tiada tunggakan yuran.'}</td>
-                    <td className="px-3 py-2 text-[9px] text-slate-600 border-l border-slate-300 max-w-xs">{m.catatan || '-'}</td>
+                    <td className="px-3 py-2 text-[9px] text-slate-600 border-r border-slate-300 max-w-xs">{actualDues > 0 ? arrearsDetails : 'Tiada tunggakan yuran.'}</td>
+                    <td className="px-3 py-2 text-[9px] text-slate-600 max-w-xs">{m.catatan || '-'}</td>
                   </tr>
                 );
               })}
@@ -513,7 +553,7 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
           </div>
         </div>
 
-        {/* Members Table */}
+         {/* Members Table */}
         <div className="overflow-x-auto border border-slate-100 rounded-xl">
           <table className="w-full text-left border-collapse text-xs">
             <thead className="bg-slate-50/70 border-b border-slate-100 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
@@ -521,8 +561,10 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
                 <th className="px-4 py-3 text-center w-20">No. Ahli</th>
                 <th className="px-4 py-3">Nama Ahli</th>
                 {currentRole !== 'user' && <th className="px-4 py-3 text-center w-32">No. Kad Pengenalan</th>}
+                <th className="px-4 py-3 text-center w-32">No. Telefon</th>
                 <th className="px-4 py-3">Alamat Berdaftar</th>
                 <th className="px-4 py-3 text-center w-24">Status</th>
+                <th className="px-4 py-3 text-center w-32">Lunas Sehingga</th>
                 <th className="px-4 py-3 w-60">Tunggakan Yuran</th>
                 <th className="px-4 py-3 max-w-xs">Catatan</th>
                 <th className="px-4 py-3 text-center w-24">Tindakan</th>
@@ -531,7 +573,7 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {filteredList.length === 0 ? (
                 <tr>
-                  <td colSpan={currentRole === 'user' ? 7 : 8} className="text-center py-10 text-slate-400 italic">
+                  <td colSpan={currentRole === 'user' ? 9 : 10} className="text-center py-10 text-slate-400 italic">
                     Tiada rekod ahli dijumpai mengikut penapis carian ini.
                   </td>
                 </tr>
@@ -562,6 +604,12 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
                           {m.ic || '-'}
                         </td>
                       )}
+
+                      {/* No. Telefon */}
+                      <td className="px-4 py-3 text-center font-mono text-slate-700 font-bold">
+                        {m.tel || <span className="text-slate-400 italic font-normal text-[10px]">Tiada</span>}
+                      </td>
+
                       {/* Alamat */}
                       <td className="px-4 py-3 text-slate-500 leading-relaxed max-w-sm truncate text-[11px]" title={m.alamat}>
                         {m.alamat || '-'}
@@ -576,6 +624,11 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
                         }`}>
                           {m.status}
                         </span>
+                      </td>
+
+                      {/* Lunas Sehingga */}
+                      <td className="px-4 py-3 text-center font-mono font-extrabold text-slate-700 text-[11px]">
+                        {getLatestPaidMonthYear(m)}
                       </td>
 
                       {/* Tunggakan Yuran (di sebelah Status) */}
