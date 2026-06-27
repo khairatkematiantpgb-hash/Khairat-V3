@@ -10,7 +10,7 @@ export const APPS_SCRIPT_CODE = `/**
  * Extensions > Apps Script
  * 
  * Pastikan nama tab atau helaian anda di Google Sheets adalah:
- * 1. "Pangkalan Data Ahli"  - (Mengandungi Lajur: No. Ahli, Nama, No. IC, Alamat, Status, Catatan)
+ * 1. "Pangkalan Data Ahli"  - (Mengandungi Lajur: No. Ahli, Nama, No. IC, Alamat, Status, Catatan, Tanggungan)
  * 2. "Rekod Jadual Pembayaran (Lejar)" - (Mengandungi Lajur: No. Ahli, Nama, Tahun, JAN, FEB, MAC, APR, MEI, JUN, JUL, OGO, SEP, OKT, NOV, DIS, Lebih)
  * 3. "Penyata Kira-Kira (Kewangan)" - (Mengandungi Lajur: ID, Tarikh, Kenyataan, Kategori Akaun, Jenis Transaksi, Amaun)
  */
@@ -22,9 +22,16 @@ function setupSheets() {
   let sheetAhli = ss.getSheetByName("Pangkalan Data Ahli");
   if (!sheetAhli) {
     sheetAhli = ss.insertSheet("Pangkalan Data Ahli");
-    sheetAhli.appendRow(["No. Ahli", "Nama", "No. IC", "Alamat", "Status", "Catatan"]);
-    sheetAhli.getRange("A1:F1").setBackground("#0f172a").setFontColor("#ffffff").setFontWeight("bold");
+    sheetAhli.appendRow(["No. Ahli", "Nama", "No. IC", "Alamat", "Status", "Catatan", "Tanggungan"]);
+    sheetAhli.getRange("A1:G1").setBackground("#0f172a").setFontColor("#ffffff").setFontWeight("bold");
     sheetAhli.setFrozenRows(1);
+  } else {
+    // Pastikan pengepala mempunyai sekurang-kurangnya 7 kolum termasuk Tanggungan
+    const lastCol = sheetAhli.getLastColumn();
+    if (lastCol < 7) {
+      sheetAhli.getRange(1, 7).setValue("Tanggungan");
+      sheetAhli.getRange("G1").setBackground("#0f172a").setFontColor("#ffffff").setFontWeight("bold");
+    }
   }
   
   // 2. Setup Tab Rekod Jadual Pembayaran jika belum ada
@@ -68,13 +75,20 @@ function doGet(e) {
       const members = [];
       for (let i = 1; i < dataAhli.length; i++) {
         if (!dataAhli[i][0]) continue;
+        let tanggungan = [];
+        if (dataAhli[i].length > 6 && dataAhli[i][6]) {
+          try {
+            tanggungan = JSON.parse(String(dataAhli[i][6]));
+          } catch(e) {}
+        }
         members.push({
           noAhli: String(dataAhli[i][0]),
           nama: String(dataAhli[i][1]),
           ic: String(dataAhli[i][2]),
           alamat: String(dataAhli[i][3]),
           status: String(dataAhli[i][4]),
-          catatan: String(dataAhli[i][5] || "")
+          catatan: String(dataAhli[i][5] || ""),
+          tanggungan: Array.isArray(tanggungan) ? tanggungan : []
         });
       }
       
@@ -210,9 +224,9 @@ function doPost(e) {
       const members = payload.members || [];
       if (members.length > 0) {
         const rowsAhli = members.map(m => [
-          m.noAhli, m.nama, m.ic, m.alamat, m.status, m.catatan || ""
+          m.noAhli, m.nama, m.ic, m.alamat, m.status, m.catatan || "", JSON.stringify(m.tanggungan || [])
         ]);
-        sheetAhli.getRange(2, 1, rowsAhli.length, 6).setValues(rowsAhli);
+        sheetAhli.getRange(2, 1, rowsAhli.length, 7).setValues(rowsAhli);
       }
       
       // 3. Tulis Rekod Lejar Baru
@@ -258,13 +272,20 @@ function getDirectData(ss, infoMessage) {
   const members = [];
   for (let i = 1; i < dataAhli.length; i++) {
     if (!dataAhli[i][0]) continue;
+    let tanggungan = [];
+    if (dataAhli[i].length > 6 && dataAhli[i][6]) {
+      try {
+        tanggungan = JSON.parse(String(dataAhli[i][6]));
+      } catch(e) {}
+    }
     members.push({
       noAhli: String(dataAhli[i][0]),
       nama: String(dataAhli[i][1]),
       ic: String(dataAhli[i][2]),
       alamat: String(dataAhli[i][3]),
       status: String(dataAhli[i][4]),
-      catatan: String(dataAhli[i][5] || "")
+      catatan: String(dataAhli[i][5] || ""),
+      tanggungan: Array.isArray(tanggungan) ? tanggungan : []
     });
   }
   

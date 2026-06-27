@@ -684,6 +684,7 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
                 <th className="px-4 py-2">Nama Ahli</th>
                 <th className="px-4 py-2">No. IC (Kad Pengenalan)</th>
                 <th className="px-4 py-2">Alamat Kediaman</th>
+                <th className="px-4 py-2">Tanggungan</th>
                 <th className="px-4 py-2 text-center">Status</th>
                 <th className="px-4 py-2 text-right">Tindakan</th>
               </tr>
@@ -691,7 +692,7 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
             <tbody className="divide-y divide-slate-100 text-xs font-sans">
               {paginatedMembers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-8 text-slate-400 italic">
+                  <td colSpan={7} className="text-center py-8 text-slate-400 italic">
                     Sistem tidak menemui sebarang rekod ahli yang sepadan dengan carian.
                   </td>
                 </tr>
@@ -709,6 +710,19 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
                     </td>
                     <td className="px-4 py-2.5 text-[11px] max-w-xs truncate text-slate-500" title={member.alamat}>
                       {member.alamat}
+                    </td>
+                    <td className="px-4 py-2.5 text-[11px] text-slate-600 max-w-xs">
+                      {member.tanggungan && member.tanggungan.length > 0 ? (
+                        <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto">
+                          {member.tanggungan.map((dep, dIdx) => (
+                            <span key={dIdx} className="inline-block bg-emerald-50 border border-emerald-100 text-emerald-850 text-[9px] px-1.5 py-0.5 rounded font-medium" title={`IC: ${dep.ic || '-'}`}>
+                              {dep.nama} <span className="text-emerald-600 font-bold">({dep.hubungan})</span>
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 italic">Tiada</span>
+                      )}
                     </td>
                     <td className="px-4 py-2.5 text-center">
                       <span

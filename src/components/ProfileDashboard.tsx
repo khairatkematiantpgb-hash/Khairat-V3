@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AppState, Member, Tanggungan, MONTH_KEYS, MONTH_LABELS } from '../types';
 import { calculateOutstandingDues, isSameMemberId, runKemaskiniMaklumatAhli } from '../lib/database';
-import { Search, User, ShieldCheck, CheckCircle2, AlertCircle, FileText, Printer, MapPin, CreditCard, PlusCircle, Trash2, Edit2, Users, Check, X } from 'lucide-react';
+import { Search, User, ShieldCheck, CheckCircle2, AlertCircle, FileText, Printer, MapPin, CreditCard, PlusCircle, Trash2, Edit2, Users, Check, X, Plus } from 'lucide-react';
 
 interface ProfileDashboardProps {
   state: AppState;
@@ -644,7 +644,71 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
               )}
             </div>
 
-            {/* Section for family dependents removed */}
+            {/* Maklumat Tanggungan Keluarga Section */}
+            <div className="bg-white p-5 rounded-xl border border-slate-105 shadow-xs space-y-4">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-150">
+                <h3 className="text-xs font-extrabold text-slate-700 uppercase tracking-tight flex items-center gap-1.5 font-sans">
+                  <Users className="h-4.5 w-4.5 text-slate-805" />
+                  Maklumat Tanggungan Keluarga
+                </h3>
+                {currentRole === 'admin' && (
+                  <button
+                    onClick={openAddDependentModal}
+                    className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10px] font-black rounded uppercase flex items-center gap-1 cursor-pointer transition-all border border-emerald-200"
+                  >
+                    <Plus className="h-3 w-3" /> Tambah Tanggungan
+                  </button>
+                )}
+              </div>
+
+              {finalMember.tanggungan && finalMember.tanggungan.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-[11px] font-sans">
+                    <thead>
+                      <tr className="border-b border-slate-100 bg-slate-50/50 text-slate-500 font-bold uppercase tracking-wider text-[9px]">
+                        <th className="px-3 py-1.5">Nama Tanggungan</th>
+                        <th className="px-3 py-1.5">No. IC / Surat Beranak</th>
+                        <th className="px-3 py-1.5">Hubungan</th>
+                        {currentRole === 'admin' && <th className="px-3 py-1.5 text-right">Tindakan</th>}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium">
+                      {finalMember.tanggungan.map((dep, dIdx) => (
+                        <tr key={dIdx} className="hover:bg-slate-50">
+                          <td className="px-3 py-2 font-bold text-slate-900 capitalize">{dep.nama}</td>
+                          <td className="px-3 py-2 text-slate-600 font-mono text-[10px]">{dep.ic}</td>
+                          <td className="px-3 py-2">
+                            <span className="inline-block bg-emerald-50 border border-emerald-100 text-emerald-700 text-[9px] font-bold uppercase px-2 py-0.5 rounded">
+                              {dep.hubungan}
+                            </span>
+                          </td>
+                          {currentRole === 'admin' && (
+                            <td className="px-3 py-2 text-right space-x-1">
+                              <button
+                                onClick={() => openEditDependentModal(dIdx)}
+                                className="px-1.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded text-[9px] font-bold cursor-pointer transition-all"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteDependent(dIdx)}
+                                className="px-1.5 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded text-[9px] font-bold cursor-pointer transition-all"
+                              >
+                                Padam
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="py-6 text-center text-slate-400 text-xs italic font-sans">
+                  Tiada maklumat tanggungan keluarga yang didaftarkan untuk ahli ini.
+                </div>
+              )}
+            </div>
 
             {/* Historic ledger list */}
             {ledgerRows.length > 1 && (
@@ -815,6 +879,7 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
                     <option value="Anak">Anak</option>
                     <option value="Ibu">Ibu</option>
                     <option value="Bapa">Bapa</option>
+                    <option value="Lain-lain">Lain-lain</option>
                   </select>
                 </div>
 

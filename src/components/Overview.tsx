@@ -4,9 +4,9 @@
  */
 
 import React, { useState } from 'react';
-import { AppState } from '../types';
+import { AppState, Tanggungan } from '../types';
 import { runDaftarAhliBaru, calculateOutstandingDues, isSameMemberId } from '../lib/database';
-import { PlusCircle, Info, Sparkles, UserPlus, ShieldAlert, CheckCircle, Search, HelpCircle, FileText } from 'lucide-react';
+import { PlusCircle, Info, Sparkles, UserPlus, ShieldAlert, CheckCircle, Search, HelpCircle, FileText, Plus, Trash2, Users } from 'lucide-react';
 
 interface OverviewProps {
   state: AppState;
@@ -23,9 +23,39 @@ export default function Overview({ state, onChangeState, onNavigate, currentRole
   const [alamat, setAlamat] = useState('');
   const [status, setStatus] = useState('Aktif');
 
+  const monthsMalay = [
+    'Januari', 'Februari', 'Mac', 'April', 'Mei', 'Jun',
+    'Julai', 'Ogos', 'September', 'Oktober', 'November', 'Disember'
+  ];
+
+  const [bulanDaftar, setBulanDaftar] = useState<number>(new Date().getMonth());
+  const [tahunDaftar, setTahunDaftar] = useState<number>(new Date().getFullYear());
+  
+  // Tanggungan states (minimum 2 by default, can be added)
+  const [tanggunganList, setTanggunganList] = useState<Tanggungan[]>([
+    { nama: '', ic: '', hubungan: 'Isteri' },
+    { nama: '', ic: '', hubungan: 'Anak' }
+  ]);
+
   // Feedback states
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Tanggungan helpers
+  const handleAddTanggungan = () => {
+    setTanggunganList([...tanggunganList, { nama: '', ic: '', hubungan: 'Anak' }]);
+  };
+
+  const handleUpdateTanggungan = (index: number, field: keyof Tanggungan, value: string) => {
+    const newList = [...tanggunganList];
+    newList[index] = { ...newList[index], [field]: value };
+    setTanggunganList(newList);
+  };
+
+  const handleRemoveTanggungan = (index: number) => {
+    const newList = tanggunganList.filter((_, i) => i !== index);
+    setTanggunganList(newList);
+  };
 
   // 1. Calculate next recommended Member ID ("Cadangan")
   const getNextRecommendedId = () => {
@@ -56,12 +86,18 @@ export default function Overview({ state, onChangeState, onNavigate, currentRole
       return;
     }
 
+    // Filter out dependents that do not have a name
+    const validTanggungan = tanggunganList.filter(t => t.nama.trim() !== '');
+    const catatanPendaftaran = `Mendaftar pada ${monthsMalay[bulanDaftar]} ${tahunDaftar}`;
+
     const { newState, error } = runDaftarAhliBaru(state, {
       noAhli,
       nama,
       ic,
       alamat,
-      status
+      status,
+      tanggungan: validTanggungan,
+      catatan: catatanPendaftaran
     });
 
     if (error) {
@@ -76,6 +112,12 @@ export default function Overview({ state, onChangeState, onNavigate, currentRole
       setIc('');
       setAlamat('');
       setStatus('Aktif');
+      setBulanDaftar(new Date().getMonth());
+      setTahunDaftar(new Date().getFullYear());
+      setTanggunganList([
+        { nama: '', ic: '', hubungan: 'Isteri' },
+        { nama: '', ic: '', hubungan: 'Anak' }
+      ]);
     }
   };
 
@@ -216,6 +258,43 @@ export default function Overview({ state, onChangeState, onNavigate, currentRole
                 </div>
               </div>
 
+              {/* Bulan & Tahun Pendaftaran (Mula Yuran) Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-sans">
+                {/* Bulan Mendaftar */}
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase">
+                    Bulan Pendaftaran (Mula Yuran) <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    required
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 text-xs rounded px-3 py-2 outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 font-bold"
+                    value={bulanDaftar}
+                    onChange={(e) => setBulanDaftar(parseInt(e.target.value, 10))}
+                  >
+                    {monthsMalay.map((m, idx) => (
+                      <option key={idx} value={idx}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Tahun Pendaftaran */}
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase">
+                    Tahun Pendaftaran <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    required
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-900 text-xs rounded px-3 py-2 outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 font-bold"
+                    value={tahunDaftar}
+                    onChange={(e) => setTahunDaftar(parseInt(e.target.value, 10))}
+                  >
+                    {[2024, 2025, 2026, 2027, 2028].map((y) => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               {/* Nama Penuh */}
               <div className="space-y-1">
                 <label className="block text-[10px] font-bold text-slate-500 uppercase font-sans">
@@ -259,6 +338,83 @@ export default function Overview({ state, onChangeState, onNavigate, currentRole
                   value={alamat}
                   onChange={(e) => setAlamat(e.target.value)}
                 />
+              </div>
+
+              {/* Ruang Tanggungan (Sumbangan/Dependents) */}
+              <div className="space-y-3 pt-3 border-t border-slate-100">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
+                    <Users className="h-4 w-4 text-emerald-600" />
+                    Ruang Tanggungan Ahli Baru (1, 2)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleAddTanggungan}
+                    className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10px] font-black rounded uppercase flex items-center gap-1 cursor-pointer transition-all border border-emerald-200"
+                  >
+                    <Plus className="h-3 w-3" /> Tambah Tanggungan
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-400">Masukkan nama ahli keluarga di bawah tanggungan ahli utama (Jika ada). Anda boleh menambah baris jika lebih daripada 2 tanggungan.</p>
+                
+                <div className="space-y-2">
+                  {tanggunganList.map((t, idx) => (
+                    <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-md relative">
+                      {/* Nama */}
+                      <div className="md:col-span-5 space-y-1">
+                        <label className="text-[9px] font-bold text-slate-500 uppercase block">Nama Tanggungan</label>
+                        <input
+                          type="text"
+                          placeholder="Nama anak / isteri / suami..."
+                          className="w-full bg-white border border-slate-300 text-slate-900 text-[11px] rounded px-2.5 py-1.5 focus:ring-1 focus:ring-emerald-500 outline-none font-semibold capitalize"
+                          value={t.nama}
+                          onChange={(e) => handleUpdateTanggungan(idx, 'nama', e.target.value)}
+                        />
+                      </div>
+                      
+                      {/* IC / Surat Beranak */}
+                      <div className="md:col-span-4 space-y-1">
+                        <label className="text-[9px] font-bold text-slate-500 uppercase block">No. IC / Surat Beranak</label>
+                        <input
+                          type="text"
+                          placeholder="Contoh: 151212-11-0421"
+                          className="w-full bg-white border border-slate-300 text-slate-900 text-[11px] rounded px-2.5 py-1.5 focus:ring-1 focus:ring-emerald-500 outline-none font-mono"
+                          value={t.ic}
+                          onChange={(e) => handleUpdateTanggungan(idx, 'ic', e.target.value)}
+                        />
+                      </div>
+                      
+                      {/* Hubungan */}
+                      <div className="md:col-span-2 space-y-1">
+                        <label className="text-[9px] font-bold text-slate-500 uppercase block">Hubungan</label>
+                        <select
+                          className="w-full bg-white border border-slate-300 text-slate-900 text-[11px] rounded px-2 py-1.5 focus:ring-1 focus:ring-emerald-500 outline-none font-bold"
+                          value={t.hubungan}
+                          onChange={(e) => handleUpdateTanggungan(idx, 'hubungan', e.target.value)}
+                        >
+                          <option value="Isteri">Isteri</option>
+                          <option value="Suami">Suami</option>
+                          <option value="Anak">Anak</option>
+                          <option value="Ibu">Ibu</option>
+                          <option value="Bapa">Bapa</option>
+                          <option value="Lain-lain">Lain-lain</option>
+                        </select>
+                      </div>
+                      
+                      {/* Padam Button */}
+                      <div className="md:col-span-1 flex items-end justify-center pb-1">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTanggungan(idx)}
+                          className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 hover:text-rose-700 rounded transition cursor-pointer"
+                          title="Padam tanggungan ini"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* Feedback messages */}

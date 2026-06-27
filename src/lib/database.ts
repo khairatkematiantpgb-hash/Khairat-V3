@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Member, LedgerRow, AppState, MONTH_KEYS } from '../types';
+import { Member, LedgerRow, AppState, MONTH_KEYS, Tanggungan } from '../types';
 import { defaultMembers, defaultLedger, defaultKewangan } from './defaultData';
 
 const STATE_KEY = 'khairat_gong_badak';
@@ -267,9 +267,9 @@ export function fillMissingLedgerRows(members: Member[], ledger: LedgerRow[]): L
 // 1. DAFTAR AHLI BARU (React state implementation)
 export function runDaftarAhliBaru(
   state: AppState,
-  params: { noAhli: string; nama: string; ic: string; alamat: string; status: string }
+  params: { noAhli: string; nama: string; ic: string; alamat: string; status: string; tanggungan?: Tanggungan[]; catatan?: string }
 ): { newState: AppState; error?: string } {
-  const { nama, ic, alamat, status } = params;
+  const { nama, ic, alamat, status, tanggungan, catatan } = params;
   const noAhli = normalizeMemberId(params.noAhli);
 
   // Validation
@@ -308,7 +308,9 @@ export function runDaftarAhliBaru(
     nama: nama.trim(),
     ic: ic.trim(),
     alamat: alamat.trim(),
-    status: status || 'Aktif'
+    status: status || 'Aktif',
+    tanggungan: tanggungan || [],
+    catatan: catatan || ''
   };
 
   const currentYear = new Date().getFullYear();
@@ -427,9 +429,16 @@ export function runSimpanBayaranYuranAhli(
     }
 
     if (currentRow) {
-      // Fill empty slots chronologically
-      for (const key of MONTH_KEYS) {
+      // Fill empty slots chronologically skipping months before registration start in registration year
+      const regStart = getRegistrationStart(member, ledgerCopy, cleanNoAhli);
+      for (let i = 0; i < MONTH_KEYS.length; i++) {
+        const key = MONTH_KEYS[i];
         if (monthsEarned === 0) break;
+
+        if (regStart && currentRow.tahun === regStart.year && i < regStart.monthIdx) {
+          continue;
+        }
+
         if (!currentRow[key]) {
           (currentRow[key] as string) = cleanNoResit;
           monthsEarned--;
@@ -468,9 +477,10 @@ export function runKemaskiniMaklumatAhli(
     alamatBaru: string;
     statusBaru: string;
     catatanBaru?: string;
+    tanggunganBaru?: Tanggungan[];
   }
 ): { newState: AppState; error?: string } {
-  const { noAhli, namaBaru, icBaru, alamatBaru, statusBaru, catatanBaru } = params;
+  const { noAhli, namaBaru, icBaru, alamatBaru, statusBaru, catatanBaru, tanggunganBaru } = params;
 
   const cleanNoAhli = normalizeMemberId(noAhli);
   if (!cleanNoAhli) {
@@ -478,7 +488,8 @@ export function runKemaskiniMaklumatAhli(
   }
 
   const isCatatanNew = catatanBaru !== undefined;
-  if (!namaBaru.trim() && !icBaru.trim() && !alamatBaru.trim() && !statusBaru.trim() && (!isCatatanNew)) {
+  const isTanggunganNew = tanggunganBaru !== undefined;
+  if (!namaBaru.trim() && !icBaru.trim() && !alamatBaru.trim() && !statusBaru.trim() && (!isCatatanNew) && (!isTanggunganNew)) {
     return { newState: state, error: 'Sila masukkan sekurang-kurangnya satu medan maklumat baru!' };
   }
 
@@ -495,6 +506,7 @@ export function runKemaskiniMaklumatAhli(
   if (alamatBaru.trim()) targetMember.alamat = alamatBaru.trim();
   if (statusBaru.trim()) targetMember.status = statusBaru.trim();
   if (catatanBaru !== undefined) targetMember.catatan = catatanBaru.trim();
+  if (tanggunganBaru !== undefined) targetMember.tanggungan = tanggunganBaru;
 
   updatedMembers[memberIndex] = targetMember;
 
