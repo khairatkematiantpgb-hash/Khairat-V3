@@ -514,13 +514,15 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
                 </div>
               </div>
 
-              <div className="flex gap-2.5">
-                <ShieldCheck className="h-4 w-4 text-slate-400 shrink-0" />
-                <div className="space-y-0.5">
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">Nombor Kad Pengenalan</span>
-                  <p className="text-slate-700 font-mono tracking-tight font-bold">{finalMember.ic}</p>
+              {currentRole !== 'user' && (
+                <div className="flex gap-2.5">
+                  <ShieldCheck className="h-4 w-4 text-slate-400 shrink-0" />
+                  <div className="space-y-0.5">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">Nombor Kad Pengenalan</span>
+                    <p className="text-slate-700 font-mono tracking-tight font-bold">{finalMember.ic}</p>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="flex gap-2.5">
                 <Phone className="h-4 w-4 text-slate-400 shrink-0" />
@@ -678,7 +680,7 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
                     <thead>
                       <tr className="border-b border-slate-100 bg-slate-50/50 text-slate-500 font-bold uppercase tracking-wider text-[9px]">
                         <th className="px-3 py-1.5">Nama Tanggungan</th>
-                        <th className="px-3 py-1.5">No. IC / Surat Beranak</th>
+                        {currentRole !== 'user' && <th className="px-3 py-1.5">No. IC / Surat Beranak</th>}
                         <th className="px-3 py-1.5">Hubungan</th>
                         {currentRole === 'admin' && <th className="px-3 py-1.5 text-right">Tindakan</th>}
                       </tr>
@@ -687,7 +689,7 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
                       {finalMember.tanggungan.map((dep, dIdx) => (
                         <tr key={dIdx} className="hover:bg-slate-50">
                           <td className="px-3 py-2 font-bold text-slate-900 capitalize">{dep.nama}</td>
-                          <td className="px-3 py-2 text-slate-600 font-mono text-[10px]">{dep.ic}</td>
+                          {currentRole !== 'user' && <td className="px-3 py-2 text-slate-600 font-mono text-[10px]">{dep.ic}</td>}
                           <td className="px-3 py-2">
                             <span className="inline-block bg-emerald-50 border border-emerald-100 text-emerald-700 text-[9px] font-bold uppercase px-2 py-0.5 rounded">
                               {dep.hubungan}

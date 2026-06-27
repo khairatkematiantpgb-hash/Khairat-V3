@@ -191,10 +191,11 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
 
   // Export to Excel (CSV with UTF-8 BOM)
   const handleExportExcel = () => {
+    const showIc = currentRole !== 'user';
     const headers = [
       'No. Ahli',
       'Nama Ahli',
-      'No. IC',
+      ...(showIc ? ['No. IC'] : []),
       'Alamat Berdaftar',
       'Status Keahlian',
       'Jumlah Tunggakan (RM)',
@@ -212,7 +213,7 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
       return [
         m.noAhli,
         m.nama,
-        m.ic || '-',
+        ...(showIc ? [m.ic || '-'] : []),
         m.alamat || '-',
         m.status,
         actualDues,
@@ -350,7 +351,7 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
               <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 font-bold uppercase">
                 <th className="px-3 py-2 text-center border-r border-slate-300 w-16">No. Ahli</th>
                 <th className="px-3 py-2 border-r border-slate-300 w-40">Nama Ahli</th>
-                <th className="px-3 py-2 text-center border-r border-slate-300 w-24">No. IC</th>
+                {currentRole !== 'user' && <th className="px-3 py-2 text-center border-r border-slate-300 w-24">No. IC</th>}
                 <th className="px-3 py-2 border-r border-slate-300">Alamat Berdaftar</th>
                 <th className="px-3 py-2 text-center border-r border-slate-300 w-16">Status</th>
                 <th className="px-3 py-2 text-center w-20">Tunggakan</th>
@@ -370,7 +371,7 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
                   <tr key={m.noAhli} className="align-top">
                     <td className="px-3 py-2 text-center font-mono font-bold border-r border-slate-300">{m.noAhli}</td>
                     <td className="px-3 py-2 font-bold text-slate-900 border-r border-slate-300">{m.nama}</td>
-                    <td className="px-3 py-2 text-center font-mono border-r border-slate-300">{m.ic || '-'}</td>
+                    {currentRole !== 'user' && <td className="px-3 py-2 text-center font-mono border-r border-slate-300">{m.ic || '-'}</td>}
                     <td className="px-3 py-1.5 text-[9px] leading-relaxed border-r border-slate-300">{m.alamat || '-'}</td>
                     <td className="px-3 py-2 text-center border-r border-slate-300 font-bold text-[9px] uppercase">{m.status}</td>
                     <td className="px-3 py-2 text-center font-mono font-bold text-slate-900">
@@ -519,7 +520,7 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
               <tr>
                 <th className="px-4 py-3 text-center w-20">No. Ahli</th>
                 <th className="px-4 py-3">Nama Ahli</th>
-                <th className="px-4 py-3 text-center w-32">No. Kad Pengenalan</th>
+                {currentRole !== 'user' && <th className="px-4 py-3 text-center w-32">No. Kad Pengenalan</th>}
                 <th className="px-4 py-3">Alamat Berdaftar</th>
                 <th className="px-4 py-3 text-center w-24">Status</th>
                 <th className="px-4 py-3 w-60">Tunggakan Yuran</th>
@@ -530,7 +531,7 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {filteredList.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-10 text-slate-400 italic">
+                  <td colSpan={currentRole === 'user' ? 7 : 8} className="text-center py-10 text-slate-400 italic">
                     Tiada rekod ahli dijumpai mengikut penapis carian ini.
                   </td>
                 </tr>
@@ -556,10 +557,11 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
                       </td>
                       
                       {/* No Kad Pengenalan */}
-                      <td className="px-4 py-3 text-center font-mono text-slate-600 font-bold">
-                        {m.ic || '-'}
-                      </td>
-                      
+                      {currentRole !== 'user' && (
+                        <td className="px-4 py-3 text-center font-mono text-slate-600 font-bold">
+                          {m.ic || '-'}
+                        </td>
+                      )}
                       {/* Alamat */}
                       <td className="px-4 py-3 text-slate-500 leading-relaxed max-w-sm truncate text-[11px]" title={m.alamat}>
                         {m.alamat || '-'}

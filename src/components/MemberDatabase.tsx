@@ -274,10 +274,11 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
 
   // Export Member list to Excel (CSV format)
   const downloadExcel = () => {
+    const showIc = currentRole !== 'user';
     const headers = [
       'No. Ahli',
       'Nama Ahli',
-      'No. Kad Pengenalan (IC)',
+      ...(showIc ? ['No. Kad Pengenalan (IC)'] : []),
       'No. Telefon',
       'Alamat Berdaftar',
       'Status Keahlian'
@@ -286,7 +287,7 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
     const rows = filteredMembers.map((m) => [
       m.noAhli,
       m.nama,
-      m.ic,
+      ...(showIc ? [m.ic] : []),
       m.tel || '',
       m.alamat,
       m.status
@@ -318,13 +319,14 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
     }
 
     const filterDesc = statusFilter === 'Semua' ? 'Semua Keahlian' : `Status ${statusFilter}`;
+    const showIc = currentRole !== 'user';
 
     const tableRowsHtml = filteredMembers.map((m) => {
       return `
         <tr style="font-size: 10px; page-break-inside: avoid;">
           <td style="border: 1px solid #cbd5e1; padding: 6px; font-family: monospace; font-weight: bold; text-align: center;">${m.noAhli}</td>
           <td style="border: 1px solid #cbd5e1; padding: 6px; font-weight: bold;">${m.nama}</td>
-          <td style="border: 1px solid #cbd5e1; padding: 6px; font-family: monospace;">${m.ic}</td>
+          ${showIc ? `<td style="border: 1px solid #cbd5e1; padding: 6px; font-family: monospace;">${m.ic}</td>` : ''}
           <td style="border: 1px solid #cbd5e1; padding: 6px; font-family: monospace;">${m.tel || '-'}</td>
           <td style="border: 1px solid #cbd5e1; padding: 6px; color: #475569;">${m.alamat}</td>
           <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">
@@ -449,14 +451,14 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
             <tr>
               <th style="width: 70px;">NO. AHLI</th>
               <th>NAMA REKOD AHLI KHAIRAT</th>
-              <th style="width: 110px;">NO. KAD PENGENALAN (IC)</th>
+              ${showIc ? '<th style="width: 110px;">NO. KAD PENGENALAN (IC)</th>' : ''}
               <th style="width: 100px;">NO. TELEFON</th>
               <th>ALAMAT BERDAFTAR</th>
               <th style="width: 75px;">STATUS</th>
             </tr>
           </thead>
           <tbody>
-            ${tableRowsHtml || `<tr><td colspan="6" style="text-align: center; padding: 25px; font-style: italic; color: #64748b;">Tiada rekod ahli berdaftar dijumpai.</td></tr>`}
+            ${tableRowsHtml || `<tr><td colspan="${showIc ? 6 : 5}" style="text-align: center; padding: 25px; font-style: italic; color: #64748b;">Tiada rekod ahli berdaftar dijumpai.</td></tr>`}
           </tbody>
         </table>
 
@@ -686,7 +688,7 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
               <tr className="border-b border-slate-205 bg-slate-50/50 text-slate-550 text-[10px] font-bold uppercase tracking-wider font-sans">
                 <th className="px-4 py-2">No. Ahli</th>
                 <th className="px-4 py-2">Nama Ahli</th>
-                <th className="px-4 py-2">No. IC (Kad Pengenalan)</th>
+                {currentRole !== 'user' && <th className="px-4 py-2">No. IC (Kad Pengenalan)</th>}
                 <th className="px-4 py-2">No. Telefon</th>
                 <th className="px-4 py-2">Alamat Kediaman</th>
                 <th className="px-4 py-2">Tanggungan</th>
@@ -697,7 +699,7 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
             <tbody className="divide-y divide-slate-100 text-xs font-sans">
               {paginatedMembers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-8 text-slate-400 italic">
+                  <td colSpan={currentRole === 'user' ? 7 : 8} className="text-center py-8 text-slate-400 italic">
                     Sistem tidak menemui sebarang rekod ahli yang sepadan dengan carian.
                   </td>
                 </tr>
@@ -710,9 +712,11 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
                     <td className="px-4 py-2.5 font-bold text-slate-900 tracking-tight">
                       {member.nama}
                     </td>
-                    <td className="px-4 py-2.5 text-slate-600 font-mono text-[11px]">
-                      {member.ic}
-                    </td>
+                    {currentRole !== 'user' && (
+                      <td className="px-4 py-2.5 text-slate-600 font-mono text-[11px]">
+                        {member.ic}
+                      </td>
+                    )}
                     <td className="px-4 py-2.5 text-slate-700 font-mono text-[11px]">
                       {member.tel || <span className="text-slate-400 italic">Tiada</span>}
                     </td>
