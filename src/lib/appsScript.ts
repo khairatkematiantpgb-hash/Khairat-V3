@@ -55,6 +55,13 @@ function setupSheets() {
     sheetKewangan.getRange("A1:F1").setBackground("#475569").setFontColor("#ffffff").setFontWeight("bold");
     sheetKewangan.setFrozenRows(1);
   }
+
+  // Tetapkan format teks biasa (@) bagi kolum kritikal untuk mengelakkan kehilangan '0' di depan
+  sheetAhli.getRange("A:A").setNumberFormat("@"); // No. Ahli
+  sheetAhli.getRange("C:C").setNumberFormat("@"); // No. IC
+  sheetAhli.getRange("H:H").setNumberFormat("@"); // No. Telefon
+
+  sheetLejar.getRange("A:A").setNumberFormat("@"); // No. Ahli
 }
 
 // Buka akses CORS dengan membalas respons yang betul
@@ -86,8 +93,11 @@ function doGet(e) {
           } catch(e) {}
         }
         let tel = "";
-        if (dataAhli[i].length > 7 && dataAhli[i][7]) {
-          tel = String(dataAhli[i][7]);
+        if (dataAhli[i].length > 7 && dataAhli[i][7] !== undefined && dataAhli[i][7] !== null) {
+          tel = String(dataAhli[i][7]).trim();
+          if (tel && !tel.startsWith("0") && /^\d+$/.test(tel)) {
+            tel = "0" + tel;
+          }
         }
         members.push({
           noAhli: String(dataAhli[i][0]),
@@ -288,8 +298,11 @@ function getDirectData(ss, infoMessage) {
       } catch(e) {}
     }
     let tel = "";
-    if (dataAhli[i].length > 7 && dataAhli[i][7]) {
-      tel = String(dataAhli[i][7]);
+    if (dataAhli[i].length > 7 && dataAhli[i][7] !== undefined && dataAhli[i][7] !== null) {
+      tel = String(dataAhli[i][7]).trim();
+      if (tel && !tel.startsWith("0") && /^\d+$/.test(tel)) {
+        tel = "0" + tel;
+      }
     }
     members.push({
       noAhli: String(dataAhli[i][0]),
