@@ -691,7 +691,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block truncate" title={acc}>
                       {getAccountDisplayName(acc)}
                     </span>
-                    {(currentRole === 'admin' || currentRole === 'ajk') && (
+                    {currentRole === 'admin' && (
                       <button 
                         onClick={() => {
                           setRenamingAccountKey(acc);
@@ -788,7 +788,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
                       <span className="truncate text-[11px] tracking-wide font-black" title={acc}>
                         {getAccountDisplayName(acc)}
                       </span>
-                      {(currentRole === 'admin' || currentRole === 'ajk') && (
+                      {currentRole === 'admin' && (
                         <button 
                           onClick={() => {
                             setRenamingAccountKey(acc);
