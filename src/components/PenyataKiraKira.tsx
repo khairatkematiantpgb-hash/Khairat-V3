@@ -31,6 +31,17 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
   const transactions = state.kewangan || [];
   const isInIframe = typeof window !== "undefined" && window.self !== window.top;
 
+  // Account Customization State
+  const [renamingAccountKey, setRenamingAccountKey] = useState<string | null>(null);
+  const [renamingAccountValue, setRenamingAccountValue] = useState<string>('');
+
+  const getAccountDisplayName = (acc: string) => {
+    if (state.customAccountNames && state.customAccountNames[acc]) {
+      return state.customAccountNames[acc];
+    }
+    return SHORT_NAMES[acc] || acc;
+  };
+
   // Form states
   const [tarikh, setTarikh] = useState('2026-06-20');
   const [kenyataan, setKenyataan] = useState('');
@@ -543,7 +554,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
                 >
                   {ACCOUNTS_LIST.map((acc, idx) => (
                     <option key={idx} value={acc}>
-                      {idx + 1}. {acc}
+                      {idx + 1}. {getAccountDisplayName(acc)}
                     </option>
                   ))}
                 </select>
@@ -676,10 +687,24 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
               const bal = processedData.finalBalances[acc];
               return (
                 <div key={keyIdx} className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-3xs hover:border-emerald-300 transition-all">
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block truncate" title={acc}>
-                    {SHORT_NAMES[acc]}
-                  </span>
-                  <strong className={`block text-xs md:text-sm font-mono font-black mt-2 ${bal < 0 ? 'text-rose-600' : 'text-emerald-850'}`}>
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block truncate" title={acc}>
+                      {getAccountDisplayName(acc)}
+                    </span>
+                    {(currentRole === 'admin' || currentRole === 'ajk') && (
+                      <button 
+                        onClick={() => {
+                          setRenamingAccountKey(acc);
+                          setRenamingAccountValue(getAccountDisplayName(acc));
+                        }}
+                        className="p-1 hover:bg-slate-100 text-slate-400 hover:text-slate-650 rounded transition-colors cursor-pointer shrink-0"
+                        title={`Ubah nama saluran ${getAccountDisplayName(acc)}`}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                  <strong className={`block text-xs md:text-sm font-mono font-black mt-1 ${bal < 0 ? 'text-rose-600' : 'text-emerald-850'}`}>
                     RM {formatCur(bal)}
                   </strong>
                 </div>
@@ -759,8 +784,22 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
                     className="px-2 py-2.5 text-center border-r border-slate-700 w-[245px]" 
                     colSpan={3}
                   >
-                    <div className="truncate text-[11px] tracking-wide font-black" title={acc}>
-                      {SHORT_NAMES[acc]}
+                    <div className="flex items-center justify-center gap-1.5 px-1">
+                      <span className="truncate text-[11px] tracking-wide font-black" title={acc}>
+                        {getAccountDisplayName(acc)}
+                      </span>
+                      {(currentRole === 'admin' || currentRole === 'ajk') && (
+                        <button 
+                          onClick={() => {
+                            setRenamingAccountKey(acc);
+                            setRenamingAccountValue(getAccountDisplayName(acc));
+                          }}
+                          className="p-0.5 hover:bg-slate-700 text-slate-355 hover:text-white rounded transition-colors cursor-pointer shrink-0"
+                          title={`Ubah nama saluran ${getAccountDisplayName(acc)}`}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                      )}
                     </div>
                   </th>
                 ))}
@@ -849,7 +888,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
                                       ? 'bg-amber-100 text-amber-800' 
                                       : 'hover:bg-amber-50 text-amber-650'
                                   }`}
-                                  title={`Kemaskini pergerakan ${SHORT_NAMES[otx.kategoriAkaun]} - RM ${formatCur(otx.amaun)}`}
+                                  title={`Kemaskini pergerakan ${getAccountDisplayName(otx.kategoriAkaun)} - RM ${formatCur(otx.amaun)}`}
                                 >
                                   <Pencil className="h-3.2 w-3.2" />
                                 </button>
@@ -858,7 +897,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
                                 <button
                                   onClick={() => setDeletingTransaction(otx)}
                                   className="p-1 hover:bg-rose-50 text-rose-500 rounded transition-colors cursor-pointer"
-                                  title={`Padam pergerakan ${SHORT_NAMES[otx.kategoriAkaun]} - RM ${formatCur(otx.amaun)}`}
+                                  title={`Padam pergerakan ${getAccountDisplayName(otx.kategoriAkaun)} - RM ${formatCur(otx.amaun)}`}
                                 >
                                   <Trash2 className="h-3.2 w-3.2" />
                                 </button>
@@ -979,7 +1018,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
               return (
                 <div key={keyIdx} className="text-center">
                   <span className="text-[8px] font-bold text-slate-500 uppercase block tracking-wider truncate mb-1">
-                    {SHORT_NAMES[acc]}
+                    {getAccountDisplayName(acc)}
                   </span>
                   <strong className="text-xs font-mono font-black text-slate-900">
                     RM {formatCur(currentBal)}
@@ -999,7 +1038,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
                 
                 {ACCOUNTS_LIST.map((acc, idx) => (
                   <th key={idx} className="px-1.5 py-1 text-center border-r border-slate-300 text-[8px] tracking-tight font-black" colSpan={3}>
-                    {SHORT_NAMES[acc]}
+                    {getAccountDisplayName(acc)}
                   </th>
                 ))}
               </tr>
@@ -1125,7 +1164,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400 font-bold">Saluran/Akaun:</span>
-                <span className="font-black text-slate-750">{SHORT_NAMES[deletingTransaction.kategoriAkaun]}</span>
+                <span className="font-black text-slate-750">{getAccountDisplayName(deletingTransaction.kategoriAkaun)}</span>
               </div>
               <div className="flex justify-between border-t border-slate-200 pt-2 mt-2">
                 <span className="text-slate-500 font-extrabold">Amaun Terlibat:</span>
@@ -1152,6 +1191,120 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
               >
                 {isSyncing && <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />}
                 <span>{isSyncing ? 'Memadam...' : 'Ya, Padam!'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Rename Account Modal */}
+      {renamingAccountKey && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 transition-opacity">
+          <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-xl max-w-md w-full animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 text-emerald-850 mb-4">
+              <div className="p-2.5 bg-emerald-50 text-emerald-755 rounded-xl">
+                <Pencil className="h-5 w-5 shrink-0 animate-pulse text-emerald-600" />
+              </div>
+              <div>
+                <h3 className="font-black text-sm uppercase text-slate-800 tracking-tight">Kemas Kini Nama Saluran</h3>
+                <p className="text-[10px] text-slate-400">Edit nama paparan ringkas saluran kewangan</p>
+              </div>
+            </div>
+            
+            <p className="text-xs text-slate-655 leading-relaxed mb-4">
+              Sila masukkan nama baharu untuk saluran akaun ini bagi memudahkan pengurusan dan penyata aliran tunai.
+            </p>
+
+            <div className="space-y-4 mb-5">
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Nama Asal Saluran:</span>
+                <span className="text-xs font-mono bg-slate-100 p-2 rounded-lg block text-slate-700 select-all leading-normal whitespace-pre-wrap break-all">
+                  {renamingAccountKey}
+                </span>
+              </div>
+              
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  Nama Paparan Baharu <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={renamingAccountValue}
+                  onChange={(e) => setRenamingAccountValue(e.target.value)}
+                  placeholder="Contoh: Pelaburan Khas, Tabung Kematian..."
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-bold"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setRenamingAccountKey(null)}
+                className="flex-1 py-2.5 bg-slate-155 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase rounded-xl transition-all cursor-pointer text-center select-none"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const cleanVal = renamingAccountValue.trim();
+                  if (!cleanVal) {
+                    alert('Sila masukkan nama paparan yang sah.');
+                    return;
+                  }
+                  
+                  const updatedCustomNames = {
+                    ...(state.customAccountNames || {}),
+                    [renamingAccountKey]: cleanVal
+                  };
+
+                  setIsSyncing(true);
+                  try {
+                    const updatedState = {
+                      ...state,
+                      customAccountNames: updatedCustomNames
+                    };
+                    
+                    // If Google Sheets connection is active, let's also sync the new names
+                    if (state.useGoogleSheets && state.appsScriptUrl) {
+                      const uploadPayload = {
+                        action: 'syncLocalToSheets',
+                        members: state.members,
+                        ledger: state.ledger,
+                        kewangan: state.kewangan,
+                        customAccountNames: updatedCustomNames
+                      };
+                      const result = await writeToAppsScript(state.appsScriptUrl, uploadPayload);
+                      if (result.success && result.data) {
+                        onChangeState({
+                          ...updatedState,
+                          members: result.data.members || state.members,
+                          ledger: result.data.ledger || state.ledger,
+                          kewangan: result.data.kewangan || state.kewangan
+                        });
+                      } else {
+                        onChangeState(updatedState);
+                      }
+                    } else {
+                      onChangeState(updatedState);
+                    }
+                    
+                    setRenamingAccountKey(null);
+                  } catch (err) {
+                    onChangeState({
+                      ...state,
+                      customAccountNames: updatedCustomNames
+                    });
+                    setRenamingAccountKey(null);
+                  } finally {
+                    setIsSyncing(false);
+                  }
+                }}
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase rounded-xl shadow-md active:scale-[0.98] transition-all cursor-pointer text-center select-none flex items-center justify-center gap-1.5"
+              >
+                {isSyncing && <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />}
+                <span>{isSyncing ? 'Menyimpan...' : 'Simpan'}</span>
               </button>
             </div>
           </div>

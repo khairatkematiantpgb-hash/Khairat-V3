@@ -58,6 +58,7 @@ export interface AppState {
   adminPassword?: string;
   ajkPassword?: string;
   kewangan?: KewanganTransaction[];
+  customAccountNames?: { [key: string]: string };
 }
 
 export const MONTH_KEYS: (keyof LedgerRow)[] = [
