@@ -56,9 +56,13 @@ export default function Navbar({ activeTab, onTabChange, state, currentRole, onL
             <h1 className="text-xs sm:text-sm font-extrabold uppercase leading-tight tracking-wide">
               Sistem Pengurusan Pertubuhan Khairat Kematian dan Kebajikan Kampung Gong Badak
             </h1>
-            <p className="text-[10px] text-emerald-205 font-bold uppercase tracking-wider">
-              Kuala Nerus, Terengganu
-            </p>
+            <div className="flex flex-wrap items-center gap-x-2 text-[10px] text-emerald-205 font-bold uppercase tracking-wider mt-0.5">
+              <span>Kuala Nerus, Terengganu</span>
+              <span className="text-emerald-400 font-normal">|</span>
+              <span className="text-amber-300 font-mono tracking-normal normal-case">
+                Bank Rakyat: <strong className="font-extrabold text-[11px] tracking-wider text-amber-200 select-all">1102624241</strong>
+              </span>
+            </div>
           </div>
         </div>
 
