@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from 'react';
-import { AppState, Member } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { AppState, Member, Pekeliling, RoleAssignment, ChartRoles } from '../types';
 import { 
   Users, 
   FileText, 
@@ -26,29 +26,6 @@ interface MaklumatPertubuhanProps {
   state: AppState;
   onChangeState?: (newState: AppState) => void;
   currentRole: 'admin' | 'user' | 'ajk' | null;
-}
-
-interface Pekeliling {
-  id: string;
-  noRujukan: string;
-  tarikh: string;
-  tarikhBerkuatkuasa?: string;
-  jenis?: 'Pekeliling' | 'Hebahan';
-  tajuk: string;
-  kandungan: string;
-  penerbit: string;
-  jawatanPenerbit: string;
-  kepentingan: 'Penting' | 'Biasa' | 'Segera';
-}
-
-interface RoleAssignment {
-  nama: string;
-  tel: string;
-  noAhli?: string;
-}
-
-interface ChartRoles {
-  [roleId: string]: RoleAssignment;
 }
 
 const ROLE_LABELS: { [key: string]: string } = {
@@ -123,6 +100,12 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
   const savePekelilingToStorage = (newList: Pekeliling[]) => {
     setPekelilingList(newList);
     localStorage.setItem('khairat_gong_badak_pekeliling', JSON.stringify(newList));
+    if (onChangeState) {
+      onChangeState({
+        ...state,
+        pekelilingList: newList
+      });
+    }
   };
 
   // 2. Active Tab inside Information View (either 'carta' or 'pekeliling')
@@ -170,6 +153,40 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
       ajk_10: { nama: "ENCIK MAT ALI BIN DIN", tel: '017-9123456' },
     };
   });
+
+  // Synchronize state from props whenever it changes (critical for multi-device/visitor polling sync)
+  useEffect(() => {
+    if (state.pekelilingList && state.pekelilingList.length > 0) {
+      setPekelilingList(state.pekelilingList);
+    }
+  }, [state.pekelilingList]);
+
+  useEffect(() => {
+    if (state.chartRoles && Object.keys(state.chartRoles).length > 0) {
+      setChartRoles(state.chartRoles);
+    }
+  }, [state.chartRoles]);
+
+  // Initial sync: Save default/local states to parent global state if missing on the server
+  useEffect(() => {
+    if (onChangeState) {
+      let updated = false;
+      const newState = { ...state };
+      
+      if (!state.pekelilingList || state.pekelilingList.length === 0) {
+        newState.pekelilingList = pekelilingList;
+        updated = true;
+      }
+      if (!state.chartRoles || Object.keys(state.chartRoles).length === 0) {
+        newState.chartRoles = chartRoles;
+        updated = true;
+      }
+      
+      if (updated) {
+        onChangeState(newState);
+      }
+    }
+  }, [state.pekelilingList, state.chartRoles, onChangeState]);
 
   // Modal States for selecting Member
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
@@ -225,6 +242,12 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
 
     setChartRoles(updatedRoles);
     localStorage.setItem('khairat_gong_badak_chart_roles', JSON.stringify(updatedRoles));
+    if (onChangeState) {
+      onChangeState({
+        ...state,
+        chartRoles: updatedRoles
+      });
+    }
     setEditingRoleId(null);
   };
 
@@ -243,6 +266,12 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
 
     setChartRoles(updatedRoles);
     localStorage.setItem('khairat_gong_badak_chart_roles', JSON.stringify(updatedRoles));
+    if (onChangeState) {
+      onChangeState({
+        ...state,
+        chartRoles: updatedRoles
+      });
+    }
     setEditingRoleId(null);
   };
 

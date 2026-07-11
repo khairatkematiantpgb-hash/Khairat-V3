@@ -48,6 +48,29 @@ export interface KewanganTransaction {
   amaun: number;
 }
 
+export interface Pekeliling {
+  id: string;
+  noRujukan: string;
+  tarikh: string;
+  tarikhBerkuatkuasa?: string;
+  jenis?: 'Pekeliling' | 'Hebahan';
+  tajuk: string;
+  kandungan: string;
+  penerbit: string;
+  jawatanPenerbit: string;
+  kepentingan: 'Penting' | 'Biasa' | 'Segera';
+}
+
+export interface RoleAssignment {
+  nama: string;
+  tel: string;
+  noAhli?: string;
+}
+
+export interface ChartRoles {
+  [roleId: string]: RoleAssignment;
+}
+
 export interface AppState {
   members: Member[];
   ledger: LedgerRow[];
@@ -59,6 +82,8 @@ export interface AppState {
   ajkPassword?: string;
   kewangan?: KewanganTransaction[];
   customAccountNames?: { [key: string]: string };
+  chartRoles?: ChartRoles;
+  pekelilingList?: Pekeliling[];
 }
 
 export const MONTH_KEYS: (keyof LedgerRow)[] = [
