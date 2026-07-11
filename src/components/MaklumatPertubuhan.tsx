@@ -115,6 +115,7 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedPekeliling, setSelectedPekeliling] = useState<Pekeliling | null>(null);
   const [editingPekeliling, setEditingPekeliling] = useState<Pekeliling | null>(null);
+  const [pekelilingToDelete, setPekelilingToDelete] = useState<string | null>(null);
   
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
@@ -359,13 +360,17 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
   // Delete Circular
   const handleDeleteCircular = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm('Adakah anda pasti mahu memadam pekeliling rasmi ini?')) {
-      const filtered = pekelilingList.filter(p => p.id !== id);
-      savePekelilingToStorage(filtered);
-      if (selectedPekeliling?.id === id) {
-        setSelectedPekeliling(null);
-      }
+    setPekelilingToDelete(id);
+  };
+
+  const executeDeleteCircular = () => {
+    if (!pekelilingToDelete) return;
+    const filtered = pekelilingList.filter(p => p.id !== pekelilingToDelete);
+    savePekelilingToStorage(filtered);
+    if (selectedPekeliling?.id === pekelilingToDelete) {
+      setSelectedPekeliling(null);
     }
+    setPekelilingToDelete(null);
   };
 
   const handlePrintCircular = () => {
@@ -1225,6 +1230,42 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
               </div>
 
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Confirmation Modal for Deleting Pekeliling */}
+      {pekelilingToDelete !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-rose-950 border border-rose-900 text-rose-500 mb-4">
+                <Trash2 className="h-6 w-6" />
+              </div>
+              <h3 className="text-base font-black text-white uppercase tracking-wide">
+                Sahkan Padam Pekeliling
+              </h3>
+              <p className="mt-2 text-xs text-slate-400 font-sans leading-relaxed">
+                Adakah anda pasti mahu memadam dokumen pekeliling / hebahan rasmi ini? Tindakan ini adalah kekal dan tidak boleh diundur.
+              </p>
+            </div>
+            
+            <div className="mt-5 flex gap-3 font-black uppercase text-center text-[10px]">
+              <button
+                type="button"
+                onClick={() => setPekelilingToDelete(null)}
+                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700 transition rounded-xl cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={executeDeleteCircular}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white transition rounded-xl cursor-pointer shadow-md"
+              >
+                Ya, Padam
+              </button>
+            </div>
           </div>
         </div>
       )}
