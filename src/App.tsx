@@ -16,6 +16,7 @@ import ProfileDashboard from './components/ProfileDashboard';
 import ReportsSummary from './components/ReportsSummary';
 import IntegrationPanel from './components/IntegrationPanel';
 import PenyataKiraKira from './components/PenyataKiraKira';
+import MaklumatPertubuhan from './components/MaklumatPertubuhan';
 import { ShieldAlert, LogIn, Users, HelpCircle, FileText, CheckCircle2, Lock, ArrowLeft } from 'lucide-react';
 
 export default function App() {
@@ -644,6 +645,14 @@ export default function App() {
               state={state}
               onChangeState={handleChangeState}
               onNavigate={setActiveTab}
+              currentRole={currentRole}
+            />
+          )}
+
+          {activeTab === 'maklumat' && (
+            <MaklumatPertubuhan
+              state={state}
+              onChangeState={handleChangeState}
               currentRole={currentRole}
             />
           )}

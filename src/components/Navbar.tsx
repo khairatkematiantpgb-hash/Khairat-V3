@@ -20,6 +20,7 @@ export default function Navbar({ activeTab, onTabChange, state, currentRole, onL
   // Navigation tabs mapping
   const tabs = [
     { id: 'overview', label: 'Paparan Keseluruhan', icon: LayoutDashboard, role: 'both' },
+    { id: 'maklumat', label: 'Maklumat Pertubuhan', icon: HelpCircle, role: 'both' },
     { id: 'database', label: 'Pangkalan Data Ahli', icon: Users, role: 'both' },
     { id: 'payment', label: 'Bayaran Yuran Ahli', icon: CreditCard, role: 'admin' },
     { id: 'ledger', label: 'Rekod Jadual Pembayaran', icon: Table, role: 'both' },
