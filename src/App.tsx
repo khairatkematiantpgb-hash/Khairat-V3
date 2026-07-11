@@ -78,6 +78,13 @@ export default function App() {
     setState(newState);
     localStorage.setItem('khairat_gong_badak', JSON.stringify(newState));
     localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(newState));
+    
+    // Safety guard: Guest ('user') devices should NEVER write or overwrite the server-side master database!
+    if (currentRole === 'user' || !currentRole) {
+      console.log('Guest device: local state updated, skipping server upload to protect master database.');
+      return;
+    }
+
     try {
       await fetch('/api/state', {
         method: 'POST',
@@ -279,7 +286,8 @@ export default function App() {
 
   // Background polling untuk Google Sheets apabila berjalan di persekitaran offline / tanpa server (Vercel)
   useEffect(() => {
-    if (currentRole === 'admin' || !state.useGoogleSheets || !state.appsScriptUrl) return;
+    // Hanya jalankan jika kita adalah admin/ajk. Tetamu ('user') tidak perlu sync terus dengan Sheets (mereka poll dari pelayan /api/state)
+    if (currentRole === 'admin' || currentRole === 'user' || !state.useGoogleSheets || !state.appsScriptUrl) return;
 
     const sheetsPollInterval = setInterval(async () => {
       try {
@@ -313,9 +321,9 @@ export default function App() {
     return () => clearInterval(sheetsPollInterval);
   }, [currentRole, state.useGoogleSheets, state.appsScriptUrl]);
 
-  // Pull remote data on load if configured
+  // Pull remote data on load if configured - strictly restricted to admin/ajk to avoid startup race conditions for guests
   useEffect(() => {
-    if (currentRole && state.useGoogleSheets && state.appsScriptUrl) {
+    if (currentRole && currentRole !== 'user' && state.useGoogleSheets && state.appsScriptUrl) {
       handleRefreshFromSheets();
     }
   }, [currentRole, state.useGoogleSheets, state.appsScriptUrl]);
