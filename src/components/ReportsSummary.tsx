@@ -19,9 +19,44 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
   const [searchQuery, setSearchQuery] = useState('');
   const [isPrinting, setIsPrinting] = useState(false);
   const [filterGroup, setFilterGroup] = useState<string>('all');
+  const [addressFilter, setAddressFilter] = useState<string>('all');
   const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
 
   const kadarYuran = state.kadarYuranSebulan || 3;
+
+  // Helper to categorize house address
+  const getAddressCategory = (alamat: string | undefined): string => {
+    if (!alamat) return 'others';
+    const upper = alamat.trim().toUpperCase();
+    
+    // Check M / Blok M first (since Blok M starts with B but belongs in M group)
+    if (upper.startsWith('M') || upper.startsWith('BLOK M') || upper.startsWith('BLOCK M') || upper.startsWith('BLOKM') || upper.startsWith('BLOCKM')) {
+      return 'start_m';
+    }
+    // Check A / Blok A
+    if (upper.startsWith('A') || upper.startsWith('BLOK A') || upper.startsWith('BLOCK A') || upper.startsWith('BLOKA') || upper.startsWith('BLOCKA')) {
+      return 'start_a';
+    }
+    // Check B / Blok B
+    if (upper.startsWith('B') || upper.startsWith('BLOK B') || upper.startsWith('BLOCK B') || upper.startsWith('BLOKB') || upper.startsWith('BLOCKB')) {
+      return 'start_b';
+    }
+    // Check C / Blok C
+    if (upper.startsWith('C') || upper.startsWith('BLOK C') || upper.startsWith('BLOCK C') || upper.startsWith('BLOKC') || upper.startsWith('BLOCKC')) {
+      return 'start_c';
+    }
+    
+    return 'others';
+  };
+
+  const addressCategories = [
+    { id: 'all', label: 'Semua Alamat', count: state.members.length },
+    { id: 'start_a', label: 'A xxx', count: state.members.filter(m => getAddressCategory(m.alamat) === 'start_a').length },
+    { id: 'start_b', label: 'B xxx', count: state.members.filter(m => getAddressCategory(m.alamat) === 'start_b').length },
+    { id: 'start_c', label: 'C xxx', count: state.members.filter(m => getAddressCategory(m.alamat) === 'start_c').length },
+    { id: 'start_m', label: 'M xxx / Blok M xxx', count: state.members.filter(m => getAddressCategory(m.alamat) === 'start_m').length },
+    { id: 'others', label: 'Lain-lain', count: state.members.filter(m => getAddressCategory(m.alamat) === 'others').length },
+  ];
 
   // Calculate total outstanding overall arrears
   const totalDuesSum = state.members.reduce((sum, member) => {
@@ -190,28 +225,31 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
       if (!passSearch) return false;
 
       // 2. Group Filter
-      if (filterGroup === 'all') return true;
+      let passGroup = true;
+      if (filterGroup !== 'all') {
+        const stats = memberStats.find(s => s.noAhli === member.noAhli);
+        if (stats) {
+          if (filterGroup === 'tidak_aktif' || filterGroup === 'tiada') {
+            passGroup = stats.status !== 'Aktif';
+          } else if (filterGroup === 'aktif') {
+            passGroup = stats.status === 'Aktif';
+          } else if (filterGroup === 'lunas') {
+            passGroup = stats.status === 'Aktif' && stats.dues === 0;
+          } else if (filterGroup === 'ada_tunggakan') {
+            passGroup = stats.status === 'Aktif' && stats.dues > 0;
+          } else if (filterGroup === 'tunggakan_50') {
+            passGroup = stats.status === 'Aktif' && stats.dues > 50;
+          }
+        } else {
+          passGroup = false;
+        }
+      }
+      if (!passGroup) return false;
 
-      const stats = memberStats.find(s => s.noAhli === member.noAhli);
-      if (!stats) return true;
-
-      if (filterGroup === 'tidak_aktif') {
-        return stats.status !== 'Aktif';
-      }
-      if (filterGroup === 'aktif') {
-        return stats.status === 'Aktif';
-      }
-      if (filterGroup === 'tiada') {
-        return stats.status !== 'Aktif';
-      }
-      if (filterGroup === 'lunas') {
-        return stats.status === 'Aktif' && stats.dues === 0;
-      }
-      if (filterGroup === 'ada_tunggakan') {
-        return stats.status === 'Aktif' && stats.dues > 0;
-      }
-      if (filterGroup === 'tunggakan_50') {
-        return stats.status === 'Aktif' && stats.dues > 50;
+      // 3. Address Filter
+      if (addressFilter !== 'all') {
+        const addrCat = getAddressCategory(member.alamat);
+        if (addrCat !== addressFilter) return false;
       }
 
       return true;
@@ -540,6 +578,45 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
                   className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all duration-200 flex items-center gap-1.5 cursor-pointer select-none border border-slate-200/80 ${
                     isActive
                       ? 'bg-indigo-700 text-white border-indigo-800 shadow-md ring-2 ring-indigo-200 transform -translate-y-px scale-[1.02]'
+                      : 'bg-white hover:bg-slate-50 text-slate-700 hover:border-slate-350 shadow-xxs'
+                  }`}
+                >
+                  <span className="tracking-tight">{cat.label}</span>
+                  <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[9px] font-mono leading-none font-black ${badgeColor}`}>
+                    {cat.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Tapisan Alamat Rumah */}
+        <div className="space-y-2 pt-2 border-t border-slate-100">
+          <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
+            Tapis Mengikut Alamat Rumah:
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {addressCategories.map((cat) => {
+              const isActive = addressFilter === cat.id;
+              
+              let badgeColor = 'bg-slate-200 text-slate-700';
+              if (isActive) {
+                badgeColor = 'bg-emerald-900 text-emerald-100';
+              } else if (cat.id === 'others') {
+                badgeColor = 'bg-slate-50 text-slate-600 hover:bg-slate-100/85 hover:text-slate-700';
+              } else {
+                badgeColor = 'bg-sky-50 text-sky-700 hover:bg-sky-100/80 hover:text-sky-850';
+              }
+
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setAddressFilter(cat.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all duration-200 flex items-center gap-1.5 cursor-pointer select-none border border-slate-200/80 ${
+                    isActive
+                      ? 'bg-emerald-700 text-white border-emerald-800 shadow-md ring-2 ring-emerald-200 transform -translate-y-px scale-[1.02]'
                       : 'bg-white hover:bg-slate-50 text-slate-700 hover:border-slate-350 shadow-xxs'
                   }`}
                 >
