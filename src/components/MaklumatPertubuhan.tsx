@@ -114,6 +114,7 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
   // 3. States for adding new Circular
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedPekeliling, setSelectedPekeliling] = useState<Pekeliling | null>(null);
+  const [editingPekeliling, setEditingPekeliling] = useState<Pekeliling | null>(null);
   
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
@@ -275,40 +276,84 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
     setEditingRoleId(null);
   };
 
-  // Handle Create Circular
-  const handleCreateCircular = (e: React.FormEvent) => {
+  // Handle Create or Update Circular
+  const handleSaveCircular = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim() || !newContent.trim()) return;
 
-    const currentYear = new Date().getFullYear();
-    const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
-    const currentDate = String(new Date().getDate()).padStart(2, '0');
-    const formattedDate = `${currentYear}-${currentMonth}-${currentDate}`;
-    
-    const sequentialNum = String(pekelilingList.length + 1).padStart(2, '0');
-    const newRef = `PKKKBGB/${currentYear}/PEK/${sequentialNum}`;
+    if (editingPekeliling) {
+      // Update existing
+      const updated = pekelilingList.map(p => {
+        if (p.id === editingPekeliling.id) {
+          return {
+            ...p,
+            jenis: newJenis,
+            tajuk: newTitle,
+            kandungan: newContent,
+            penerbit: newIssuer,
+            jawatanPenerbit: newIssuerRole,
+            kepentingan: newPriority,
+            tarikhBerkuatkuasa: newTarikhBerkuatkuasa || undefined
+          };
+        }
+        return p;
+      });
+      savePekelilingToStorage(updated);
+      
+      // If the edited circular is currently viewed, update the viewed state as well
+      if (selectedPekeliling?.id === editingPekeliling.id) {
+        const updatedPek = updated.find(p => p.id === editingPekeliling.id);
+        if (updatedPek) setSelectedPekeliling(updatedPek);
+      }
+    } else {
+      // Create new
+      const currentYear = new Date().getFullYear();
+      const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+      const currentDate = String(new Date().getDate()).padStart(2, '0');
+      const formattedDate = `${currentYear}-${currentMonth}-${currentDate}`;
+      
+      const sequentialNum = String(pekelilingList.length + 1).padStart(2, '0');
+      const newRef = `PKKKBGB/${currentYear}/PEK/${sequentialNum}`;
 
-    const newPek: Pekeliling = {
-      id: `pek-${Date.now()}`,
-      noRujukan: newRef,
-      tarikh: formattedDate,
-      tarikhBerkuatkuasa: newTarikhBerkuatkuasa || undefined,
-      jenis: newJenis,
-      tajuk: newTitle,
-      kandungan: newContent,
-      penerbit: newIssuer,
-      jawatanPenerbit: newIssuerRole,
-      kepentingan: newPriority
-    };
+      const newPek: Pekeliling = {
+        id: `pek-${Date.now()}`,
+        noRujukan: newRef,
+        tarikh: formattedDate,
+        tarikhBerkuatkuasa: newTarikhBerkuatkuasa || undefined,
+        jenis: newJenis,
+        tajuk: newTitle,
+        kandungan: newContent,
+        penerbit: newIssuer,
+        jawatanPenerbit: newIssuerRole,
+        kepentingan: newPriority
+      };
 
-    const updated = [newPek, ...pekelilingList];
-    savePekelilingToStorage(updated);
+      const updated = [newPek, ...pekelilingList];
+      savePekelilingToStorage(updated);
+    }
     
     setNewTitle('');
     setNewContent('');
     setNewTarikhBerkuatkuasa('');
     setNewJenis('Pekeliling');
+    setNewIssuer('Encik Zakaria bin Jusoh');
+    setNewIssuerRole('Setiausaha Agung');
+    setNewPriority('Biasa');
+    setEditingPekeliling(null);
     setShowAddModal(false);
+  };
+
+  // Populate form to edit circular
+  const handleEditCircular = (pek: Pekeliling) => {
+    setEditingPekeliling(pek);
+    setNewTitle(pek.tajuk);
+    setNewContent(pek.kandungan);
+    setNewIssuer(pek.penerbit);
+    setNewIssuerRole(pek.jawatanPenerbit || '');
+    setNewPriority(pek.kepentingan);
+    setNewJenis(pek.jenis || 'Pekeliling');
+    setNewTarikhBerkuatkuasa(pek.tarikhBerkuatkuasa || '');
+    setShowAddModal(true);
   };
 
   // Delete Circular
@@ -685,13 +730,25 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
                         
                         <div className="flex items-center gap-2">
                           {currentRole === 'admin' && (
-                            <button
-                              onClick={(e) => handleDeleteCircular(pek.id, e)}
-                              className="p-1 text-slate-400 hover:text-rose-600 transition rounded hover:bg-rose-50"
-                              title="Padam Pekeliling"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditCircular(pek);
+                                }}
+                                className="p-1 text-slate-400 hover:text-amber-600 transition rounded hover:bg-amber-50"
+                                title="Kemaskini Pekeliling"
+                              >
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={(e) => handleDeleteCircular(pek.id, e)}
+                                className="p-1 text-slate-400 hover:text-rose-600 transition rounded hover:bg-rose-50"
+                                title="Padam Pekeliling"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </>
                           )}
                           <span className="text-emerald-700 font-bold group-hover:translate-x-0.5 transition-transform flex items-center">
                             Baca &rarr;
@@ -871,6 +928,20 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
               </span>
               
               <div className="flex items-center gap-1.5">
+                {currentRole === 'admin' && (
+                  <button
+                    onClick={() => {
+                      const pekToEdit = selectedPekeliling;
+                      setSelectedPekeliling(null);
+                      handleEditCircular(pekToEdit);
+                    }}
+                    className="p-1.8 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg transition text-xs font-bold flex items-center gap-1 cursor-pointer"
+                    title="Kemaskini Surat"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                    <span>Kemaskini</span>
+                  </button>
+                )}
                 <button
                   onClick={handlePrintCircular}
                   className="p-1.8 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition text-xs font-bold flex items-center gap-1 cursor-pointer"
@@ -963,18 +1034,28 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
             
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <h3 className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-                <Plus className="h-4 w-4" />
-                Tambah Surat Pekeliling
+                {editingPekeliling ? <Edit2 className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                {editingPekeliling ? 'Kemaskini Surat Pekeliling' : 'Tambah Surat Pekeliling'}
               </h3>
               <button 
-                onClick={() => setShowAddModal(false)}
-                className="text-slate-400 hover:text-white cursor-pointer"
+                onClick={() => {
+                  setShowAddModal(false);
+                  setEditingPekeliling(null);
+                  setNewTitle('');
+                  setNewContent('');
+                  setNewTarikhBerkuatkuasa('');
+                  setNewJenis('Pekeliling');
+                  setNewIssuer('Encik Zakaria bin Jusoh');
+                  setNewIssuerRole('Setiausaha Agung');
+                  setNewPriority('Biasa');
+                }}
+                className="text-slate-400 hover:text-white cursor-pointer text-lg font-bold"
               >
                 &times;
               </button>
             </div>
 
-            <form onSubmit={handleCreateCircular} className="space-y-3.5 text-left text-xs font-sans">
+            <form onSubmit={handleSaveCircular} className="space-y-3.5 text-left text-xs font-sans">
               
               <div className="space-y-1">
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tajuk Dokumen</label>
@@ -1120,7 +1201,17 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
               <div className="pt-2 flex gap-2 font-black uppercase text-center text-[10px]">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setEditingPekeliling(null);
+                    setNewTitle('');
+                    setNewContent('');
+                    setNewTarikhBerkuatkuasa('');
+                    setNewJenis('Pekeliling');
+                    setNewIssuer('Encik Zakaria bin Jusoh');
+                    setNewIssuerRole('Setiausaha Agung');
+                    setNewPriority('Biasa');
+                  }}
                   className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-850 text-slate-350 hover:text-white border border-slate-800 transition rounded-xl cursor-pointer"
                 >
                   Batal
@@ -1129,7 +1220,7 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
                   type="submit"
                   className="flex-1 py-2.5 bg-[#047857] hover:bg-emerald-700 text-white transition rounded-xl cursor-pointer shadow-md"
                 >
-                  Simpan Pekeliling / Hebahan
+                  {editingPekeliling ? 'Simpan Perubahan' : 'Simpan Pekeliling / Hebahan'}
                 </button>
               </div>
 
