@@ -115,7 +115,9 @@ export default function App() {
           members: result.data.members || state.members,
           ledger: result.data.ledger || state.ledger,
           kewangan: result.data.kewangan || state.kewangan || [],
-          googleSheetsId: result.data.spreadsheetId || state.googleSheetsId
+          googleSheetsId: result.data.spreadsheetId || state.googleSheetsId,
+          chartRoles: (result.data.chartRoles && Object.keys(result.data.chartRoles).length > 0) ? result.data.chartRoles : state.chartRoles,
+          pekelilingList: (result.data.pekelilingList && result.data.pekelilingList.length > 0) ? result.data.pekelilingList : state.pekelilingList
         };
         await handleChangeState(mergedState);
       } else {
@@ -255,7 +257,7 @@ export default function App() {
 
   // Setup standard dynamic polling for guest/visitor devices to get live database updates automatically
   useEffect(() => {
-    if (currentRole === 'admin') return; // Admin updates are pushed transactionally. Guests poll.
+    if (currentRole === 'admin' || state.useGoogleSheets) return; // Admin updates are pushed transactionally. If Sheets is active, we sync from Sheets instead of stale server database.
 
     const pollInterval = setInterval(async () => {
       try {
@@ -286,8 +288,8 @@ export default function App() {
 
   // Background polling untuk Google Sheets apabila berjalan di persekitaran offline / tanpa server (Vercel)
   useEffect(() => {
-    // Hanya jalankan jika kita adalah admin/ajk. Tetamu ('user') tidak perlu sync terus dengan Sheets (mereka poll dari pelayan /api/state)
-    if (currentRole === 'admin' || currentRole === 'user' || !state.useGoogleSheets || !state.appsScriptUrl) return;
+    // Apabila Google Sheets diaktifkan, semua pengguna (termasuk tetamu) akan menyegerak dari Google Sheets terus
+    if (currentRole === 'admin' || !state.useGoogleSheets || !state.appsScriptUrl) return;
 
     const sheetsPollInterval = setInterval(async () => {
       try {
@@ -300,7 +302,9 @@ export default function App() {
               members: result.data.members || prevState.members,
               ledger: result.data.ledger || prevState.ledger,
               kewangan: result.data.kewangan || prevState.kewangan || [],
-              googleSheetsId: result.data.spreadsheetId || prevState.googleSheetsId
+              googleSheetsId: result.data.spreadsheetId || prevState.googleSheetsId,
+              chartRoles: (result.data.chartRoles && Object.keys(result.data.chartRoles).length > 0) ? result.data.chartRoles : prevState.chartRoles,
+              pekelilingList: (result.data.pekelilingList && result.data.pekelilingList.length > 0) ? result.data.pekelilingList : prevState.pekelilingList
             };
             
             const currentString = localStorage.getItem('khairat_gong_badak');
@@ -321,12 +325,12 @@ export default function App() {
     return () => clearInterval(sheetsPollInterval);
   }, [currentRole, state.useGoogleSheets, state.appsScriptUrl]);
 
-  // Pull remote data on load if configured - strictly restricted to admin/ajk to avoid startup race conditions for guests
+  // Pull remote data on load if configured
   useEffect(() => {
-    if (currentRole && currentRole !== 'user' && state.useGoogleSheets && state.appsScriptUrl) {
+    if (state.useGoogleSheets && state.appsScriptUrl) {
       handleRefreshFromSheets();
     }
-  }, [currentRole, state.useGoogleSheets, state.appsScriptUrl]);
+  }, [state.useGoogleSheets, state.appsScriptUrl]);
 
   // Handle simulated login
   const handleLogin = async (role: 'admin' | 'user' | 'ajk') => {

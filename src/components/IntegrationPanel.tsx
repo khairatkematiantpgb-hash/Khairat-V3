@@ -215,7 +215,9 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
       action: 'syncLocalToSheets',
       members: state.members,
       ledger: state.ledger,
-      kewangan: state.kewangan || []
+      kewangan: state.kewangan || [],
+      chartRoles: state.chartRoles || {},
+      pekelilingList: state.pekelilingList || []
     };
 
     try {
@@ -225,7 +227,9 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
           ...state,
           members: result.data.members,
           ledger: result.data.ledger,
-          kewangan: result.data.kewangan || state.kewangan || []
+          kewangan: result.data.kewangan || state.kewangan || [],
+          chartRoles: result.data.chartRoles || state.chartRoles || {},
+          pekelilingList: result.data.pekelilingList || state.pekelilingList || []
         });
         setTestResult({
           success: true,

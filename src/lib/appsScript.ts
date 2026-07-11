@@ -13,6 +13,8 @@ export const APPS_SCRIPT_CODE = `/**
  * 1. "Pangkalan Data Ahli"  - (Mengandungi Lajur: No. Ahli, Nama, No. IC, Alamat, Status, Catatan, Tanggungan, No. Telefon)
  * 2. "Rekod Jadual Pembayaran (Lejar)" - (Mengandungi Lajur: No. Ahli, Nama, Tahun, JAN, FEB, MAC, APR, MEI, JUN, JUL, OGO, SEP, OKT, NOV, DIS, Lebih)
  * 3. "Penyata Kira-Kira (Kewangan)" - (Mengandungi Lajur: ID, Tarikh, Kenyataan, Kategori Akaun, Jenis Transaksi, Amaun)
+ * 4. "Carta Organisasi" - (Mengandungi Lajur: Jawatan ID, Nama, No. Telefon, No. Ahli)
+ * 5. "Pekeliling & Hebahan" - (Mengandungi Lajur: ID, No. Rujukan, Tarikh, Tarikh Berkuatkuasa, Jenis, Tajuk, Kandungan, Penerbit, Jawatan Penerbit, Kepentingan)
  */
 
 function setupSheets() {
@@ -56,6 +58,73 @@ function setupSheets() {
     sheetKewangan.setFrozenRows(1);
   }
 
+  // 4. Setup Tab Carta Organisasi jika belum ada
+  let sheetCarta = ss.getSheetByName("Carta Organisasi");
+  if (!sheetCarta) {
+    sheetCarta = ss.insertSheet("Carta Organisasi");
+    sheetCarta.appendRow(["Jawatan ID", "Nama", "No. Telefon", "No. Ahli"]);
+    sheetCarta.getRange("A1:D1").setBackground("#334155").setFontColor("#ffffff").setFontWeight("bold");
+    sheetCarta.setFrozenRows(1);
+    
+    // Default roles on initial install
+    const defaultRoles = [
+      ["pengerusi", "LAKSAMANA DATO' PAHLAWAN HJ. SULAIMAN BIN MOHAMAD (B)", "013-5871409", ""],
+      ["timb_pengerusi", "IR. HJ. ABDUL RAHIM BIN JAAFAR", "019-5581192", ""],
+      ["setiausaha", "HJ. SALLEH BIN HASHIM", "019-5514670", ""],
+      ["pen_setiausaha", "HJ. AHMAD BIN HAMZAH", "012-4565905", ""],
+      ["bendahari", "HJ. JAMALUDDIN BIN MOHAMAD", "013-4842213", ""],
+      ["pemeriksa_kira1", "HJ. WAN SALLEH BIN WAN MAT", "019-9430113", ""],
+      ["pemeriksa_kira2", "HJ. MOHD NORDIN BIN MAT ISMAIL", "019-9150033", ""],
+      ["ajk1", "HJ. HASBULLAH BIN ABD RAHMAN", "019-9556391", ""],
+      ["ajk2", "HJ. MOHD NOOR BIN MAMAT", "019-9896791", ""],
+      ["ajk3", "EN. NIK AB GHANI BIN NIK WAN", "012-9214713", ""],
+      ["ajk4", "EN. AMRAN BIN ISMAIL", "013-9828236", ""],
+      ["ajk5", "HJ. MOHD RAMLI BIN YUSOF", "019-9060049", ""],
+      ["ajk6", "HJ. MOHD SAFIAI BIN HARUN", "019-9130767", ""],
+      ["ajk7", "EN. WAN NIK BIN WAN ISMAIL", "011-10515152", ""],
+      ["ajk8", "EN. ISMAIL BIN EMBONG", "019-9152285", ""],
+      ["ajk9", "HJ. IBRAHIM BIN DOLLAH", "013-9394344", ""]
+    ];
+    sheetCarta.getRange(2, 1, defaultRoles.length, 4).setValues(defaultRoles);
+  }
+
+  // 5. Setup Tab Pekeliling & Hebahan jika belum ada
+  let sheetPekeliling = ss.getSheetByName("Pekeliling & Hebahan");
+  if (!sheetPekeliling) {
+    sheetPekeliling = ss.insertSheet("Pekeliling & Hebahan");
+    sheetPekeliling.appendRow(["ID", "No. Rujukan", "Tarikh", "Tarikh Berkuatkuasa", "Jenis", "Tajuk", "Kandungan", "Penerbit", "Jawatan Penerbit", "Kepentingan"]);
+    sheetPekeliling.getRange("A1:J1").setBackground("#334155").setFontColor("#ffffff").setFontWeight("bold");
+    sheetPekeliling.setFrozenRows(1);
+
+    const defaultPekeliling = [
+      [
+        "pekeliling-1",
+        "KKKGB/01/2026-T1",
+        "2026-05-15",
+        "2026-05-15",
+        "Pekeliling",
+        "Penyelarasan Kadar Yuran Khairat Kematian Mulai 2026",
+        "Sila ambil perhatian bahawa kadar sumbangan tahunan khairat kematian diselaraskan untuk menjamin kelangsungan tabung kebajikan serta menampung kos pengurusan jenazah kariah Kampung Gong Badak.",
+        "HJ. SALLEH BIN HASHIM",
+        "Setiausaha",
+        "Penting"
+      ],
+      [
+        "pekeliling-2",
+        "KKKGB/02/2026-H1",
+        "2026-06-01",
+        "2026-06-10",
+        "Hebahan",
+        "Hebahan Majlis Tahlil Perdana & Solat Hajat Kariah",
+        "Semua kariah dijemput hadir ke Majlis Tahlil Perdana & Solat Hajat yang akan diadakan di Masjid An-Nasriyah Kampung Gong Badak pada tarikh berkuatkuasa bagi mendoakan kesejahteraan seluruh ahli kariah.",
+        "LAKSAMANA DATO' PAHLAWAN HJ. SULAIMAN BIN MOHAMAD (B)",
+        "Pengerusi",
+        "Biasa"
+      ]
+    ];
+    sheetPekeliling.getRange(2, 1, defaultPekeliling.length, 10).setValues(defaultPekeliling);
+  }
+
   // Tetapkan format teks biasa (@) bagi kolum kritikal untuk mengelakkan kehilangan '0' di depan
   sheetAhli.getRange("A:A").setNumberFormat("@"); // No. Ahli
   sheetAhli.getRange("C:C").setNumberFormat("@"); // No. IC
@@ -80,6 +149,8 @@ function doGet(e) {
       const sheetAhli = ss.getSheetByName("Pangkalan Data Ahli");
       const sheetLejar = ss.getSheetByName("Rekod Jadual Pembayaran (Lejar)");
       const sheetKewangan = ss.getSheetByName("Penyata Kira-Kira (Kewangan)");
+      const sheetCarta = ss.getSheetByName("Carta Organisasi");
+      const sheetPekeliling = ss.getSheetByName("Pekeliling & Hebahan");
       
       // Ambil Rekod Ahli
       const dataAhli = sheetAhli.getDataRange().getValues();
@@ -157,13 +228,68 @@ function doGet(e) {
           });
         }
       }
+
+      // Ambil Rekod Carta Organisasi (Roles)
+      const chartRoles = {};
+      if (sheetCarta) {
+        const dataCarta = sheetCarta.getDataRange().getValues();
+        for (let i = 1; i < dataCarta.length; i++) {
+          const roleId = String(dataCarta[i][0]).trim();
+          if (!roleId) continue;
+          chartRoles[roleId] = {
+            nama: String(dataCarta[i][1] || ""),
+            tel: String(dataCarta[i][2] || ""),
+            noAhli: String(dataCarta[i][3] || "")
+          };
+        }
+      }
+
+      // Ambil Rekod Pekeliling
+      const pekelilingList = [];
+      if (sheetPekeliling) {
+        const dataPekeliling = sheetPekeliling.getDataRange().getValues();
+        for (let i = 1; i < dataPekeliling.length; i++) {
+          if (!dataPekeliling[i][0]) continue;
+          
+          let tarikhVal = dataPekeliling[i][2];
+          let tarikhStr = "";
+          if (tarikhVal instanceof Date) {
+            tarikhStr = Utilities.formatDate(tarikhVal, Session.getScriptTimeZone(), "yyyy-MM-dd");
+          } else {
+            tarikhStr = String(tarikhVal || "");
+          }
+
+          let tarikhBVal = dataPekeliling[i][3];
+          let tarikhBStr = "";
+          if (tarikhBVal instanceof Date) {
+            tarikhBStr = Utilities.formatDate(tarikhBVal, Session.getScriptTimeZone(), "yyyy-MM-dd");
+          } else {
+            tarikhBStr = String(tarikhBVal || "");
+          }
+
+          pekelilingList.push({
+            id: String(dataPekeliling[i][0]),
+            noRujukan: String(dataPekeliling[i][1] || ""),
+            tarikh: tarikhStr,
+            tarikhBerkuatkuasa: tarikhBStr,
+            jenis: String(dataPekeliling[i][4] || "Pekeliling"),
+            tajuk: String(dataPekeliling[i][5] || ""),
+            kandungan: String(dataPekeliling[i][6] || ""),
+            penerbit: String(dataPekeliling[i][7] || ""),
+            jawatanPenerbit: String(dataPekeliling[i][8] || ""),
+            kepentingan: String(dataPekeliling[i][9] || "Biasa")
+          });
+        }
+      }
       
       return replyJSON({
         status: "success",
         spreadsheetId: ss.getId(),
         members: members,
         ledger: ledger,
-        kewangan: kewangan
+        kewangan: kewangan,
+        chartRoles: chartRoles,
+        pekelilingList: pekelilingList
       });
     } catch (err) {
       return replyJSON({ status: "error", message: err.toString() });
@@ -188,6 +314,8 @@ function doPost(e) {
   const sheetAhli = ss.getSheetByName("Pangkalan Data Ahli");
   const sheetLejar = ss.getSheetByName("Rekod Jadual Pembayaran (Lejar)");
   const sheetKewangan = ss.getSheetByName("Penyata Kira-Kira (Kewangan)");
+  const sheetCarta = ss.getSheetByName("Carta Organisasi");
+  const sheetPekeliling = ss.getSheetByName("Pekeliling & Hebahan");
   
   if (action === "padamAhli") {
     const noAhli = String(payload.noAhli);
@@ -222,6 +350,12 @@ function doPost(e) {
     if (sheetKewangan && sheetKewangan.getLastRow() > 1) {
       sheetKewangan.getRange(2, 1, sheetKewangan.getLastRow() - 1, sheetKewangan.getLastColumn()).clearContent();
     }
+    if (sheetCarta && sheetCarta.getLastRow() > 1) {
+      sheetCarta.getRange(2, 1, sheetCarta.getLastRow() - 1, sheetCarta.getLastColumn()).clearContent();
+    }
+    if (sheetPekeliling && sheetPekeliling.getLastRow() > 1) {
+      sheetPekeliling.getRange(2, 1, sheetPekeliling.getLastRow() - 1, sheetPekeliling.getLastColumn()).clearContent();
+    }
     
     return getDirectData(ss, "Seluruh pangkalan data telah dikosongkan.");
   }
@@ -237,6 +371,12 @@ function doPost(e) {
       }
       if (sheetKewangan && sheetKewangan.getLastRow() > 1) {
         sheetKewangan.getRange(2, 1, sheetKewangan.getLastRow() - 1, sheetKewangan.getLastColumn()).clearContent();
+      }
+      if (sheetCarta && sheetCarta.getLastRow() > 1) {
+        sheetCarta.getRange(2, 1, sheetCarta.getLastRow() - 1, sheetCarta.getLastColumn()).clearContent();
+      }
+      if (sheetPekeliling && sheetPekeliling.getLastRow() > 1) {
+        sheetPekeliling.getRange(2, 1, sheetPekeliling.getLastRow() - 1, sheetPekeliling.getLastColumn()).clearContent();
       }
       
       // 2. Tulis Senarai Ahli Baru
@@ -271,6 +411,25 @@ function doPost(e) {
         ]);
         sheetKewangan.getRange(2, 1, rowsKewangan.length, 6).setValues(rowsKewangan);
       }
+
+      // 5. Tulis Carta Organisasi Baru
+      const chartRolesObj = payload.chartRoles || {};
+      const chartRoleKeys = Object.keys(chartRolesObj);
+      if (chartRoleKeys.length > 0 && sheetCarta) {
+        const rowsCarta = chartRoleKeys.map(k => [
+          k, chartRolesObj[k].nama || "", chartRolesObj[k].tel || "", chartRolesObj[k].noAhli || ""
+        ]);
+        sheetCarta.getRange(2, 1, rowsCarta.length, 4).setValues(rowsCarta);
+      }
+
+      // 6. Tulis Pekeliling Baru
+      const pekelilingListArr = payload.pekelilingList || [];
+      if (pekelilingListArr.length > 0 && sheetPekeliling) {
+        const rowsPekeliling = pekelilingListArr.map(p => [
+          p.id, p.noRujukan || "", p.tarikh || "", p.tarikhBerkuatkuasa || "", p.jenis || "Pekeliling", p.tajuk || "", p.kandungan || "", p.penerbit || "", p.jawatanPenerbit || "", p.kepentingan || "Biasa"
+        ]);
+        sheetPekeliling.getRange(2, 1, rowsPekeliling.length, 10).setValues(rowsPekeliling);
+      }
       
       return getDirectData(ss, "Penyegerakan tempatan ke Cloud dwi-hala berjaya.");
     } catch (err) {
@@ -286,6 +445,8 @@ function getDirectData(ss, infoMessage) {
   const sheetAhli = ss.getSheetByName("Pangkalan Data Ahli");
   const sheetLejar = ss.getSheetByName("Rekod Jadual Pembayaran (Lejar)");
   const sheetKewangan = ss.getSheetByName("Penyata Kira-Kira (Kewangan)");
+  const sheetCarta = ss.getSheetByName("Carta Organisasi");
+  const sheetPekeliling = ss.getSheetByName("Pekeliling & Hebahan");
   
   const dataAhli = sheetAhli.getDataRange().getValues();
   const members = [];
@@ -357,6 +518,59 @@ function getDirectData(ss, infoMessage) {
       });
     }
   }
+
+  // Ambil Rekod Carta Organisasi (Roles)
+  const chartRoles = {};
+  if (sheetCarta) {
+    const dataCarta = sheetCarta.getDataRange().getValues();
+    for (let i = 1; i < dataCarta.length; i++) {
+      const roleId = String(dataCarta[i][0]).trim();
+      if (!roleId) continue;
+      chartRoles[roleId] = {
+        nama: String(dataCarta[i][1] || ""),
+        tel: String(dataCarta[i][2] || ""),
+        noAhli: String(dataCarta[i][3] || "")
+      };
+    }
+  }
+
+  // Ambil Rekod Pekeliling
+  const pekelilingList = [];
+  if (sheetPekeliling) {
+    const dataPekeliling = sheetPekeliling.getDataRange().getValues();
+    for (let i = 1; i < dataPekeliling.length; i++) {
+      if (!dataPekeliling[i][0]) continue;
+      
+      let tarikhVal = dataPekeliling[i][2];
+      let tarikhStr = "";
+      if (tarikhVal instanceof Date) {
+        tarikhStr = Utilities.formatDate(tarikhVal, Session.getScriptTimeZone(), "yyyy-MM-dd");
+      } else {
+        tarikhStr = String(tarikhVal || "");
+      }
+
+      let tarikhBVal = dataPekeliling[i][3];
+      let tarikhBStr = "";
+      if (tarikhBVal instanceof Date) {
+        tarikhBStr = Utilities.formatDate(tarikhBVal, Session.getScriptTimeZone(), "yyyy-MM-dd");
+      } else {
+        tarikhBStr = String(tarikhBVal || "");
+      }
+
+      pekelilingList.push({
+        id: String(dataPekeliling[i][0]),
+        noRujukan: String(dataPekeliling[i][1] || ""),
+        tarikh: tarikhStr,
+        tarikhBerkuatkuasa: tarikhBStr,
+        jenis: String(dataPekeliling[i][4] || "Pekeliling"),
+        tajuk: String(dataPekeliling[i][5] || ""),
+        kandungan: String(dataPekeliling[i][6] || ""),
+        penerbit: String(dataPekeliling[i][7] || ""),
+        jawatanPenerbit: String(dataPekeliling[i][8] || ""),
+        kepentingan: String(dataPekeliling[i][9] || "Biasa")
+      });
+    }
+  }
   
   return replyJSON({
     status: "success",
@@ -365,7 +579,9 @@ function getDirectData(ss, infoMessage) {
     data: {
       members: members,
       ledger: ledger,
-      kewangan: kewangan
+      kewangan: kewangan,
+      chartRoles: chartRoles,
+      pekelilingList: pekelilingList
     }
   });
 }
