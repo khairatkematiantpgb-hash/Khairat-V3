@@ -29,22 +29,42 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
     if (!alamat) return 'others';
     const upper = alamat.trim().toUpperCase();
     
-    // Check M / Blok M first (since Blok M starts with B but belongs in M group)
-    if (upper.startsWith('M') || upper.startsWith('BLOK M') || upper.startsWith('BLOCK M') || upper.startsWith('BLOKM') || upper.startsWith('BLOCKM')) {
-      return 'start_m';
-    }
-    // Check A / Blok A
-    if (upper.startsWith('A') || upper.startsWith('BLOK A') || upper.startsWith('BLOCK A') || upper.startsWith('BLOKA') || upper.startsWith('BLOCKA')) {
-      return 'start_a';
-    }
-    // Check B / Blok B
-    if (upper.startsWith('B') || upper.startsWith('BLOK B') || upper.startsWith('BLOCK B') || upper.startsWith('BLOKB') || upper.startsWith('BLOCKB')) {
-      return 'start_b';
-    }
-    // Check C / Blok C
-    if (upper.startsWith('C') || upper.startsWith('BLOK C') || upper.startsWith('BLOCK C') || upper.startsWith('BLOKC') || upper.startsWith('BLOCKC')) {
-      return 'start_c';
-    }
+    const hasBlockOrHouse = (str: string, letter: string): boolean => {
+      // 1. Check if it starts with the letter followed by a non-letter (or end of string)
+      const startsWithPattern = new RegExp(`^${letter}([^A-Z]|$)`);
+      if (startsWithPattern.test(str)) {
+        return true;
+      }
+      
+      // 2. Check if it contains keywords: BLOK X, BLOCK X, RUMAH X, LOT X, NO X, NO. X
+      const keywords = ['BLOK', 'BLOCK', 'RUMAH', 'LOT', 'NO', 'NO.'];
+      for (const kw of keywords) {
+        const patterns = [
+          `${kw} ${letter}`,
+          `${kw}-${letter}`,
+          `${kw}${letter}`
+        ];
+        for (const p of patterns) {
+          if (str.includes(p)) {
+            return true;
+          }
+        }
+      }
+
+      // 3. Match if the letter appears as a separate word/code inside the address,
+      // e.g., preceded by a non-letter and followed by a non-letter.
+      const wordPattern = new RegExp(`[^A-Z]${letter}([^A-Z]|$)`);
+      if (wordPattern.test(str)) {
+        return true;
+      }
+
+      return false;
+    };
+
+    if (hasBlockOrHouse(upper, 'M')) return 'start_m';
+    if (hasBlockOrHouse(upper, 'A')) return 'start_a';
+    if (hasBlockOrHouse(upper, 'B')) return 'start_b';
+    if (hasBlockOrHouse(upper, 'C')) return 'start_c';
     
     return 'others';
   };
