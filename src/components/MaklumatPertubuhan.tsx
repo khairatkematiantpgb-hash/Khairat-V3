@@ -423,7 +423,7 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
             {/* Hierarchy Tree (Responsively designed to match the uploaded diagram layout) */}
             <div className="relative p-2 md:p-6 bg-white border border-slate-150 rounded-2xl shadow-sm overflow-x-auto min-w-[700px] md:min-w-0">
               
-              <div className="flex flex-col items-center space-y-4">
+              <div className="flex flex-col items-center">
                 
                 {/* Level 1: PENGERUSI (Centered at top) */}
                 <div className="flex justify-center w-full relative z-10">
@@ -431,18 +431,18 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
                 </div>
 
                 {/* Vertical Connector Line from Pengerusi to Horizontal Bar */}
-                <div className="w-1.5 h-6 bg-slate-900 -mt-1" />
+                <div className="w-1.5 h-8 bg-slate-900 !mt-0 z-0" />
 
                 {/* Level 2: Left-Center-Right Layout connected with horizontal line */}
-                <div className="w-full relative">
+                <div className="w-full relative !mt-0">
                   
                   {/* The Horizontal Connector Line */}
-                  <div className="absolute top-0 left-[16%] right-[16%] h-1.5 bg-slate-900" />
+                  <div className="absolute top-0 left-[16.67%] right-[16.67%] h-1.5 bg-slate-900" />
                   
                   {/* Vertical drops at the endpoints of the line */}
-                  <div className="absolute top-0 left-[16%] w-1.5 h-4 bg-slate-900" />
+                  <div className="absolute top-0 left-[16.67%] w-1.5 h-4 bg-slate-900" />
                   <div className="absolute top-0 left-1/2 -ml-[3px] w-1.5 h-4 bg-slate-900" />
-                  <div className="absolute top-0 right-[16%] w-1.5 h-4 bg-slate-900" />
+                  <div className="absolute top-0 right-[16.67%] w-1.5 h-4 bg-slate-900" />
 
                   {/* Three pillars below horizontal line: Bendahari (Left), Timb. Pengerusi (Center), Setiausaha (Right) */}
                   <div className="grid grid-cols-3 gap-4 pt-4 relative z-10">
@@ -453,11 +453,11 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
                     </div>
 
                     {/* Center: TIMB. PENGERUSI */}
-                    <div className="flex flex-col items-center">
+                    <div className="flex flex-col items-center h-full">
                       {renderCard('timb_pengerusi')}
                       
                       {/* Vertical line going down from Timb Pengerusi to AJKs section */}
-                      <div className="w-1.5 h-10 bg-slate-900" />
+                      <div className="w-1.5 flex-grow bg-slate-900" />
                     </div>
 
                     {/* Right: SETIAUSAHA */}
@@ -475,9 +475,13 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
                 </div>
 
                 {/* Level 3: 10 Ahli Jawatankuasa under Timb. Pengerusi */}
-                <div className="w-full border-t-2 border-slate-350 pt-5 mt-4">
-                  <div className="text-center mb-4">
-                    <span className="bg-slate-150 text-slate-800 font-extrabold text-[10px] tracking-widest uppercase py-1 px-4 rounded-full border border-slate-300 font-mono">
+                <div className="w-full border-t-4 border-slate-900 pt-6 !mt-0 relative">
+                  
+                  {/* Vertical connector line inside Level 3 */}
+                  <div className="absolute top-0 left-1/2 -ml-[3px] w-1.5 h-16 bg-slate-900 pointer-events-none" />
+                  
+                  <div className="text-center mb-6 relative z-10">
+                    <span className="bg-white border-2 border-slate-900 text-slate-950 font-black text-[10px] tracking-widest uppercase py-1.5 px-5 rounded-full font-mono">
                       AHLI JAWATANKUASA (10 ORANG) - Di bawah Timbalan Pengerusi
                     </span>
                   </div>
