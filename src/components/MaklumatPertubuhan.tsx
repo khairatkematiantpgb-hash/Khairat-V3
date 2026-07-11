@@ -32,6 +32,8 @@ interface Pekeliling {
   id: string;
   noRujukan: string;
   tarikh: string;
+  tarikhBerkuatkuasa?: string;
+  jenis?: 'Pekeliling' | 'Hebahan';
   tajuk: string;
   kandungan: string;
   penerbit: string;
@@ -83,6 +85,8 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
         id: 'pek-1',
         noRujukan: 'PKKKBGB/2026/PEK/01',
         tarikh: '2026-01-01',
+        tarikhBerkuatkuasa: '2026-01-01',
+        jenis: 'Pekeliling',
         tajuk: 'Penetapan Caruman Kebajikan & Yuran Khairat Bulanan RM3',
         kandungan: `Dengan hormat takzimnya perkara di atas adalah dirujuk.\n\nAdalah dimaklumkan kepada seluruh ahli kariah Kampung Gong Badak bahawa kadar caruman kebajikan bulanan kekal sebanyak RM3.00 sebulan bagi setiap ahli berdaftar. Caruman ini adalah sangat kritikal bagi membolehkan pihak jawatankuasa menguruskan bantuan kebajikan am, khairat kematian (RM400 hingga RM700), serta saguhati kemasukan wad (RM50-RM100) secara saksama.\n\nPihak bendahari memohon kerjasama semua ketua keluarga agar melakukan semakan baki secara berkala melalui portal ini dan melunaskan tunggakan sekiranya ada sebelum tarikh akhir kutipan tahunan bagi mengelakkan status keahlian bertukar kepada "Tidak Aktif".\n\nKerjasama dan keperihatinan seluruh ahli kariah amatlah dihargai demi kebajikan bersama.\n\nSekian, terima kasih.\n\n"BERIKHTIAR BERSAMA, BERBAKTI SEIKHLAS HATI"`,
         penerbit: 'Encik Zakaria bin Jusoh',
@@ -93,6 +97,8 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
         id: 'pek-2',
         noRujukan: 'PKKKBGB/2026/PEK/02',
         tarikh: '2026-06-15',
+        tarikhBerkuatkuasa: '2026-06-15',
+        jenis: 'Hebahan',
         tajuk: 'Hebahan Pelancaran Sistem Awan Google Sheets Terbuka',
         kandungan: `Merujuk kepada ketetapan Mesyuarat Agung Tahunan (AGM) Pertubuhan, dengan sukacitanya dimaklumkan bahawa sistem pangkalan data khairat kini dinaik taraf sepenuhnya dengan sistem penyegerakan dwi-hala Google Sheets.\n\nLangkah ini bertujuan meningkatkan ketelusan rekod bayaran dan membolehkan seluruh ahli kariah menyemak status terkini yuran masing-masing terus dari telefon pintar tanpa perlu merujuk kepada rekod fizikal.\n\nSemua urusan kemasukan data hanya boleh disunting oleh bendahari berdaftar (admin), manakala ahli kariah dan ajk diberikan akses carian telus bagi mengelakkan ralat teknikal.\n\nSila sebarkan pautan portal rasmi khairat-v3.vercel.app kepada semua waris kariah.\n\nSekian, terima kasih.`,
         penerbit: 'Haji Mohamad bin Alias',
@@ -103,8 +109,10 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
         id: 'pek-3',
         noRujukan: 'PKKKBGB/2026/PEK/03',
         tarikh: '2026-06-28',
+        tarikhBerkuatkuasa: '2026-07-01',
+        jenis: 'Pekeliling',
         tajuk: 'Prosedur Tuntutan Manfaat Kematian & Bantuan Kebajikan Wad',
-        kandungan: `Untuk makluman semua pencarum aktif, berikut adalah ketetapan prosedur rasmi bagi tuntutan khairat kematian dan bantuan kebajikan wad:\n\n1. Tuntutan Kematian (Ahli / Tanggungan):\n   - Salinan Sijil Kematian (Sijil Daftar Kematian) mestilah dikemukakan kepada Setiausaha dalam tempoh 14 hari.\n   - Kadar bantuan kematian ahli aktif adalah sebanyak RM700, manakala bantuan bagi tanggungan berdaftar adalah sebanyak RM400.\n\n2. Bantuan Kebajikan Wad (Warded):\n   - Bantuan sebanyak RM50 (rawatan biasa) sehingga RM100 (tahan wad melebihi 3 hari) akan diberikan sekali setahun bagi rawatan dalam wad hospital kerajaan.\n   - Sila lampirkan surat discaj wad (discharge note) kepada Setiausaha/PIC kebajikan bagi tujuan pengesahan.\n\nSemua tuntutan akan diproses dan diluluskan secara tunai/pindahan bank dalam tempoh 48 jam bekerja.\n\nSekian untuk makluman seluruh ahli.`,
+        kandungan: `Untuk makluman semua pencarum aktif, berikut adalah ketetapan prosedur rasmi bagi tuntutan khairat kematian dan bantuan kebajikan wad:\n\n1. Tuntutan Kematian (Ahli / Tanggungan):\n   - Salinan Sijil Kematian (Sijil Daftar Kematian) mestilah dikemukakan kepada Setiausaha dalam tempoh 14 hari.\n   - Kadar bantuan kematian ahli aktif adalah sebanyak RM700, manakala bantuan bagi tanggungan berdaftar adalah sebanyak RM400.\n\n2. Bantuan Kebajikan Wad (Warded):\n   - Bantuan sebanyak RM50 (rawatan biasa) sehingga RM100 (tahan wad melebihi 3 hari) akan diberikan sekali setahun bagi rawatan dalam wad hospital kerajaan.\n   - Sila lampirkan surat discaj wad (discharge note) kepada Setiausaha/PIC kebajikan bagi tujuan pengesahan.\n\nSemua tuntutan akan diproses and diluluskan secara tunai/pindahan bank dalam tempoh 48 jam bekerja.\n\nSekian untuk makluman seluruh ahli.`,
         penerbit: 'Haji Mamat bin Bakar',
         jawatanPenerbit: 'Bendahari Kehormat',
         kepentingan: 'Biasa'
@@ -129,6 +137,9 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
   const [newIssuer, setNewIssuer] = useState('Encik Zakaria bin Jusoh');
   const [newIssuerRole, setNewIssuerRole] = useState('Setiausaha Agung');
   const [newPriority, setNewPriority] = useState<'Penting' | 'Biasa' | 'Segera'>('Biasa');
+  const [newJenis, setNewJenis] = useState<'Pekeliling' | 'Hebahan'>('Pekeliling');
+  const [newTarikhBerkuatkuasa, setNewTarikhBerkuatkuasa] = useState('');
+  const [filterJenis, setFilterJenis] = useState<'Semua' | 'Pekeliling' | 'Hebahan'>('Semua');
 
   // 4. Interactive Org Chart State
   const [chartRoles, setChartRoles] = useState<ChartRoles>(() => {
@@ -251,6 +262,8 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
       id: `pek-${Date.now()}`,
       noRujukan: newRef,
       tarikh: formattedDate,
+      tarikhBerkuatkuasa: newTarikhBerkuatkuasa || undefined,
+      jenis: newJenis,
       tajuk: newTitle,
       kandungan: newContent,
       penerbit: newIssuer,
@@ -263,6 +276,8 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
     
     setNewTitle('');
     setNewContent('');
+    setNewTarikhBerkuatkuasa('');
+    setNewJenis('Pekeliling');
     setShowAddModal(false);
   };
 
@@ -537,11 +552,53 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
               )}
             </div>
 
+            {/* Tapis Jenis Pekeliling / Hebahan */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 border border-slate-200 p-3 rounded-xl">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[11px] font-black uppercase text-slate-500 mr-1.5">Tapis Dokumen:</span>
+                <button
+                  onClick={() => setFilterJenis('Semua')}
+                  className={`px-3 py-1.5 text-[11px] font-bold uppercase rounded-lg transition-all cursor-pointer ${
+                    filterJenis === 'Semua'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-550'
+                  }`}
+                >
+                  Semua ({pekelilingList.length})
+                </button>
+                <button
+                  onClick={() => setFilterJenis('Pekeliling')}
+                  className={`px-3 py-1.5 text-[11px] font-bold uppercase rounded-lg transition-all cursor-pointer ${
+                    filterJenis === 'Pekeliling'
+                      ? 'bg-emerald-700 text-white shadow-xs'
+                      : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-550'
+                  }`}
+                >
+                  Pekeliling ({pekelilingList.filter(p => (p.jenis || 'Pekeliling') === 'Pekeliling').length})
+                </button>
+                <button
+                  onClick={() => setFilterJenis('Hebahan')}
+                  className={`px-3 py-1.5 text-[11px] font-bold uppercase rounded-lg transition-all cursor-pointer ${
+                    filterJenis === 'Hebahan'
+                      ? 'bg-sky-700 text-white shadow-xs'
+                      : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-550'
+                  }`}
+                >
+                  Hebahan ({pekelilingList.filter(p => p.jenis === 'Hebahan').length})
+                </button>
+              </div>
+            </div>
+
             {/* Circular list grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4.5">
-              {pekelilingList.map((pek) => {
+              {pekelilingList.filter(pek => {
+                if (filterJenis === 'Semua') return true;
+                return (pek.jenis || 'Pekeliling') === filterJenis;
+              }).map((pek) => {
                 const isUrgent = pek.kepentingan === 'Segera';
                 const isImportant = pek.kepentingan === 'Penting';
+                const jenis = pek.jenis || 'Pekeliling';
+                const isHebahan = jenis === 'Hebahan';
                 
                 return (
                   <div
@@ -555,15 +612,24 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
                         <span className="text-[9px] font-mono font-bold text-slate-400">
                           {pek.noRujukan}
                         </span>
-                        <span className={`text-[8.5px] font-black uppercase px-2 py-0.5 rounded font-mono ${
-                          isUrgent 
-                            ? 'bg-rose-50 text-rose-700 border border-rose-200' 
-                            : isImportant 
-                              ? 'bg-amber-50 text-amber-700 border border-amber-200' 
-                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        }`}>
-                          {pek.kepentingan}
-                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded font-mono ${
+                            isHebahan 
+                              ? 'bg-sky-50 text-sky-700 border border-sky-100' 
+                              : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                          }`}>
+                            {jenis}
+                          </span>
+                          <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded font-mono ${
+                            isUrgent 
+                              ? 'bg-rose-50 text-rose-700 border border-rose-100' 
+                              : isImportant 
+                                ? 'bg-amber-50 text-amber-700 border border-amber-100' 
+                                : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                          }`}>
+                            {pek.kepentingan}
+                          </span>
+                        </div>
                       </div>
 
                       <h4 className="text-xs font-black text-slate-800 leading-snug group-hover:text-emerald-700 transition-colors uppercase">
@@ -575,26 +641,35 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
                       </p>
                     </div>
 
-                    <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-[10px] text-slate-400 font-mono mt-auto shrink-0">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3.5 w-3.5 text-slate-450" />
-                        <span>{pek.tarikh}</span>
+                    <div className="border-t border-slate-100 pt-3 flex flex-col gap-2 mt-auto shrink-0">
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                          <span>Diterbit: {pek.tarikh}</span>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          {currentRole === 'admin' && (
+                            <button
+                              onClick={(e) => handleDeleteCircular(pek.id, e)}
+                              className="p-1 text-slate-400 hover:text-rose-600 transition rounded hover:bg-rose-50"
+                              title="Padam Pekeliling"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          <span className="text-emerald-700 font-bold group-hover:translate-x-0.5 transition-transform flex items-center">
+                            Baca &rarr;
+                          </span>
+                        </div>
                       </div>
-                      
-                      <div className="flex items-center gap-2">
-                        {currentRole === 'admin' && (
-                          <button
-                            onClick={(e) => handleDeleteCircular(pek.id, e)}
-                            className="p-1 text-slate-400 hover:text-rose-600 transition rounded hover:bg-rose-50"
-                            title="Padam Pekeliling"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                        <span className="text-emerald-700 font-bold group-hover:translate-x-0.5 transition-transform flex items-center">
-                          Baca Memo &rarr;
-                        </span>
-                      </div>
+
+                      {pek.tarikhBerkuatkuasa && (
+                        <div className="flex items-center gap-1 bg-emerald-50 text-emerald-800 px-2 py-1 rounded text-[9.5px] font-bold font-mono self-start border border-emerald-100">
+                          <Check className="h-3 w-3 text-emerald-600" />
+                          <span>Mula Kuatkuasa: {pek.tarikhBerkuatkuasa}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -602,12 +677,12 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
             </div>
 
             {/* Empty state */}
-            {pekelilingList.length === 0 && (
+            {pekelilingList.filter(pek => filterJenis === 'Semua' || (pek.jenis || 'Pekeliling') === filterJenis).length === 0 && (
               <div className="bg-white border border-slate-200 rounded-xl p-10 text-center space-y-2 max-w-md mx-auto">
                 <FileText className="h-8 w-8 text-slate-300 mx-auto" />
-                <h4 className="text-xs font-black uppercase text-slate-600">Tiada Pekeliling Ditemui</h4>
+                <h4 className="text-xs font-black uppercase text-slate-600">Tiada Rekod Ditemui</h4>
                 <p className="text-xs text-slate-400 font-sans">
-                  Sila hubungi bendahari (admin) kariah untuk memuat naik surat pekeliling atau keputusan mesyuarat terkini.
+                  Sila hubungi bendahari (admin) kariah untuk memuat naik surat pekeliling atau keputusan mesyuarat terkini bagi kategori ini.
                 </p>
               </div>
             )}
@@ -795,10 +870,14 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
               <div className="flex justify-between items-start text-xs font-sans font-semibold text-slate-800">
                 <div className="space-y-0.5">
                   <div>Ruj. Kami: <strong className="font-bold">{selectedPekeliling.noRujukan}</strong></div>
-                  <div>Status: <span className="text-emerald-700 font-bold uppercase font-mono text-[10px]">{selectedPekeliling.kepentingan}</span></div>
+                  <div>Jenis: <span className={`font-black uppercase font-mono text-[10px] ${selectedPekeliling.jenis === 'Hebahan' ? 'text-sky-700' : 'text-emerald-700'}`}>{selectedPekeliling.jenis || 'Pekeliling'}</span></div>
+                  <div>Status: <span className="text-amber-700 font-bold uppercase font-mono text-[10px]">{selectedPekeliling.kepentingan}</span></div>
                 </div>
                 <div className="text-right space-y-0.5">
-                  <div>Tarikh: <strong className="font-bold">{selectedPekeliling.tarikh}</strong></div>
+                  <div>Tarikh Terbit: <strong className="font-bold">{selectedPekeliling.tarikh}</strong></div>
+                  {selectedPekeliling.tarikhBerkuatkuasa && (
+                    <div className="text-emerald-800 font-bold">Mula Kuatkuasa: <span>{selectedPekeliling.tarikhBerkuatkuasa}</span></div>
+                  )}
                   <div>Kariah: <span className="font-normal italic">Kampung Gong Badak</span></div>
                 </div>
               </div>
@@ -810,7 +889,7 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
               </div>
 
               <div className="text-slate-950 font-bold uppercase text-xs md:text-[13px] leading-snug border-l-4 border-slate-900 pl-3 py-1 bg-slate-50 font-sans">
-                PEKELILING RASMI: {selectedPekeliling.tajuk}
+                {selectedPekeliling.jenis === 'Hebahan' ? 'HEBAHAN RASMI' : 'PEKELILING RASMI'}: {selectedPekeliling.tajuk}
               </div>
 
               <div className="text-xs md:text-[13px] text-slate-900 leading-relaxed whitespace-pre-wrap font-sans text-justify space-y-4 pt-1">
@@ -863,7 +942,7 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
             <form onSubmit={handleCreateCircular} className="space-y-3.5 text-left text-xs font-sans">
               
               <div className="space-y-1">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tajuk Pekeliling</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tajuk Dokumen</label>
                 <input
                   type="text"
                   required
@@ -874,9 +953,79 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
                 />
               </div>
 
+              <div className="space-y-1">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider font-sans">Jenis Dokumen</label>
+                <div className="grid grid-cols-2 gap-2 bg-slate-900 p-1 rounded-xl border border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setNewJenis('Pekeliling')}
+                    className={`py-2 text-xs font-black uppercase rounded-lg transition-all cursor-pointer ${
+                      newJenis === 'Pekeliling'
+                        ? 'bg-emerald-700 text-white shadow-xs'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                    }`}
+                  >
+                    Pekeliling
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewJenis('Hebahan')}
+                    className={`py-2 text-xs font-black uppercase rounded-lg transition-all cursor-pointer ${
+                      newJenis === 'Hebahan'
+                        ? 'bg-sky-700 text-white shadow-xs'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                    }`}
+                  >
+                    Hebahan
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider font-sans">Pilih Pengeluar (Isi Automatik dari Carta Organisasi)</label>
+                <select
+                  className="w-full p-2.5 bg-slate-900 border border-slate-800 text-slate-100 rounded-xl focus:outline-none focus:border-emerald-500 font-bold"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val) {
+                      const roleData = chartRoles[val];
+                      if (roleData && roleData.nama) {
+                        setNewIssuer(roleData.nama);
+                        const rawLabel = ROLE_LABELS[val];
+                        let formattedLabel = rawLabel;
+                        if (rawLabel === 'PENGERUSI') formattedLabel = 'Pengerusi Pertubuhan';
+                        else if (rawLabel === 'TIMB. PENGERUSI') formattedLabel = 'Timbalan Pengerusi';
+                        else if (rawLabel === 'SETIAUSAHA') formattedLabel = 'Setiausaha Kehormat';
+                        else if (rawLabel === 'PEN. SETIAUSAHA') formattedLabel = 'Penolong Setiausaha';
+                        else if (rawLabel === 'BENDAHARI') formattedLabel = 'Bendahari Kehormat';
+                        else {
+                          // Titlecase AJK
+                          formattedLabel = rawLabel.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                        }
+                        setNewIssuerRole(formattedLabel);
+                      }
+                    }
+                  }}
+                  defaultValue=""
+                >
+                  <option value="" disabled>-- Pilih Pengurus Jawatankuasa --</option>
+                  {Object.keys(chartRoles).map((roleId) => {
+                    const roleData = chartRoles[roleId];
+                    if (roleData && roleData.nama) {
+                      return (
+                        <option key={roleId} value={roleId}>
+                          {ROLE_LABELS[roleId]} - {roleData.nama}
+                        </option>
+                      );
+                    }
+                    return null;
+                  })}
+                </select>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Penerbit</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Penerbit (Nama)</label>
                   <input
                     type="text"
                     required
@@ -897,24 +1046,35 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider font-sans">Tahap Kepentingan</label>
-                <select
-                  className="w-full p-2.5 bg-slate-900 border border-slate-800 text-slate-100 rounded-xl focus:outline-none focus:border-emerald-500 font-bold"
-                  value={newPriority}
-                  onChange={(e: any) => setNewPriority(e.target.value)}
-                >
-                  <option value="Biasa">Biasa (Hijau)</option>
-                  <option value="Penting">Penting (Oren)</option>
-                  <option value="Segera">Segera / Mustahak (Merah)</option>
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider font-sans">Tahap Kepentingan</label>
+                  <select
+                    className="w-full p-2.5 bg-slate-900 border border-slate-800 text-slate-100 rounded-xl focus:outline-none focus:border-emerald-500 font-bold"
+                    value={newPriority}
+                    onChange={(e: any) => setNewPriority(e.target.value)}
+                  >
+                    <option value="Biasa">Biasa (Hijau)</option>
+                    <option value="Penting">Penting (Oren)</option>
+                    <option value="Segera">Segera (Merah)</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider font-sans">Tarikh Berkuatkuasa</label>
+                  <input
+                    type="date"
+                    className="w-full p-2.5 bg-slate-900 border border-slate-800 text-slate-100 rounded-xl focus:outline-none focus:border-emerald-500 font-bold font-mono"
+                    value={newTarikhBerkuatkuasa}
+                    onChange={(e) => setNewTarikhBerkuatkuasa(e.target.value)}
+                  />
+                </div>
               </div>
 
               <div className="space-y-1">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Isi Kandungan Surat</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Isi Kandungan Surat / Mesej</label>
                 <textarea
                   required
-                  rows={6}
+                  rows={5}
                   placeholder="Tuliskan isi kandungan rasmi..."
                   className="w-full p-2.5 bg-slate-900 border border-slate-800 text-slate-100 rounded-xl focus:outline-none focus:border-emerald-500 font-sans"
                   value={newContent}
@@ -934,7 +1094,7 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
                   type="submit"
                   className="flex-1 py-2.5 bg-[#047857] hover:bg-emerald-700 text-white transition rounded-xl cursor-pointer shadow-md"
                 >
-                  Simpan Pekeliling
+                  Simpan Pekeliling / Hebahan
                 </button>
               </div>
 
