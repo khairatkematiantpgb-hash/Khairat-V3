@@ -22,6 +22,19 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
   const [addressFilter, setAddressFilter] = useState<string>('all');
   const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
 
+  const [visibleColumns, setVisibleColumns] = useState({
+    noAhli: true,
+    nama: true,
+    ic: currentRole !== 'user',
+    tel: true,
+    alamat: true,
+    status: true,
+    lunasSehingga: true,
+    tunggakan: true,
+    periodTunggakan: true,
+    catatan: true,
+  });
+
   const kadarYuran = state.kadarYuranSebulan || 3;
 
   // Helper to categorize house address
@@ -358,7 +371,7 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
           <div className="mb-8 bg-amber-50 border border-amber-200 p-5 rounded-xl print:hidden flex flex-col gap-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div className="flex items-center gap-3">
-                <AlertTriangle className="h-5 w-5 text-amber-550 animate-pulse shrink-0" />
+                <AlertTriangle className="h-5 w-5 text-amber-500 animate-pulse shrink-0" />
                 <div>
                   <span className="text-xs font-bold text-amber-900 block font-sans uppercase tracking-wide">Mod Pratonton Dokumen (PDF)</span>
                   <span className="text-[10px] text-amber-700 block mt-0.5 font-sans">Laporan sedia dicetak. Klik butang cetak di sebelah kanan untuk memilih pencetak atau simpan sebagai PDF.</span>
@@ -387,6 +400,185 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
               </div>
             </div>
 
+            {/* Column Selector Configurator Section */}
+            <div className="pt-4 border-t border-amber-200/60 mt-1">
+              <span className="block text-[10px] font-black text-amber-905 uppercase tracking-wider mb-2">
+                ⚙️ PILIHAN KOLUM UNTUK DIKADARKAN SEBELUM DICETAK (Sembunyikan kolum tidak perlu untuk membesarkan tulisan):
+              </span>
+              
+              {/* Presets */}
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setVisibleColumns({
+                    noAhli: true,
+                    nama: true,
+                    ic: currentRole !== 'user',
+                    tel: true,
+                    alamat: true,
+                    status: true,
+                    lunasSehingga: true,
+                    tunggakan: true,
+                    periodTunggakan: true,
+                    catatan: true,
+                  })}
+                  className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 font-extrabold text-[9px] rounded-md transition border border-amber-300"
+                >
+                  Semua Kolum
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVisibleColumns({
+                    noAhli: true,
+                    nama: true,
+                    ic: false,
+                    tel: false,
+                    alamat: false,
+                    status: true,
+                    lunasSehingga: true,
+                    tunggakan: true,
+                    periodTunggakan: true,
+                    catatan: false,
+                  })}
+                  className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 font-extrabold text-[9px] rounded-md transition border border-amber-300"
+                >
+                  Ringkasan Tunggakan (Disyorkan PDF)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVisibleColumns({
+                    noAhli: true,
+                    nama: true,
+                    ic: false,
+                    tel: true,
+                    alamat: false,
+                    status: true,
+                    lunasSehingga: false,
+                    tunggakan: false,
+                    periodTunggakan: false,
+                    catatan: true,
+                  })}
+                  className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 font-extrabold text-[9px] rounded-md transition border border-amber-300"
+                >
+                  Hubungan & Catatan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVisibleColumns({
+                    noAhli: true,
+                    nama: true,
+                    ic: false,
+                    tel: false,
+                    alamat: true,
+                    status: false,
+                    lunasSehingga: false,
+                    tunggakan: false,
+                    periodTunggakan: false,
+                    catatan: false,
+                  })}
+                  className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 font-extrabold text-[9px] rounded-md transition border border-amber-300"
+                >
+                  Senarai Alamat Sahaja
+                </button>
+              </div>
+
+              {/* Checkbox grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-x-4 gap-y-2 bg-amber-50/50 p-3 rounded-lg border border-amber-200/50">
+                <label className="flex items-center gap-2 text-[11px] font-bold text-amber-900 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={visibleColumns.noAhli}
+                    onChange={(e) => setVisibleColumns({ ...visibleColumns, noAhli: e.target.checked })}
+                    className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 border-amber-300"
+                  />
+                  <span>No. Ahli</span>
+                </label>
+                <label className="flex items-center gap-2 text-[11px] font-bold text-amber-900 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={visibleColumns.nama}
+                    onChange={(e) => setVisibleColumns({ ...visibleColumns, nama: e.target.checked })}
+                    className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 border-amber-300"
+                  />
+                  <span>Nama Ahli</span>
+                </label>
+                {currentRole !== 'user' && (
+                  <label className="flex items-center gap-2 text-[11px] font-bold text-amber-900 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={visibleColumns.ic}
+                      onChange={(e) => setVisibleColumns({ ...visibleColumns, ic: e.target.checked })}
+                      className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 border-amber-300"
+                    />
+                    <span>No. IC</span>
+                  </label>
+                )}
+                <label className="flex items-center gap-2 text-[11px] font-bold text-amber-900 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={visibleColumns.tel}
+                    onChange={(e) => setVisibleColumns({ ...visibleColumns, tel: e.target.checked })}
+                    className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 border-amber-300"
+                  />
+                  <span>No. Telefon</span>
+                </label>
+                <label className="flex items-center gap-2 text-[11px] font-bold text-amber-900 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={visibleColumns.alamat}
+                    onChange={(e) => setVisibleColumns({ ...visibleColumns, alamat: e.target.checked })}
+                    className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 border-amber-300"
+                  />
+                  <span>Alamat Berdaftar</span>
+                </label>
+                <label className="flex items-center gap-2 text-[11px] font-bold text-amber-900 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={visibleColumns.status}
+                    onChange={(e) => setVisibleColumns({ ...visibleColumns, status: e.target.checked })}
+                    className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 border-amber-300"
+                  />
+                  <span>Status Keahlian</span>
+                </label>
+                <label className="flex items-center gap-2 text-[11px] font-bold text-amber-900 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={visibleColumns.lunasSehingga}
+                    onChange={(e) => setVisibleColumns({ ...visibleColumns, lunasSehingga: e.target.checked })}
+                    className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 border-amber-300"
+                  />
+                  <span>Lunas Sehingga</span>
+                </label>
+                <label className="flex items-center gap-2 text-[11px] font-bold text-amber-900 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={visibleColumns.tunggakan}
+                    onChange={(e) => setVisibleColumns({ ...visibleColumns, tunggakan: e.target.checked })}
+                    className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 border-amber-300"
+                  />
+                  <span>Jumlah Tunggakan</span>
+                </label>
+                <label className="flex items-center gap-2 text-[11px] font-bold text-amber-900 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={visibleColumns.periodTunggakan}
+                    onChange={(e) => setVisibleColumns({ ...visibleColumns, periodTunggakan: e.target.checked })}
+                    className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 border-amber-300"
+                  />
+                  <span>Bulan Tertunggak</span>
+                </label>
+                <label className="flex items-center gap-2 text-[11px] font-bold text-amber-900 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={visibleColumns.catatan}
+                    onChange={(e) => setVisibleColumns({ ...visibleColumns, catatan: e.target.checked })}
+                    className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 border-amber-300"
+                  />
+                  <span>Catatan</span>
+                </label>
+              </div>
+            </div>
+
             {isInIframe && (
               <div className="bg-red-50 border border-red-200 text-red-900 p-4 rounded-lg text-xs leading-relaxed shadow-sm">
                 <p className="font-extrabold text-[11px] mb-1.5 uppercase tracking-wide flex items-center gap-1">
@@ -396,7 +588,7 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
                   Memandangkan aplikasi ini sedang berjalan di dalam panel <strong>Pratonton (IFrame Sandbox)</strong> AI Studio, pelayar web (browser) menghalang arahan cetakan fizikal secara langsung atas faktor keselamatan.
                 </p>
                 <ul className="list-decimal pl-5 space-y-1 font-semibold text-[11px] text-red-950">
-                  <li>Sila klik butang ikon anak panah <strong className="bg-red-100 px-1 py-0.5 rounded text-red-900 border border-red-250">"Open in a new tab"</strong> di bahagian atas kanan skrin kelabu AI Studio (luar bingkai putih aplikasi).</li>
+                  <li>Sila klik butang ikon anak panah <strong className="bg-red-100 px-1 py-0.5 rounded text-red-900 border border-red-250 font-sans">"Open in a new tab"</strong> di bahagian atas kanan skrin kelabu AI Studio (luar bingkai putih aplikasi).</li>
                   <li>Selepas aplikasi dibuka di tab berasingan, anda boleh menekan semula butang di atas untuk memanggil menu cetakan rasmi atau menyimpan terus sebagai dokumen PDF!</li>
                 </ul>
               </div>
@@ -440,19 +632,27 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
           </div>
 
           {/* Printable Report Table */}
-          <table className="w-full text-left border-collapse text-[10px] border border-slate-300">
+          <table className={`w-full text-left border-collapse border border-slate-350 ${
+            Object.values(visibleColumns).filter(Boolean).length <= 5
+              ? 'text-xs'
+              : Object.values(visibleColumns).filter(Boolean).length <= 7
+              ? 'text-[11px]'
+              : Object.values(visibleColumns).filter(Boolean).length <= 9
+              ? 'text-[10px]'
+              : 'text-[9px]'
+          }`}>
             <thead>
-              <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 font-bold uppercase">
-                <th className="px-3 py-2 text-center border-r border-slate-300 w-16">No. Ahli</th>
-                <th className="px-3 py-2 border-r border-slate-300 w-40">Nama Ahli</th>
-                {currentRole !== 'user' && <th className="px-3 py-2 text-center border-r border-slate-300 w-24">No. IC</th>}
-                <th className="px-3 py-2 border-r border-slate-300 w-24 text-center">No. Telefon</th>
-                <th className="px-3 py-2 border-r border-slate-300">Alamat Berdaftar</th>
-                <th className="px-3 py-2 text-center border-r border-slate-300 w-16">Status</th>
-                <th className="px-3 py-2 text-center border-r border-slate-300 w-20">Lunas Sehingga</th>
-                <th className="px-3 py-2 text-center w-20 border-r border-slate-300">Tunggakan</th>
-                <th className="px-3 py-2 border-r border-slate-300 w-36">Period Tertunggak</th>
-                <th className="px-3 py-2 w-36">Catatan</th>
+              <tr className="bg-slate-100 border-b border-slate-350 text-slate-700 font-bold uppercase">
+                {visibleColumns.noAhli && <th className="px-2.5 py-2 text-center border-r border-slate-350 w-16">No. Ahli</th>}
+                {visibleColumns.nama && <th className="px-2.5 py-2 border-r border-slate-350 w-40">Nama Ahli</th>}
+                {visibleColumns.ic && currentRole !== 'user' && <th className="px-2.5 py-2 text-center border-r border-slate-350 w-24">No. IC</th>}
+                {visibleColumns.tel && <th className="px-2.5 py-2 border-r border-slate-350 w-24 text-center">No. Telefon</th>}
+                {visibleColumns.alamat && <th className="px-2.5 py-2 border-r border-slate-350">Alamat Berdaftar</th>}
+                {visibleColumns.status && <th className="px-2.5 py-2 text-center border-r border-slate-350 w-16">Status</th>}
+                {visibleColumns.lunasSehingga && <th className="px-2.5 py-2 text-center border-r border-slate-350 w-20">Lunas Sehingga</th>}
+                {visibleColumns.tunggakan && <th className="px-2.5 py-2 text-center w-20 border-r border-slate-350">Tunggakan</th>}
+                {visibleColumns.periodTunggakan && <th className="px-2.5 py-2 border-r border-slate-350 w-36">Period Tertunggak</th>}
+                {visibleColumns.catatan && <th className="px-2.5 py-2 w-36">Catatan</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 text-slate-800">
@@ -465,18 +665,24 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
  
                 return (
                   <tr key={m.noAhli} className="align-top">
-                    <td className="px-3 py-2 text-center font-mono font-bold border-r border-slate-300">{m.noAhli}</td>
-                    <td className="px-3 py-2 font-bold text-slate-900 border-r border-slate-300">{m.nama}</td>
-                    {currentRole !== 'user' && <td className="px-3 py-2 text-center font-mono border-r border-slate-300">{m.ic || '-'}</td>}
-                    <td className="px-3 py-2 text-center font-mono border-r border-slate-300">{m.tel || '-'}</td>
-                    <td className="px-3 py-1.5 text-[9px] leading-relaxed border-r border-slate-300">{m.alamat || '-'}</td>
-                    <td className="px-3 py-2 text-center border-r border-slate-300 font-bold text-[9px] uppercase">{m.status}</td>
-                    <td className="px-3 py-2 text-center font-mono font-bold border-r border-slate-300">{getLatestPaidMonthYear(m)}</td>
-                    <td className="px-3 py-2 text-center font-mono font-bold text-slate-900 border-r border-slate-300">
-                      {actualDues > 0 ? `RM ${actualDues}` : 'LUNAS'}
-                    </td>
-                    <td className="px-3 py-2 text-[9px] text-slate-600 border-r border-slate-300 max-w-xs">{actualDues > 0 ? arrearsDetails : 'Tiada tunggakan yuran.'}</td>
-                    <td className="px-3 py-2 text-[9px] text-slate-600 max-w-xs">{m.catatan || '-'}</td>
+                    {visibleColumns.noAhli && <td className="px-2.5 py-2 text-center font-mono font-bold border-r border-slate-350">{m.noAhli}</td>}
+                    {visibleColumns.nama && <td className="px-2.5 py-2 font-bold text-slate-900 border-r border-slate-350">{m.nama}</td>}
+                    {visibleColumns.ic && currentRole !== 'user' && <td className="px-2.5 py-2 text-center font-mono border-r border-slate-350">{m.ic || '-'}</td>}
+                    {visibleColumns.tel && <td className="px-2.5 py-2 text-center font-mono border-r border-slate-350">{m.tel || '-'}</td>}
+                    {visibleColumns.alamat && <td className="px-2.5 py-1.5 leading-relaxed border-r border-slate-350 text-[10px]">{m.alamat || '-'}</td>}
+                    {visibleColumns.status && <td className="px-2.5 py-2 text-center border-r border-slate-350 font-bold uppercase">{m.status}</td>}
+                    {visibleColumns.lunasSehingga && <td className="px-2.5 py-2 text-center font-mono font-bold border-r border-slate-350">{getLatestPaidMonthYear(m)}</td>}
+                    {visibleColumns.tunggakan && (
+                      <td className="px-2.5 py-2 text-center font-mono font-bold text-slate-900 border-r border-slate-350">
+                        {actualDues > 0 ? `RM ${actualDues}` : 'LUNAS'}
+                      </td>
+                    )}
+                    {visibleColumns.periodTunggakan && (
+                      <td className="px-2.5 py-2 border-r border-slate-350 max-w-xs text-[10px] text-slate-600">
+                        {actualDues > 0 ? arrearsDetails : 'Tiada tunggakan yuran.'}
+                      </td>
+                    )}
+                    {visibleColumns.catatan && <td className="px-2.5 py-2 max-w-xs text-[10px] text-slate-600">{m.catatan || '-'}</td>}
                   </tr>
                 );
               })}
