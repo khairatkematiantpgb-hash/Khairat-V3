@@ -632,15 +632,7 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
           </div>
 
           {/* Printable Report Table */}
-          <table className={`w-full text-left border-collapse border border-slate-350 ${
-            Object.values(visibleColumns).filter(Boolean).length <= 5
-              ? 'text-xs'
-              : Object.values(visibleColumns).filter(Boolean).length <= 7
-              ? 'text-[11px]'
-              : Object.values(visibleColumns).filter(Boolean).length <= 9
-              ? 'text-[10px]'
-              : 'text-[9px]'
-          }`}>
+          <table className="w-full text-left border-collapse border border-slate-350 text-[12px]">
             <thead>
               <tr className="bg-slate-100 border-b border-slate-350 text-slate-700 font-bold uppercase">
                 {visibleColumns.noAhli && <th className="px-2.5 py-2 text-center border-r border-slate-350 w-16">No. Ahli</th>}
@@ -669,7 +661,7 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
                     {visibleColumns.nama && <td className="px-2.5 py-2 font-bold text-slate-900 border-r border-slate-350">{m.nama}</td>}
                     {visibleColumns.ic && currentRole !== 'user' && <td className="px-2.5 py-2 text-center font-mono border-r border-slate-350">{m.ic || '-'}</td>}
                     {visibleColumns.tel && <td className="px-2.5 py-2 text-center font-mono border-r border-slate-350">{m.tel || '-'}</td>}
-                    {visibleColumns.alamat && <td className="px-2.5 py-1.5 leading-relaxed border-r border-slate-350 text-[10px]">{m.alamat || '-'}</td>}
+                    {visibleColumns.alamat && <td className="px-2.5 py-1.5 leading-relaxed border-r border-slate-350 text-[12px]">{m.alamat || '-'}</td>}
                     {visibleColumns.status && <td className="px-2.5 py-2 text-center border-r border-slate-350 font-bold uppercase">{m.status}</td>}
                     {visibleColumns.lunasSehingga && <td className="px-2.5 py-2 text-center font-mono font-bold border-r border-slate-350">{getLatestPaidMonthYear(m)}</td>}
                     {visibleColumns.tunggakan && (
@@ -678,11 +670,11 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
                       </td>
                     )}
                     {visibleColumns.periodTunggakan && (
-                      <td className="px-2.5 py-2 border-r border-slate-350 max-w-xs text-[10px] text-slate-600">
+                      <td className="px-2.5 py-2 border-r border-slate-350 max-w-xs text-[12px] text-slate-600">
                         {actualDues > 0 ? arrearsDetails : 'Tiada tunggakan yuran.'}
                       </td>
                     )}
-                    {visibleColumns.catatan && <td className="px-2.5 py-2 max-w-xs text-[10px] text-slate-600">{m.catatan || '-'}</td>}
+                    {visibleColumns.catatan && <td className="px-2.5 py-2 max-w-xs text-[12px] text-slate-600">{m.catatan || '-'}</td>}
                   </tr>
                 );
               })}
