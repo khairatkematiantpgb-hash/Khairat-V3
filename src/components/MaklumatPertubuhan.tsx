@@ -180,6 +180,7 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
 
   // Open Edit Mode for specific position
   const startEditingRole = (roleId: string) => {
+    if (currentRole !== 'admin') return;
     const current = chartRoles[roleId] || { nama: '', tel: '' };
     setEditingRoleId(roleId);
     setManualNama(current.nama);
@@ -303,12 +304,17 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
     const title = customTitle || ROLE_LABELS[roleId];
     const isAssigned = !!roleData.nama;
     const isBendahari = roleId === 'bendahari';
+    const isAdmin = currentRole === 'admin';
 
     return (
       <div
-        onClick={() => startEditingRole(roleId)}
-        className={`group bg-[#FAF9F6] border-2 ${isAssigned ? 'border-slate-400' : 'border-dashed border-slate-300'} rounded shadow-sm text-center w-full max-w-[230px] hover:scale-102 hover:shadow-md hover:border-emerald-600 transition-all cursor-pointer overflow-hidden flex flex-col justify-between`}
-        title={`Klik untuk tukar / pilih pemegang jawatan ${title}`}
+        onClick={() => isAdmin && startEditingRole(roleId)}
+        className={`group bg-[#FAF9F6] border-2 ${isAssigned ? 'border-slate-400' : 'border-dashed border-slate-300'} rounded shadow-sm text-center w-full max-w-[230px] ${
+          isAdmin 
+            ? 'hover:scale-102 hover:shadow-md hover:border-emerald-600 cursor-pointer transition-all' 
+            : 'cursor-default'
+        } overflow-hidden flex flex-col justify-between`}
+        title={isAdmin ? `Klik untuk tukar / pilih pemegang jawatan ${title}` : `${title}`}
       >
         {/* Plaque Header / Title block */}
         <div className="bg-[#EAE6DB] border-b-2 border-slate-350 text-slate-950 font-black tracking-wide text-[11px] md:text-xs py-1.5 uppercase font-mono">
@@ -341,7 +347,7 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
               <svg className="w-9 h-9" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
               </svg>
-              {isAssigned && (
+              {isAssigned && isAdmin && (
                 <div className="absolute -bottom-1 -right-1 bg-emerald-600 text-white p-0.5 rounded-full">
                   <Edit2 className="h-2.5 w-2.5" />
                 </div>
@@ -363,7 +369,7 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
             </>
           ) : (
             <span className="text-[10px] text-slate-400 font-bold tracking-tight uppercase italic block border border-dashed border-slate-300 rounded p-1 mx-2">
-              + Pilih Nama
+              {isAdmin ? '+ Pilih Nama' : 'Tiada Pemegang'}
             </span>
           )}
         </div>
