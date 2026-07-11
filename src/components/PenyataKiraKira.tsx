@@ -180,6 +180,11 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
     };
   }, [transactions]);
 
+  // Calculate the grand total of all current balances
+  const totalBalance = useMemo(() => {
+    return ACCOUNTS_LIST.reduce((sum, acc) => sum + (processedData.finalBalances[acc] || 0), 0);
+  }, [processedData.finalBalances]);
+
   // Apply Search and Year Filters
   const filteredDisplayRows = useMemo(() => {
     return processedData.displayRows.filter(row => {
@@ -682,7 +687,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
           </div>
 
           {/* Large, beautiful Quick Stats Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 my-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 mt-2 mb-4">
             {ACCOUNTS_LIST.map((acc, keyIdx) => {
               const bal = processedData.finalBalances[acc];
               return (
@@ -710,6 +715,23 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
                 </div>
               );
             })}
+          </div>
+
+          {/* Premium Grand Total Section - Placed Below & Enlarged */}
+          <div className="bg-emerald-950 text-white border border-emerald-900 p-5 rounded-2xl shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4 transition-all hover:bg-emerald-900/90 my-2">
+            <div>
+              <span className="text-[10px] font-extrabold text-emerald-350 uppercase tracking-widest block mb-0.5">
+                JUMLAH KESELURUHAN (SEMUA SALURAN)
+              </span>
+              <p className="text-[11px] text-slate-300 font-sans leading-none">
+                Gabungan keseluruhan nilai baki aktif dari lima akaun saluran pertubuhan.
+              </p>
+            </div>
+            <div className="text-right">
+              <strong className={`block text-2xl md:text-3xl font-mono font-black tracking-tight ${totalBalance < 0 ? 'text-rose-400' : 'text-amber-300'}`}>
+                RM {formatCur(totalBalance)}
+              </strong>
+            </div>
           </div>
 
           <div className="mt-4 bg-emerald-50/50 border border-emerald-100 p-4 rounded-xl flex items-start gap-3 text-xs text-emerald-850">
@@ -1012,20 +1034,30 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
           </div>
 
           {/* Financial summary Cards on top of printable PDF */}
-          <div className="grid grid-cols-5 gap-3 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
-            {ACCOUNTS_LIST.map((acc, keyIdx) => {
-              const currentBal = processedData.finalBalances[acc];
-              return (
-                <div key={keyIdx} className="text-center">
-                  <span className="text-[8px] font-bold text-slate-500 uppercase block tracking-wider truncate mb-1">
-                    {getAccountDisplayName(acc)}
-                  </span>
-                  <strong className="text-xs font-mono font-black text-slate-900">
-                    RM {formatCur(currentBal)}
-                  </strong>
-                </div>
-              );
-            })}
+          <div className="mb-6 space-y-3">
+            <div className="grid grid-cols-5 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+              {ACCOUNTS_LIST.map((acc, keyIdx) => {
+                const currentBal = processedData.finalBalances[acc];
+                return (
+                  <div key={keyIdx} className="text-center">
+                    <span className="text-[8px] font-bold text-slate-500 uppercase block tracking-wider truncate mb-1">
+                      {getAccountDisplayName(acc)}
+                    </span>
+                    <strong className="text-xs font-mono font-black text-slate-900">
+                      RM {formatCur(currentBal)}
+                    </strong>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl flex justify-between items-center px-5">
+              <span className="text-[9px] font-extrabold text-emerald-800 uppercase tracking-wider">
+                JUMLAH KESELURUHAN (SEMUA SALURAN)
+              </span>
+              <strong className="text-sm font-mono font-black text-emerald-900">
+                RM {formatCur(totalBalance)}
+              </strong>
+            </div>
           </div>
 
           {/* Printable Table */}
