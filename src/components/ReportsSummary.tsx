@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { AppState } from '../types';
-import { calculateOutstandingDues, isSameMemberId } from '../lib/database';
+import { calculateOutstandingDues, isSameMemberId, getArrearsDetails } from '../lib/database';
 import { FileText, AlertTriangle, Eye, Search, FileSpreadsheet, Download, Printer } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
@@ -101,82 +101,8 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
     return sum + actualDues;
   }, 0);
 
-  // Helper to compute exact months/years that are unpaid
-  const getArrearsDetails = (m: any) => {
-    if (m.status !== 'Aktif') return 'N/A (Tidak Aktif)';
-    
-    const cleanNoAhli = m.noAhli;
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonthIdx = now.getMonth();
-    const monthsKeys: string[] = [
-      'jan', 'feb', 'mac', 'apr', 'mei', 'jun',
-      'jul', 'ogo', 'sep', 'okt', 'nov', 'dis'
-    ];
-    const monthLabels = ['Jan', 'Feb', 'Mac', 'Apr', 'Mei', 'Jun', 'Jul', 'Ogos', 'Sep', 'Okt', 'Nov', 'Dis'];
-
-    const hasPaidBeyond = () => {
-      const currentYearRow = state.ledger.find(r => isSameMemberId(r.noAhli, cleanNoAhli) && r.tahun === currentYear);
-      if (currentYearRow) {
-        for (let i = currentMonthIdx + 1; i < 12; i++) {
-          if ((currentYearRow as any)[monthsKeys[i]]) {
-            return true;
-          }
-        }
-      }
-      const futureYearRows = state.ledger.filter(r => isSameMemberId(r.noAhli, cleanNoAhli) && r.tahun > currentYear);
-      if (futureYearRows.length > 0) {
-        for (const row of futureYearRows) {
-          for (let i = 0; i < 12; i++) {
-            if ((row as any)[monthsKeys[i]]) {
-              return true;
-            }
-          }
-        }
-      }
-      return false;
-    };
-
-    if (hasPaidBeyond()) {
-      return 'Tiada ';
-    }
-
-    const memberLedgerRows = state.ledger.filter(r => isSameMemberId(r.noAhli, cleanNoAhli));
-    if (memberLedgerRows.length === 0) {
-      // No payment records at all
-      const monthsList = monthLabels.slice(0, currentMonthIdx + 1).join(', ');
-      return `${currentYear} (${monthsList})`;
-    }
-
-    const years = memberLedgerRows.map(r => r.tahun);
-    const minYear = Math.min(...years);
-
-    const arrearsSegments: string[] = [];
-
-    for (let yr = minYear; yr <= currentYear; yr++) {
-      const row = state.ledger.find(r => isSameMemberId(r.noAhli, cleanNoAhli) && r.tahun === yr);
-      const limit = yr === currentYear ? currentMonthIdx : 11;
-      const unpaidInYear: string[] = [];
-      
-      for (let i = 0; i <= limit; i++) {
-        const key = monthsKeys[i];
-        const cellValue = row ? (row as any)[key] : '';
-        if (!cellValue) {
-          unpaidInYear.push(monthLabels[i]);
-        }
-      }
-
-      if (unpaidInYear.length > 0) {
-        if (unpaidInYear.length === limit + 1) {
-          arrearsSegments.push(`${yr} (Penuh)`);
-        } else {
-          arrearsSegments.push(`${yr} (${unpaidInYear.join(', ')})`);
-        }
-      }
-    }
-
-    return arrearsSegments.length > 0 ? arrearsSegments.join('; ') : 'Tiada';
-  };
+  // Helper to compute exact months/years that are unpaid using unified database logic
+  const computeArrearsDetails = (m: any) => getArrearsDetails(m, state.ledger, state.members);
 
   // Helper to find the latest month/year paid (Lunas Sehingga)
   const getLatestPaidMonthYear = (m: any) => {
@@ -313,7 +239,7 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
       const totalLebihanKredit = rows.reduce((acc, r) => acc + (r.lebihanKredit || 0), 0);
       const dues = calculateOutstandingDues(m.noAhli, state.ledger, state.members, kadarYuran);
       const actualDues = Math.max(0, dues - totalLebihanKredit);
-      const arrearsDetail = actualDues > 0 ? getArrearsDetails(m) : 'Lunas';
+      const arrearsDetail = actualDues > 0 ? computeArrearsDetails(m) : 'Lunas';
 
       return [
         m.noAhli,
@@ -653,7 +579,7 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
                 const totalLebihanKredit = rows.reduce((acc, r) => acc + (r.lebihanKredit || 0), 0);
                 const dues = calculateOutstandingDues(m.noAhli, state.ledger, state.members, kadarYuran);
                 const actualDues = Math.max(0, dues - totalLebihanKredit);
-                const arrearsDetails = getArrearsDetails(m);
+                const arrearsDetails = computeArrearsDetails(m);
  
                 return (
                   <tr key={m.noAhli} className="align-top">
@@ -879,7 +805,7 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
                   const totalLebihanKredit = rows.reduce((acc, r) => acc + (r.lebihanKredit || 0), 0);
                   const dues = calculateOutstandingDues(m.noAhli, state.ledger, state.members, kadarYuran);
                   const actualDues = Math.max(0, dues - totalLebihanKredit);
-                  const arrearsDetails = getArrearsDetails(m);
+                  const arrearsDetails = computeArrearsDetails(m);
 
                   return (
                     <tr key={m.noAhli} className="hover:bg-slate-50/50 transition-colors">

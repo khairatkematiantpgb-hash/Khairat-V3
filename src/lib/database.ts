@@ -563,19 +563,57 @@ export function runPadamSemuaData(state: AppState): AppState {
   return newState;
 }
 
+// Helper to check if a month cell has an actual payment
+export function isPaidValue(val: any): boolean {
+  if (val === null || val === undefined) return false;
+  const str = String(val).trim().toLowerCase();
+  if (!str || str === '-' || str === '0' || str === 'rm 0' || str === 'rm0' || str === 'none') {
+    return false;
+  }
+  return true;
+}
+
 // Helper to detect registration start month and year to prevent false arrears before join date
+// "bulan sebelum pada tahun mula-mula membuat pembayaran sepatutnya tidak dikira sebagai tunggakan."
 export function getRegistrationStart(
   member: Member | undefined,
   ledger: LedgerRow[],
   cleanNoAhli: string
 ): { monthIdx: number; year: number } | null {
+  const monthsKeys: (keyof LedgerRow)[] = [
+    'jan', 'feb', 'mac', 'apr', 'mei', 'jun',
+    'jul', 'ogo', 'sep', 'okt', 'nov', 'dis'
+  ];
+
+  // 1. Priority: Find earliest year and month with actual payment in ledger
+  // Any months before this first payment month in that starting year are pre-membership
+  const memberRows = ledger.filter(r => isSameMemberId(r.noAhli, cleanNoAhli));
+  if (memberRows.length > 0) {
+    const rowsWithPayment = memberRows.filter(r =>
+      monthsKeys.some(k => isPaidValue(r[k]))
+    );
+
+    if (rowsWithPayment.length > 0) {
+      const minPaidYear = Math.min(...rowsWithPayment.map(r => r.tahun));
+      const earliestPaidRow = rowsWithPayment.find(r => r.tahun === minPaidYear);
+      if (earliestPaidRow) {
+        for (let i = 0; i < 12; i++) {
+          if (isPaidValue(earliestPaidRow[monthsKeys[i]])) {
+            return { monthIdx: i, year: minPaidYear };
+          }
+        }
+      }
+    }
+  }
+
+  // 2. Secondary: If no payment made yet, check member's catatan for registration date
   if (member && member.catatan) {
     const catatanLower = member.catatan.toLowerCase();
     
     let parsedMonthIdx: number | null = null;
     let parsedYear: number | null = null;
     
-    // 1. Try MM/YYYY or MM-YYYY patterns
+    // 2a. Try MM/YYYY or MM-YYYY patterns
     const slashDateMatch = catatanLower.match(/\b(0?[1-9]|1[0-2])[\/\-](20\d{2})\b/);
     if (slashDateMatch) {
       parsedMonthIdx = parseInt(slashDateMatch[1], 10) - 1;
@@ -589,27 +627,26 @@ export function getRegistrationStart(
       }
     }
     
-    // 2. Look for Month Name + Year
+    // 2b. Look for Month Name + Year with word boundaries
     if (parsedMonthIdx === null) {
-      const monthsMalay = [
-        ['jan', 'januari', 'january'],
-        ['feb', 'februari', 'february'],
-        ['mac', 'march'],
-        ['apr', 'april'],
-        ['mei', 'may'],
-        ['jun', 'june'],
-        ['jul', 'julai', 'july'],
-        ['ogo', 'ogos', 'aug', 'august'],
-        ['sep', 'september', 'sept'],
-        ['okt', 'oktober', 'oct', 'october'],
-        ['nov', 'november'],
-        ['dis', 'disember', 'dec', 'december']
+      const monthsPatterns: [RegExp, number][] = [
+        [/\b(jan|januari|january)\b/, 0],
+        [/\b(feb|februari|february)\b/, 1],
+        [/\b(mac|march)\b/, 2],
+        [/\b(apr|april)\b/, 3],
+        [/\b(mei|may)\b/, 4],
+        [/\b(jun|june)\b/, 5],
+        [/\b(jul|julai|july)\b/, 6],
+        [/\b(ogo|ogos|aug|august)\b/, 7],
+        [/\b(sep|september|sept)\b/, 8],
+        [/\b(okt|oktober|oct|october)\b/, 9],
+        [/\b(nov|november)\b/, 10],
+        [/\b(dis|disember|dec|december)\b/, 11]
       ];
       
-      for (let i = 0; i < monthsMalay.length; i++) {
-        const foundMonth = monthsMalay[i].some(v => catatanLower.includes(v));
-        if (foundMonth) {
-          parsedMonthIdx = i;
+      for (const [regex, idx] of monthsPatterns) {
+        if (regex.test(catatanLower)) {
+          parsedMonthIdx = idx;
           break;
         }
       }
@@ -618,7 +655,6 @@ export function getRegistrationStart(
       if (yearMatch) {
         parsedYear = parseInt(yearMatch[1], 10);
       } else {
-        // Check 2-digit years like "24" or "25" next to month keywords
         const shortYearMatch = catatanLower.match(/\b(2[4-9])\b/);
         if (shortYearMatch) {
           parsedYear = 2000 + parseInt(shortYearMatch[1], 10);
@@ -631,25 +667,10 @@ export function getRegistrationStart(
     }
   }
 
-  // 3. Fallback: Find the earliest year and the first month with recorded payment in that year
-  const memberRows = ledger.filter(r => isSameMemberId(r.noAhli, cleanNoAhli));
+  // 3. Fallback: Earliest year in member rows if available
   if (memberRows.length > 0) {
-    const years = memberRows.map(r => r.tahun);
-    const minYear = Math.min(...years);
-    const earliestRow = memberRows.find(r => r.tahun === minYear);
-    
-    if (earliestRow) {
-      const monthsKeys: (keyof LedgerRow)[] = [
-        'jan', 'feb', 'mac', 'apr', 'mei', 'jun',
-        'jul', 'ogo', 'sep', 'okt', 'nov', 'dis'
-      ];
-      
-      for (let i = 0; i < 12; i++) {
-        if (earliestRow[monthsKeys[i]]) {
-          return { monthIdx: i, year: minYear };
-        }
-      }
-    }
+    const minYear = Math.min(...memberRows.map(r => r.tahun));
+    return { monthIdx: 0, year: minYear };
   }
   
   return null;
@@ -679,7 +700,7 @@ export function calculateOutstandingDues(noAhli: string, ledger: LedgerRow[], me
     const currentYearRow = ledger.find(r => isSameMemberId(r.noAhli, cleanNoAhli) && r.tahun === currentYear);
     if (currentYearRow) {
       for (let i = currentMonthIdx + 1; i < 12; i++) {
-        if (currentYearRow[monthsKeys[i]]) {
+        if (isPaidValue(currentYearRow[monthsKeys[i]])) {
           return true;
         }
       }
@@ -689,7 +710,7 @@ export function calculateOutstandingDues(noAhli: string, ledger: LedgerRow[], me
     if (futureYearRows.length > 0) {
       for (const row of futureYearRows) {
         for (let i = 0; i < 12; i++) {
-          if (row[monthsKeys[i]]) {
+          if (isPaidValue(row[monthsKeys[i]])) {
             return true;
           }
         }
@@ -707,23 +728,27 @@ export function calculateOutstandingDues(noAhli: string, ledger: LedgerRow[], me
 
   // Helper to count unpaid months in a specific year
   const countUnpaidInYear = (yr: number): number => {
+    if (startDetails && yr < startDetails.year) {
+      return 0; // Years before first payment / registration have 0 arrears
+    }
+
     const row = ledger.find(r => isSameMemberId(r.noAhli, cleanNoAhli) && r.tahun === yr);
     let unpaid = 0;
     const limit = yr === currentYear ? currentMonthIdx : 11;
     
     let startIdx = 0;
-    if (startDetails) {
-      if (yr < startDetails.year) {
-        return 0; // Months before registration year are 0 arrears
-      } else if (yr === startDetails.year) {
-        startIdx = startDetails.monthIdx; // In registration year, count unpaid months starting from registration month
-      }
+    if (startDetails && yr === startDetails.year) {
+      startIdx = startDetails.monthIdx; // In registration/start year, only count starting from start month
+    }
+
+    if (startIdx > limit) {
+      return 0;
     }
 
     for (let i = startIdx; i <= limit; i++) {
       const key = monthsKeys[i];
       const cellValue = row ? row[key] : '';
-      if (!cellValue) {
+      if (!isPaidValue(cellValue)) {
         unpaid++;
       }
     }
@@ -745,11 +770,17 @@ export function calculateOutstandingDues(noAhli: string, ledger: LedgerRow[], me
     if (startDetails && startDetails.year === currentYear) {
       startIdx = startDetails.monthIdx;
     }
+    if (startIdx > currentMonthIdx) {
+      return 0;
+    }
     return Math.max(0, (currentMonthIdx - startIdx + 1) * kadarYuran);
   }
 
   const years = memberLedgerRows.map(r => r.tahun);
-  const minYear = Math.min(...years);
+  let minYear = Math.min(...years);
+  if (startDetails && startDetails.year > minYear) {
+    minYear = startDetails.year;
+  }
 
   let totalUnpaid = 0;
   for (let yr = minYear; yr <= currentYear; yr++) {
@@ -757,6 +788,108 @@ export function calculateOutstandingDues(noAhli: string, ledger: LedgerRow[], me
   }
 
   return totalUnpaid * kadarYuran;
+}
+
+// 7. GET ARREARS DETAILS (Format teks senarai bulan tertunggak tanpa bulan sebelum mula bayar / pendaftaran)
+export function getArrearsDetails(
+  member: Member,
+  ledger: LedgerRow[],
+  members?: Member[]
+): string {
+  if (member.status !== 'Aktif') return 'N/A (Tidak Aktif)';
+  
+  const cleanNoAhli = normalizeMemberId(member.noAhli);
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonthIdx = now.getMonth(); // 0-indexed (0=Jan, 8=Sep)
+  const monthsKeys: (keyof LedgerRow)[] = [
+    'jan', 'feb', 'mac', 'apr', 'mei', 'jun',
+    'jul', 'ogo', 'sep', 'okt', 'nov', 'dis'
+  ];
+  const monthLabels = ['Jan', 'Feb', 'Mac', 'Apr', 'Mei', 'Jun', 'Jul', 'Ogos', 'Sep', 'Okt', 'Nov', 'Dis'];
+
+  // Check if paid beyond current month of current year, or in future years
+  const currentYearRow = ledger.find(r => isSameMemberId(r.noAhli, cleanNoAhli) && r.tahun === currentYear);
+  if (currentYearRow) {
+    for (let i = currentMonthIdx + 1; i < 12; i++) {
+      if (isPaidValue(currentYearRow[monthsKeys[i]])) {
+        return 'Tiada';
+      }
+    }
+  }
+  const futureYearRows = ledger.filter(r => isSameMemberId(r.noAhli, cleanNoAhli) && r.tahun > currentYear);
+  if (futureYearRows.length > 0) {
+    for (const row of futureYearRows) {
+      for (let i = 0; i < 12; i++) {
+        if (isPaidValue(row[monthsKeys[i]])) {
+          return 'Tiada';
+        }
+      }
+    }
+  }
+
+  // Get registration / first payment start
+  const startDetails = getRegistrationStart(member, ledger, cleanNoAhli);
+
+  const memberLedgerRows = ledger.filter(r => isSameMemberId(r.noAhli, cleanNoAhli));
+  if (memberLedgerRows.length === 0) {
+    let startIdx = 0;
+    if (startDetails && startDetails.year === currentYear) {
+      startIdx = startDetails.monthIdx;
+    }
+    if (startIdx > currentMonthIdx) {
+      return 'Tiada';
+    }
+    const monthsList = monthLabels.slice(startIdx, currentMonthIdx + 1).join(', ');
+    return `${currentYear} (${monthsList})`;
+  }
+
+  const years = memberLedgerRows.map(r => r.tahun);
+  let minYear = Math.min(...years);
+  if (startDetails && startDetails.year > minYear) {
+    minYear = startDetails.year;
+  }
+
+  const arrearsSegments: string[] = [];
+
+  for (let yr = minYear; yr <= currentYear; yr++) {
+    if (startDetails && yr < startDetails.year) {
+      continue; // Skip years prior to registration/first payment
+    }
+
+    const row = ledger.find(r => isSameMemberId(r.noAhli, cleanNoAhli) && r.tahun === yr);
+    const limit = yr === currentYear ? currentMonthIdx : 11;
+    
+    // In startDetails.year, only start checking from startDetails.monthIdx
+    let startIdx = 0;
+    if (startDetails && yr === startDetails.year) {
+      startIdx = startDetails.monthIdx;
+    }
+
+    if (startIdx > limit) {
+      continue;
+    }
+
+    const unpaidInYear: string[] = [];
+    for (let i = startIdx; i <= limit; i++) {
+      const key = monthsKeys[i];
+      const cellValue = row ? row[key] : '';
+      if (!isPaidValue(cellValue)) {
+        unpaidInYear.push(monthLabels[i]);
+      }
+    }
+
+    if (unpaidInYear.length > 0) {
+      const totalPossibleMonths = limit - startIdx + 1;
+      if (unpaidInYear.length === totalPossibleMonths && startIdx === 0 && limit === 11) {
+        arrearsSegments.push(`${yr} (Penuh)`);
+      } else {
+        arrearsSegments.push(`${yr} (${unpaidInYear.join(', ')})`);
+      }
+    }
+  }
+
+  return arrearsSegments.length > 0 ? arrearsSegments.join('; ') : 'Tiada';
 }
 
 // ============================================
