@@ -61,7 +61,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
   // PRINT PREVIEW OVERLAY STATE
   const [isPrinting, setIsPrinting] = useState(false);
   const [printFormat, setPrintFormat] = useState<'lejar' | 'matriks'>('matriks'); // Default ke Matriks Saluran Melintang Sebelah Menyebelah
-  const [printFontSize, setPrintFontSize] = useState<number>(12); // Paling minimum font 12!
+  const [printFontSize, setPrintFontSize] = useState<number>(10); // Default 10pt supaya muat padat semua 5 saluran pada 1 halaman
   const [printOrientation, setPrintOrientation] = useState<'landscape' | 'portrait'>('landscape');
   const [printAccountFilter, setPrintAccountFilter] = useState<'all' | 'bank_tunai' | 'bank' | 'tunai' | 'pelaburan'>('all');
   const [printRowSpacing, setPrintRowSpacing] = useState<'normal' | 'relaxed'>('normal');
@@ -1077,7 +1077,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
             @media print {
               @page {
                 size: ${printOrientation};
-                margin: 8mm 6mm;
+                margin: 6mm 4mm;
               }
             }
           `}} />
@@ -1169,20 +1169,22 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
               <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-xs flex flex-col justify-between">
                 <label className="text-[11px] font-extrabold uppercase tracking-wide text-slate-700 mb-1.5 flex items-center justify-between">
                   <span>Saiz Tulisan:</span>
-                  <span className="text-emerald-700 font-black">{printFontSize} pt</span>
+                  <span className="text-emerald-700 font-black">
+                    {printFontSize} pt {printFontSize <= 10 && printFormat === 'matriks' ? '(Muat Padat A4)' : ''}
+                  </span>
                 </label>
-                <div className="grid grid-cols-5 gap-1">
-                  {[10, 11, 12, 13, 14].map((size) => (
+                <div className="grid grid-cols-7 gap-1">
+                  {[8, 9, 10, 11, 12, 13, 14].map((size) => (
                     <button
                       key={size}
                       type="button"
                       onClick={() => setPrintFontSize(size)}
-                      className={`px-1 py-2 rounded-lg font-bold text-xs transition cursor-pointer text-center ${
+                      className={`px-0.5 py-1.5 rounded-lg font-bold text-[11px] transition cursor-pointer text-center ${
                         printFontSize === size
-                          ? 'bg-amber-600 text-white shadow-xs'
+                          ? 'bg-amber-600 text-white shadow-xs font-black'
                           : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                       }`}
-                      title={size === 12 ? 'Font 12 Disyorkan' : undefined}
+                      title={size === 10 ? 'Disyorkan untuk Matriks 5 Saluran' : size === 12 ? 'Disyorkan untuk Lejar 7 Kolum' : undefined}
                     >
                       {size}pt
                     </button>
@@ -1318,15 +1320,15 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
 
           {/* Financial summary Cards on top of printable PDF - High contrast & large fonts */}
           <div className="mb-6 space-y-3">
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 bg-slate-100/80 p-3.5 rounded-xl border-2 border-slate-400">
+            <div className="grid grid-cols-2 md:grid-cols-5 print:grid-cols-5 gap-2 md:gap-3 print:gap-2 bg-slate-100/80 p-2.5 md:p-3.5 print:p-2 rounded-xl border-2 border-slate-400">
               {ACCOUNTS_LIST.map((acc, keyIdx) => {
                 const currentBal = processedData.finalBalances[acc];
                 return (
-                  <div key={keyIdx} className="text-center bg-white p-2.5 rounded-lg border border-slate-300 shadow-xs">
-                    <span className="text-[11px] print:text-[10pt] font-black text-slate-700 uppercase block tracking-tight truncate mb-1">
+                  <div key={keyIdx} className="text-center bg-white p-2 rounded-lg border border-slate-300 shadow-xs">
+                    <span className="text-[11px] print:text-[9pt] font-black text-slate-700 uppercase block tracking-tight truncate mb-1">
                       {getAccountDisplayName(acc)}
                     </span>
-                    <strong className="text-sm md:text-base print:text-[13pt] font-mono font-black text-slate-950 block">
+                    <strong className="text-sm md:text-base print:text-[11pt] font-mono font-black text-slate-950 block">
                       RM {formatCur(currentBal)}
                     </strong>
                   </div>
@@ -1475,19 +1477,33 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
 
           {/* ==================== FORMAT 2: FORMAT MATRIKS SALURAN ==================== */}
           {printFormat === 'matriks' && (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto w-full print:overflow-visible">
               <table 
-                className={`w-full text-left border-collapse border-2 border-slate-700 print-font-${printFontSize}`}
+                className={`w-full text-left border-collapse border-2 border-slate-700 print-font-${printFontSize} table-matriks-print`}
                 style={{ fontSize: `${printFontSize}pt` }}
               >
+                <colgroup>
+                  {/* Fixed meta columns: Bil, Tarikh, Butiran */}
+                  <col style={{ width: '2.5%' }} />
+                  <col style={{ width: '6.5%' }} />
+                  <col style={{ width: '13%' }} />
+                  {/* 5 channels x 3 sub-columns (Masuk, Keluar, Baki) = 15 cols = 78% total (5.2% per sub-column) */}
+                  {printMatrixAccounts.map((_, idx) => (
+                    <React.Fragment key={idx}>
+                      <col style={{ width: '4.8%' }} />
+                      <col style={{ width: '4.8%' }} />
+                      <col style={{ width: '6.0%' }} />
+                    </React.Fragment>
+                  ))}
+                </colgroup>
                 <thead className="bg-slate-200 text-black border-b-2 border-slate-700">
                   <tr>
-                    <th className="px-2 py-2 text-center border-r border-slate-500 w-[35px] font-black" rowSpan={2}>BIL</th>
-                    <th className="px-2 py-2 text-center border-r border-slate-500 w-[85px] font-black whitespace-nowrap" rowSpan={2}>TARIKH</th>
-                    <th className="px-2.5 py-2 border-r border-slate-600 text-left min-w-[170px] font-black" rowSpan={2}>KENYATAAN / BUTIRAN</th>
+                    <th className="px-1 py-1.5 text-center border-r border-slate-500 font-black" rowSpan={2}>BIL</th>
+                    <th className="px-1 py-1.5 text-center border-r border-slate-500 font-black whitespace-nowrap" rowSpan={2}>TARIKH</th>
+                    <th className="px-1.5 py-1.5 border-r border-slate-600 text-left font-black" rowSpan={2}>KENYATAAN / BUTIRAN</th>
                     
                     {printMatrixAccounts.map((acc, idx) => (
-                      <th key={idx} className="px-1.5 py-1.5 text-center border-r border-slate-600 font-black bg-slate-300/80 text-black tracking-tight" colSpan={3}>
+                      <th key={idx} className="px-1 py-1 text-center border-r border-slate-600 font-black bg-slate-300/80 text-black tracking-tight" colSpan={3}>
                         {getAccountDisplayName(acc)}
                       </th>
                     ))}
@@ -1495,9 +1511,9 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
                   <tr className="bg-slate-100 border-b-2 border-slate-700 text-black font-extrabold">
                     {printMatrixAccounts.map((_, idx) => (
                       <React.Fragment key={idx}>
-                        <th className="px-1 py-1 text-right border-r border-slate-400 text-emerald-950 font-extrabold bg-emerald-50/40">Masuk</th>
-                        <th className="px-1 py-1 text-right border-r border-slate-400 text-rose-950 font-extrabold bg-rose-50/40">Keluar</th>
-                        <th className="px-1.5 py-1 text-right border-r border-slate-600 font-black bg-slate-200 text-slate-950">Baki</th>
+                        <th className="px-0.5 py-0.5 text-right border-r border-slate-400 text-emerald-950 font-extrabold bg-emerald-50/40 text-[90%]">Masuk</th>
+                        <th className="px-0.5 py-0.5 text-right border-r border-slate-400 text-rose-950 font-extrabold bg-rose-50/40 text-[90%]">Keluar</th>
+                        <th className="px-1 py-0.5 text-right border-r border-slate-600 font-black bg-slate-200 text-slate-950 text-[90%]">Baki</th>
                       </React.Fragment>
                     ))}
                   </tr>
@@ -1506,7 +1522,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
                 <tbody className="divide-y divide-slate-400 text-slate-950 font-medium">
                   {filteredDisplayRows.map((row, rowIdx) => {
                     const isBakiRow = row.kenyataan.toLowerCase().startsWith('baki');
-                    const rowPad = printRowSpacing === 'relaxed' ? 'py-2.5' : 'py-1.5';
+                    const rowPad = printRowSpacing === 'relaxed' ? 'py-2' : 'py-1';
 
                     return (
                       <tr 
@@ -1517,9 +1533,9 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
                             : (rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-100/70')
                         }`}
                       >
-                        <td className={`px-1.5 ${rowPad} text-center font-mono font-bold border-r border-slate-400`}>{rowIdx + 1}</td>
-                        <td className={`px-1.5 ${rowPad} text-center font-mono font-bold border-r border-slate-400 whitespace-nowrap`}>{parseDateMalay(row.tarikh)}</td>
-                        <td className={`px-2.5 ${rowPad} text-left font-sans font-bold leading-snug border-r border-slate-600 whitespace-normal break-words text-slate-950`}>
+                        <td className={`px-1 ${rowPad} text-center font-mono font-bold border-r border-slate-400`}>{rowIdx + 1}</td>
+                        <td className={`px-1 ${rowPad} text-center font-mono font-bold border-r border-slate-400 whitespace-nowrap`}>{parseDateMalay(row.tarikh)}</td>
+                        <td className={`px-1.5 ${rowPad} text-left font-sans font-bold leading-tight border-r border-slate-600 whitespace-normal break-words text-slate-950`}>
                           {row.kenyataan}
                         </td>
                         
@@ -1529,13 +1545,13 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
                           
                           return (
                             <React.Fragment key={keyIdx}>
-                              <td className={`px-1 ${rowPad} text-right border-r border-slate-300 font-mono font-bold text-emerald-950 ${data.masuk && !showInBakiOnly ? 'bg-emerald-50/30' : ''}`}>
+                              <td className={`px-0.5 ${rowPad} text-right border-r border-slate-300 font-mono font-bold text-emerald-950 ${data.masuk && !showInBakiOnly ? 'bg-emerald-50/30' : ''}`}>
                                 {!showInBakiOnly && data.masuk ? formatCur(data.masuk) : ''}
                               </td>
-                              <td className={`px-1 ${rowPad} text-right border-r border-slate-300 font-mono font-bold text-rose-950 ${data.keluar && !showInBakiOnly ? 'bg-rose-50/30' : ''}`}>
+                              <td className={`px-0.5 ${rowPad} text-right border-r border-slate-300 font-mono font-bold text-rose-950 ${data.keluar && !showInBakiOnly ? 'bg-rose-50/30' : ''}`}>
                                 {!showInBakiOnly && data.keluar ? formatCur(data.keluar) : ''}
                               </td>
-                              <td className={`px-1.5 ${rowPad} text-right border-r border-slate-600 font-mono font-black bg-slate-100/90 text-slate-950`}>
+                              <td className={`px-1 ${rowPad} text-right border-r border-slate-600 font-mono font-black bg-slate-100/90 text-slate-950`}>
                                 {data.hasTx ? formatCur(data.baki) : ''}
                               </td>
                             </React.Fragment>
@@ -1547,7 +1563,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
 
                   {/* Cumulative balance Footer row */}
                   <tr className="bg-slate-300 font-black border-t-2 border-slate-700 border-b-2 text-black">
-                    <td className="px-2 py-2.5 text-center border-r border-slate-600 font-black uppercase tracking-wider" colSpan={3}>
+                    <td className="px-1 py-2 text-center border-r border-slate-600 font-black uppercase tracking-wider text-[90%]" colSpan={3}>
                       BAKI TERKUMPUL (RM)
                     </td>
                     
@@ -1555,8 +1571,8 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
                       const currentBal = processedData.finalBalances[acc];
                       return (
                         <React.Fragment key={keyIdx}>
-                          <td className="px-1 py-2.5 bg-slate-200 border-r border-slate-300" colSpan={2}></td>
-                          <td className="px-1.5 py-2.5 text-right font-mono font-black bg-slate-400/50 border-r border-slate-600 text-slate-950">
+                          <td className="px-0.5 py-2 bg-slate-200 border-r border-slate-300" colSpan={2}></td>
+                          <td className="px-1 py-2 text-right font-mono font-black bg-slate-400/50 border-r border-slate-600 text-slate-950">
                             {formatCur(currentBal)}
                           </td>
                         </React.Fragment>
