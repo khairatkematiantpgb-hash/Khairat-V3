@@ -109,7 +109,19 @@ body {
   }
 }
 
-/* Explicit print font size classes ensuring minimum 12pt */
+/* Explicit print font size classes */
+.print-font-9 {
+  font-size: 9pt !important;
+  line-height: 1.35 !important;
+}
+.print-font-10 {
+  font-size: 10pt !important;
+  line-height: 1.38 !important;
+}
+.print-font-11 {
+  font-size: 11pt !important;
+  line-height: 1.4 !important;
+}
 .print-font-12 {
   font-size: 12pt !important;
   line-height: 1.45 !important;
@@ -124,6 +136,18 @@ body {
 }
 
 @media print {
+  .print-font-9 th, .print-font-9 td {
+    font-size: 9pt !important;
+    line-height: 1.35 !important;
+  }
+  .print-font-10 th, .print-font-10 td {
+    font-size: 10pt !important;
+    line-height: 1.38 !important;
+  }
+  .print-font-11 th, .print-font-11 td {
+    font-size: 11pt !important;
+    line-height: 1.4 !important;
+  }
   .print-font-12 th, .print-font-12 td {
     font-size: 12pt !important;
     line-height: 1.45 !important;

@@ -60,7 +60,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
 
   // PRINT PREVIEW OVERLAY STATE
   const [isPrinting, setIsPrinting] = useState(false);
-  const [printFormat, setPrintFormat] = useState<'lejar' | 'matriks'>('lejar'); // Default to 'lejar' (Disyorkan Mesyuarat - Tulisan Besar)
+  const [printFormat, setPrintFormat] = useState<'lejar' | 'matriks'>('matriks'); // Default ke Matriks Saluran Melintang Sebelah Menyebelah
   const [printFontSize, setPrintFontSize] = useState<number>(12); // Paling minimum font 12!
   const [printOrientation, setPrintOrientation] = useState<'landscape' | 'portrait'>('landscape');
   const [printAccountFilter, setPrintAccountFilter] = useState<'all' | 'bank_tunai' | 'bank' | 'tunai' | 'pelaburan'>('all');
@@ -1138,19 +1138,6 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
                   <button
                     type="button"
                     onClick={() => {
-                      setPrintFormat('lejar');
-                    }}
-                    className={`px-2 py-2 rounded-lg font-bold text-[11px] transition text-center cursor-pointer ${
-                      printFormat === 'lejar'
-                        ? 'bg-emerald-700 text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
-                  >
-                    🌟 Lejar (7 Kolum)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
                       setPrintFormat('matriks');
                       setPrintOrientation('landscape');
                     }}
@@ -1160,30 +1147,44 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
                         : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
-                    📊 Matriks Saluran
+                    📊 5 Saluran Sebelah (Melintang)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPrintFormat('lejar');
+                    }}
+                    className={`px-2 py-2 rounded-lg font-bold text-[11px] transition text-center cursor-pointer ${
+                      printFormat === 'lejar'
+                        ? 'bg-emerald-700 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    🌟 Lejar Kronologi (7 Kolum)
                   </button>
                 </div>
               </div>
 
-              {/* 2. Saiz Tulisan (Paling Minimum Font 12) */}
+              {/* 2. Saiz Tulisan */}
               <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-xs flex flex-col justify-between">
                 <label className="text-[11px] font-extrabold uppercase tracking-wide text-slate-700 mb-1.5 flex items-center justify-between">
-                  <span>Saiz Tulisan (Min Font 12):</span>
+                  <span>Saiz Tulisan:</span>
                   <span className="text-emerald-700 font-black">{printFontSize} pt</span>
                 </label>
-                <div className="grid grid-cols-3 gap-1">
-                  {[12, 13, 14].map((size) => (
+                <div className="grid grid-cols-5 gap-1">
+                  {[10, 11, 12, 13, 14].map((size) => (
                     <button
                       key={size}
                       type="button"
                       onClick={() => setPrintFontSize(size)}
-                      className={`px-1.5 py-2 rounded-lg font-bold text-xs transition cursor-pointer text-center ${
+                      className={`px-1 py-2 rounded-lg font-bold text-xs transition cursor-pointer text-center ${
                         printFontSize === size
                           ? 'bg-amber-600 text-white shadow-xs'
                           : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                       }`}
+                      title={size === 12 ? 'Font 12 Disyorkan' : undefined}
                     >
-                      {size} pt {size === 12 ? '(Min)' : size === 14 ? '(Besar)' : ''}
+                      {size}pt
                     </button>
                   ))}
                 </div>
@@ -1298,7 +1299,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
               <h2 className="text-base md:text-lg font-black tracking-tight uppercase text-black flex items-center gap-2">
                 LAPORAN PENYATA KIRA-KIRA ALIRAN TUNAI & PELABURAN
                 <span className="text-xs font-bold font-sans bg-slate-200 text-slate-800 px-2 py-0.5 rounded border border-slate-300">
-                  {printFormat === 'lejar' ? 'Format Lejar Mesyuarat (7 Kolum)' : 'Format Matriks Saluran'}
+                  {printFormat === 'matriks' ? 'Susunan 5 Saluran Sebelah-Menyebelah (Melintang)' : 'Format Lejar Mesyuarat (7 Kolum)'}
                 </span>
               </h2>
               <p className="text-xs text-slate-600 font-semibold mt-1">
@@ -1476,70 +1477,77 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
           {printFormat === 'matriks' && (
             <div className="overflow-x-auto">
               <table 
-                className={`w-full text-left border-collapse border-2 border-slate-600 print-font-${printFontSize}`}
+                className={`w-full text-left border-collapse border-2 border-slate-700 print-font-${printFontSize}`}
                 style={{ fontSize: `${printFontSize}pt` }}
               >
-                <thead className="bg-slate-200 text-black border-b-2 border-slate-600">
+                <thead className="bg-slate-200 text-black border-b-2 border-slate-700">
                   <tr>
-                    <th className="px-2 py-2 text-center border-r border-slate-500 w-[40px]" rowSpan={2}>BIL</th>
-                    <th className="px-2 py-2 text-center border-r border-slate-500 w-[95px]" rowSpan={2}>TARIKH</th>
-                    <th className="px-3 py-2 border-r border-slate-500 text-left min-w-[200px]" rowSpan={2}>KENYATAAN</th>
+                    <th className="px-2 py-2 text-center border-r border-slate-500 w-[35px] font-black" rowSpan={2}>BIL</th>
+                    <th className="px-2 py-2 text-center border-r border-slate-500 w-[85px] font-black whitespace-nowrap" rowSpan={2}>TARIKH</th>
+                    <th className="px-2.5 py-2 border-r border-slate-600 text-left min-w-[170px] font-black" rowSpan={2}>KENYATAAN / BUTIRAN</th>
                     
                     {printMatrixAccounts.map((acc, idx) => (
-                      <th key={idx} className="px-2 py-1.5 text-center border-r border-slate-500 font-black" colSpan={3}>
+                      <th key={idx} className="px-1.5 py-1.5 text-center border-r border-slate-600 font-black bg-slate-300/80 text-black tracking-tight" colSpan={3}>
                         {getAccountDisplayName(acc)}
                       </th>
                     ))}
                   </tr>
-                  <tr className="bg-slate-200 border-b border-slate-500">
+                  <tr className="bg-slate-100 border-b-2 border-slate-700 text-black font-extrabold">
                     {printMatrixAccounts.map((_, idx) => (
                       <React.Fragment key={idx}>
-                        <th className="px-1.5 py-1 text-right border-r border-slate-400 text-emerald-950 font-extrabold">Masuk</th>
-                        <th className="px-1.5 py-1 text-right border-r border-slate-400 text-rose-950 font-extrabold">Keluar</th>
-                        <th className="px-1.5 py-1 text-right border-r border-slate-500 font-black bg-slate-300">Baki</th>
+                        <th className="px-1 py-1 text-right border-r border-slate-400 text-emerald-950 font-extrabold bg-emerald-50/40">Masuk</th>
+                        <th className="px-1 py-1 text-right border-r border-slate-400 text-rose-950 font-extrabold bg-rose-50/40">Keluar</th>
+                        <th className="px-1.5 py-1 text-right border-r border-slate-600 font-black bg-slate-200 text-slate-950">Baki</th>
                       </React.Fragment>
                     ))}
                   </tr>
                 </thead>
 
-                <tbody className="divide-y divide-slate-400 text-slate-900">
-                  {filteredDisplayRows.map((row, rowIdx) => (
-                    <tr 
-                      key={rowIdx} 
-                      className={`page-break-inside-avoid border-b border-slate-300 ${
-                        rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-100/70'
-                      }`}
-                    >
-                      <td className="px-2 py-2 text-center font-mono font-bold border-r border-slate-400">{rowIdx + 1}</td>
-                      <td className="px-2 py-2 text-center font-mono font-bold border-r border-slate-400 whitespace-nowrap">{parseDateMalay(row.tarikh)}</td>
-                      <td className="px-3 py-2 text-left font-sans font-bold leading-tight border-r border-slate-400 whitespace-normal break-words">
-                        {row.kenyataan}
-                      </td>
-                      
-                      {printMatrixAccounts.map((acc, keyIdx) => {
-                        const data = row.accountsData[acc] || { baki: 0, hasTx: false, isBakiAwal: false };
-                        const showInBakiOnly = data.isBakiAwal;
+                <tbody className="divide-y divide-slate-400 text-slate-950 font-medium">
+                  {filteredDisplayRows.map((row, rowIdx) => {
+                    const isBakiRow = row.kenyataan.toLowerCase().startsWith('baki');
+                    const rowPad = printRowSpacing === 'relaxed' ? 'py-2.5' : 'py-1.5';
+
+                    return (
+                      <tr 
+                        key={rowIdx} 
+                        className={`page-break-inside-avoid border-b border-slate-300 ${
+                          isBakiRow 
+                            ? 'bg-amber-50/80 font-bold border-b-2 border-slate-500' 
+                            : (rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-100/70')
+                        }`}
+                      >
+                        <td className={`px-1.5 ${rowPad} text-center font-mono font-bold border-r border-slate-400`}>{rowIdx + 1}</td>
+                        <td className={`px-1.5 ${rowPad} text-center font-mono font-bold border-r border-slate-400 whitespace-nowrap`}>{parseDateMalay(row.tarikh)}</td>
+                        <td className={`px-2.5 ${rowPad} text-left font-sans font-bold leading-snug border-r border-slate-600 whitespace-normal break-words text-slate-950`}>
+                          {row.kenyataan}
+                        </td>
                         
-                        return (
-                          <React.Fragment key={keyIdx}>
-                            <td className="px-1.5 py-2 text-right border-r border-slate-300 font-mono font-bold text-emerald-950">
-                              {!showInBakiOnly && data.masuk ? formatCur(data.masuk) : ''}
-                            </td>
-                            <td className="px-1.5 py-2 text-right border-r border-slate-300 font-mono font-bold text-rose-950">
-                              {!showInBakiOnly && data.keluar ? formatCur(data.keluar) : ''}
-                            </td>
-                            <td className="px-1.5 py-2 text-right border-r border-slate-400 font-mono font-black bg-slate-100 text-slate-950">
-                              {data.hasTx ? formatCur(data.baki) : ''}
-                            </td>
-                          </React.Fragment>
-                        );
-                      })}
-                    </tr>
-                  ))}
+                        {printMatrixAccounts.map((acc, keyIdx) => {
+                          const data = row.accountsData[acc] || { baki: 0, hasTx: false, isBakiAwal: false };
+                          const showInBakiOnly = data.isBakiAwal;
+                          
+                          return (
+                            <React.Fragment key={keyIdx}>
+                              <td className={`px-1 ${rowPad} text-right border-r border-slate-300 font-mono font-bold text-emerald-950 ${data.masuk && !showInBakiOnly ? 'bg-emerald-50/30' : ''}`}>
+                                {!showInBakiOnly && data.masuk ? formatCur(data.masuk) : ''}
+                              </td>
+                              <td className={`px-1 ${rowPad} text-right border-r border-slate-300 font-mono font-bold text-rose-950 ${data.keluar && !showInBakiOnly ? 'bg-rose-50/30' : ''}`}>
+                                {!showInBakiOnly && data.keluar ? formatCur(data.keluar) : ''}
+                              </td>
+                              <td className={`px-1.5 ${rowPad} text-right border-r border-slate-600 font-mono font-black bg-slate-100/90 text-slate-950`}>
+                                {data.hasTx ? formatCur(data.baki) : ''}
+                              </td>
+                            </React.Fragment>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
 
                   {/* Cumulative balance Footer row */}
-                  <tr className="bg-slate-200 font-black border-t-2 border-slate-600 border-b text-black">
-                    <td className="px-2 py-2.5 text-center border-r border-slate-500 font-extrabold" colSpan={3}>
+                  <tr className="bg-slate-300 font-black border-t-2 border-slate-700 border-b-2 text-black">
+                    <td className="px-2 py-2.5 text-center border-r border-slate-600 font-black uppercase tracking-wider" colSpan={3}>
                       BAKI TERKUMPUL (RM)
                     </td>
                     
@@ -1547,8 +1555,8 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
                       const currentBal = processedData.finalBalances[acc];
                       return (
                         <React.Fragment key={keyIdx}>
-                          <td className="px-1.5 py-2.5 bg-slate-200 border-r border-slate-300" colSpan={2}></td>
-                          <td className="px-1.5 py-2.5 text-right font-mono font-black bg-slate-300 border-r border-slate-500 text-slate-950">
+                          <td className="px-1 py-2.5 bg-slate-200 border-r border-slate-300" colSpan={2}></td>
+                          <td className="px-1.5 py-2.5 text-right font-mono font-black bg-slate-400/50 border-r border-slate-600 text-slate-950">
                             {formatCur(currentBal)}
                           </td>
                         </React.Fragment>
