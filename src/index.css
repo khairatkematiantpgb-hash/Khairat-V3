@@ -98,5 +98,43 @@ body {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
+
+  /* Table borders in physical printing */
+  #print-area-outlet table {
+    border-collapse: collapse !important;
+  }
+  #print-area-outlet th,
+  #print-area-outlet td {
+    border-color: #475569 !important;
+  }
+}
+
+/* Explicit print font size classes ensuring minimum 12pt */
+.print-font-12 {
+  font-size: 12pt !important;
+  line-height: 1.45 !important;
+}
+.print-font-13 {
+  font-size: 13pt !important;
+  line-height: 1.45 !important;
+}
+.print-font-14 {
+  font-size: 14pt !important;
+  line-height: 1.45 !important;
+}
+
+@media print {
+  .print-font-12 th, .print-font-12 td {
+    font-size: 12pt !important;
+    line-height: 1.45 !important;
+  }
+  .print-font-13 th, .print-font-13 td {
+    font-size: 13pt !important;
+    line-height: 1.45 !important;
+  }
+  .print-font-14 th, .print-font-14 td {
+    font-size: 14pt !important;
+    line-height: 1.45 !important;
+  }
 }
 

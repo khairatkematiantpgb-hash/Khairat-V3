@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { AppState, KewanganTransaction } from '../types';
-import { PlusCircle, Trash2, Printer, Search, Calendar, FileSpreadsheet, ArrowDownCircle, ArrowUpCircle, Info, Pencil, X, Loader2 } from 'lucide-react';
+import { PlusCircle, Trash2, Printer, Search, Calendar, FileSpreadsheet, ArrowDownCircle, ArrowUpCircle, Info, Pencil, X, Loader2, SlidersHorizontal, LayoutList, Table, Check } from 'lucide-react';
 import { writeToAppsScript } from '../lib/database';
 import { createPortal } from 'react-dom';
 
@@ -60,6 +60,11 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
 
   // PRINT PREVIEW OVERLAY STATE
   const [isPrinting, setIsPrinting] = useState(false);
+  const [printFormat, setPrintFormat] = useState<'lejar' | 'matriks'>('lejar'); // Default to 'lejar' (Disyorkan Mesyuarat - Tulisan Besar)
+  const [printFontSize, setPrintFontSize] = useState<number>(12); // Paling minimum font 12!
+  const [printOrientation, setPrintOrientation] = useState<'landscape' | 'portrait'>('landscape');
+  const [printAccountFilter, setPrintAccountFilter] = useState<'all' | 'bank_tunai' | 'bank' | 'tunai' | 'pelaburan'>('all');
+  const [printRowSpacing, setPrintRowSpacing] = useState<'normal' | 'relaxed'>('normal');
 
   // Parse chronological order and compute running balances
   const processedData = useMemo(() => {
@@ -218,6 +223,108 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
     years.add('2026');
     return Array.from(years).sort((a, b) => b.localeCompare(a));
   }, [transactions]);
+
+  // Totals for printed statement
+  const { totalPeriodMasuk, totalPeriodKeluar } = useMemo(() => {
+    let masuk = 0;
+    let keluar = 0;
+    filteredDisplayRows.forEach(row => {
+      ACCOUNTS_LIST.forEach(acc => {
+        const data = row.accountsData[acc];
+        if (data && !data.isBakiAwal) {
+          if (data.masuk) masuk += data.masuk;
+          if (data.keluar) keluar += data.keluar;
+        }
+      });
+    });
+    return { totalPeriodMasuk: masuk, totalPeriodKeluar: keluar };
+  }, [filteredDisplayRows]);
+
+  // Breakdown of active accounts for Matrix print filter
+  const printMatrixAccounts = useMemo(() => {
+    if (printAccountFilter === 'bank_tunai') {
+      return ACCOUNTS_LIST.filter(acc => acc === 'Bank' || acc === 'Tunai');
+    }
+    if (printAccountFilter === 'bank') {
+      return ACCOUNTS_LIST.filter(acc => acc === 'Bank');
+    }
+    if (printAccountFilter === 'tunai') {
+      return ACCOUNTS_LIST.filter(acc => acc === 'Tunai');
+    }
+    if (printAccountFilter === 'pelaburan') {
+      return ACCOUNTS_LIST.filter(acc => acc.startsWith('Pelaburan'));
+    }
+    return ACCOUNTS_LIST;
+  }, [printAccountFilter]);
+
+  // Flat Lejar rows for clear, big-font presentation (ideal for elderly committee members)
+  const lejarRows = useMemo(() => {
+    const rows: Array<{
+      bil: number;
+      tarikh: string;
+      kenyataan: string;
+      saluran: string;
+      masuk?: number;
+      keluar?: number;
+      baki: number;
+      isBakiAwal: boolean;
+      allBakiAwalList?: Array<{ acc: string; baki: number }>;
+    }> = [];
+
+    let count = 0;
+
+    filteredDisplayRows.forEach((row) => {
+      const isBakiRow = row.kenyataan.toLowerCase().startsWith('baki');
+
+      if (isBakiRow) {
+        const bakiList: Array<{ acc: string; baki: number }> = [];
+        let totalBakiAwal = 0;
+        ACCOUNTS_LIST.forEach(acc => {
+          if (row.accountsData[acc]?.hasTx || row.accountsData[acc]?.isBakiAwal) {
+            const bal = row.accountsData[acc].baki;
+            bakiList.push({ acc, baki: bal });
+            totalBakiAwal += bal;
+          }
+        });
+
+        count++;
+        rows.push({
+          bil: count,
+          tarikh: row.tarikh,
+          kenyataan: row.kenyataan,
+          saluran: 'Semua Saluran (Baki Pembukaan)',
+          baki: totalBakiAwal,
+          isBakiAwal: true,
+          allBakiAwalList: bakiList
+        });
+      } else {
+        const activeAccounts = ACCOUNTS_LIST.filter(acc => {
+          if (printAccountFilter === 'bank_tunai' && acc !== 'Bank' && acc !== 'Tunai') return false;
+          if (printAccountFilter === 'bank' && acc !== 'Bank') return false;
+          if (printAccountFilter === 'tunai' && acc !== 'Tunai') return false;
+          if (printAccountFilter === 'pelaburan' && !acc.startsWith('Pelaburan')) return false;
+          return row.accountsData[acc]?.hasTx && !row.accountsData[acc]?.isBakiAwal;
+        });
+
+        activeAccounts.forEach(acc => {
+          const d = row.accountsData[acc];
+          count++;
+          rows.push({
+            bil: count,
+            tarikh: row.tarikh,
+            kenyataan: row.kenyataan,
+            saluran: getAccountDisplayName(acc),
+            masuk: d.masuk,
+            keluar: d.keluar,
+            baki: d.baki,
+            isBakiAwal: false
+          });
+        });
+      }
+    });
+
+    return rows;
+  }, [filteredDisplayRows, printAccountFilter, state.customAccountNames]);
 
   // Handle entering edit mode
   const handleStartEdit = (tx: KewanganTransaction) => {
@@ -963,19 +1070,39 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
 
       {/* -------------------- PRINT VIEW LAPORAN PREVIEW OVERLAY -------------------- */}
       {isPrinting && createPortal(
-        <div id="print-area-outlet" className="fixed inset-0 bg-white z-[99999] p-10 overflow-y-auto text-slate-900 font-sans print:relative print:inset-auto print:p-0 print:m-0 print:overflow-visible print:bg-white print:block print:h-auto print:w-full">
+        <div id="print-area-outlet" className="fixed inset-0 bg-white z-[99999] p-8 md:p-12 overflow-y-auto text-slate-900 font-sans print:relative print:inset-auto print:p-0 print:m-0 print:overflow-visible print:bg-white print:block print:h-auto print:w-full">
           
+          {/* Dynamic Page Orientation Style for Browser Print Engine */}
+          <style dangerouslySetInnerHTML={{ __html: `
+            @media print {
+              @page {
+                size: ${printOrientation};
+                margin: 8mm 6mm;
+              }
+            }
+          `}} />
+
           {/* Print controls Ribbon */}
-          <div className="mb-6 bg-amber-50 border border-amber-200 p-5 rounded-xl print:hidden flex flex-col gap-4">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="mb-6 bg-amber-50 border-2 border-amber-300 p-5 rounded-2xl print:hidden shadow-md flex flex-col gap-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-amber-200/80 pb-4">
               <div className="flex items-center gap-3">
-                <span className="p-2 bg-amber-500 text-amber-950 font-black rounded-lg shrink-0 text-sm">⚠️</span>
+                <div className="p-2.5 bg-amber-500 text-slate-950 font-black rounded-xl shrink-0 shadow-xs">
+                  <Printer className="h-6 w-6 text-white" />
+                </div>
                 <div>
-                  <strong className="text-slate-800 text-xs block font-extrabold uppercase tracking-wide font-sans">Mod Pratonton Cetak Laporan Penyata</strong>
-                  <p className="text-[10px] text-slate-500 font-sans mt-0.5 animate-pulse">Sila ambil perhatian: pencetakan tidak dibenarkan terus dari dalam bingkai pratonton sandboxed.</p>
+                  <h3 className="text-slate-900 text-sm font-black uppercase tracking-wide font-sans flex items-center gap-2">
+                    Tetapan Cetakan Penyata Rasmi Mesyuarat
+                    <span className="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
+                      Font 12+ Warga Emas
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-600 font-sans mt-0.5">
+                    Format telah dilaras khusus agar tulisan dan angka lebih besar dan jelas dibaca oleh ahli jawatankuasa mesyuarat.
+                  </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 self-stretch md:self-auto justify-end">
+              
+              <div className="flex items-center gap-2.5 self-stretch md:self-auto justify-end">
                 <button
                   onClick={() => {
                     try {
@@ -984,180 +1111,479 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
                       console.error(e);
                     }
                   }}
-                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs tracking-wide uppercase rounded-xl cursor-pointer shrink-0 transition"
+                  className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold text-xs tracking-wide uppercase rounded-xl cursor-pointer shrink-0 transition flex items-center gap-2 shadow-sm"
                 >
+                  <Printer className="h-4 w-4" />
                   Cetak Fizikal / Muat Turun PDF
                 </button>
                 <button
                   onClick={() => setIsPrinting(false)}
-                  className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs tracking-wide uppercase rounded-xl cursor-pointer shrink-0 transition"
+                  className="px-4 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs tracking-wide uppercase rounded-xl cursor-pointer shrink-0 transition"
                 >
                   Tutup Pratonton
                 </button>
               </div>
             </div>
 
+            {/* Customizer Ribbon Controls */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 pt-1 text-xs">
+              
+              {/* 1. Format Penyata */}
+              <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-xs flex flex-col justify-between">
+                <label className="text-[11px] font-extrabold uppercase tracking-wide text-slate-700 mb-1.5 flex items-center gap-1.5">
+                  <LayoutList className="h-3.5 w-3.5 text-amber-600" />
+                  Susunan / Format:
+                </label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPrintFormat('lejar');
+                    }}
+                    className={`px-2 py-2 rounded-lg font-bold text-[11px] transition text-center cursor-pointer ${
+                      printFormat === 'lejar'
+                        ? 'bg-emerald-700 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    🌟 Lejar (7 Kolum)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPrintFormat('matriks');
+                      setPrintOrientation('landscape');
+                    }}
+                    className={`px-2 py-2 rounded-lg font-bold text-[11px] transition text-center cursor-pointer ${
+                      printFormat === 'matriks'
+                        ? 'bg-emerald-700 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    📊 Matriks Saluran
+                  </button>
+                </div>
+              </div>
+
+              {/* 2. Saiz Tulisan (Paling Minimum Font 12) */}
+              <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-xs flex flex-col justify-between">
+                <label className="text-[11px] font-extrabold uppercase tracking-wide text-slate-700 mb-1.5 flex items-center justify-between">
+                  <span>Saiz Tulisan (Min Font 12):</span>
+                  <span className="text-emerald-700 font-black">{printFontSize} pt</span>
+                </label>
+                <div className="grid grid-cols-3 gap-1">
+                  {[12, 13, 14].map((size) => (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => setPrintFontSize(size)}
+                      className={`px-1.5 py-2 rounded-lg font-bold text-xs transition cursor-pointer text-center ${
+                        printFontSize === size
+                          ? 'bg-amber-600 text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      {size} pt {size === 12 ? '(Min)' : size === 14 ? '(Besar)' : ''}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 3. Orientasi Kertas */}
+              <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-xs flex flex-col justify-between">
+                <label className="text-[11px] font-extrabold uppercase tracking-wide text-slate-700 mb-1.5">
+                  Orientasi Kertas A4:
+                </label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setPrintOrientation('landscape')}
+                    className={`px-2 py-2 rounded-lg font-bold text-[11px] transition cursor-pointer text-center ${
+                      printOrientation === 'landscape'
+                        ? 'bg-slate-900 text-white'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    Melintang (Landscape)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPrintOrientation('portrait')}
+                    className={`px-2 py-2 rounded-lg font-bold text-[11px] transition cursor-pointer text-center ${
+                      printOrientation === 'portrait'
+                        ? 'bg-slate-900 text-white'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    Menegak (Portrait)
+                  </button>
+                </div>
+              </div>
+
+              {/* 4. Penapis Saluran / Akaun */}
+              <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-xs flex flex-col justify-between">
+                <label className="text-[11px] font-extrabold uppercase tracking-wide text-slate-700 mb-1.5">
+                  Pilihan Saluran / Akaun:
+                </label>
+                <select
+                  value={printAccountFilter}
+                  onChange={(e) => setPrintAccountFilter(e.target.value as any)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs font-bold text-slate-800 cursor-pointer focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="all">Semua Saluran (5 Akaun)</option>
+                  <option value="bank_tunai">Bank & Tunai Sahaja (Paling Kerap)</option>
+                  <option value="bank">Akaun Bank Sahaja</option>
+                  <option value="tunai">Wang Tunai Sahaja</option>
+                  <option value="pelaburan">3 Akaun Pelaburan Sahaja</option>
+                </select>
+              </div>
+
+              {/* 5. Kepadatan Ruang Baris */}
+              <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-xs flex flex-col justify-between">
+                <label className="text-[11px] font-extrabold uppercase tracking-wide text-slate-700 mb-1.5">
+                  Jarak Baris (Spacing):
+                </label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setPrintRowSpacing('normal')}
+                    className={`px-2 py-2 rounded-lg font-bold text-[11px] transition cursor-pointer text-center ${
+                      printRowSpacing === 'normal'
+                        ? 'bg-slate-800 text-white'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    Standard
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPrintRowSpacing('relaxed')}
+                    className={`px-2 py-2 rounded-lg font-bold text-[11px] transition cursor-pointer text-center ${
+                      printRowSpacing === 'relaxed'
+                        ? 'bg-slate-800 text-white'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    Selesa (Lapang)
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
             {isInIframe && (
-              <div className="bg-red-50 border border-red-200 text-red-900 p-4 rounded-lg text-xs leading-relaxed shadow-sm">
-                <p className="font-extrabold text-[11px] mb-1.5 uppercase tracking-wide flex items-center gap-1">
-                  🛑 MAKLUMAN PENTING (BACA JIKA TIADA PENERIMAAN POPUP MENU):
+              <div className="bg-red-50 border border-red-200 text-red-900 p-3.5 rounded-xl text-xs leading-relaxed shadow-xs">
+                <p className="font-extrabold text-xs mb-1 uppercase tracking-wide flex items-center gap-1 text-red-800">
+                  🛑 MAKLUMAN PENTING CETAKAN DI DALAM SANDBOX:
                 </p>
-                <p className="mb-2">
-                  Memandangkan aplikasi ini sedang berjalan di dalam panel <strong>Pratonton (IFrame Sandbox)</strong> AI Studio, pelayar web (browser) menghalang arahan cetakan fizikal secara langsung atas faktor keselamatan.
+                <p className="mb-1 text-[11px]">
+                  Jika pelayar tidak membuka dialog cetakan, klik butang anak panah <strong className="bg-red-100 px-1 py-0.5 rounded text-red-950 border border-red-200">"Open in a new tab"</strong> di sudut atas kanan skrin AI Studio untuk membuka di tab penuh pelayar, kemudian klik cetak semula.
                 </p>
-                <ul className="list-decimal pl-5 space-y-1 font-semibold text-[11px] text-red-950">
-                  <li>Sila klik butang ikon anak panah <strong className="bg-red-100 px-1 py-0.5 rounded text-red-900 border border-red-250">"Open in a new tab"</strong> di bahagian atas kanan skrin kelabu AI Studio (luar bingkai putih aplikasi).</li>
-                  <li>Selepas aplikasi dibuka di tab berasingan, anda boleh menekan semula butang hijau di atas untuk memanggil menu cetakan rasmi atau menyimpan terus sebagai dokumen PDF!</li>
-                </ul>
               </div>
             )}
           </div>
 
           {/* Letter Head */}
-          <div className="text-center border-b-2 border-slate-900 pb-5 mb-5 text-black">
-            <h1 className="text-xl font-black tracking-tight uppercase font-display">Pertubuhan Khairat Kematian Dan Kebajikan Kampung Gong Badak</h1>
-            <p className="text-xs text-slate-600 font-medium mt-1">21300 Kuala Nerus, Terengganu Darul Iman</p>
-            <p className="text-[10px] text-slate-400 font-mono mt-1">Sistem Pengurusan Khairat Kematian Tambahan | Hubungi: khairatkematiantpgb@gmail.com</p>
+          <div className="text-center border-b-2 border-slate-900 pb-4 mb-5 text-black">
+            <h1 className="text-xl md:text-2xl font-black tracking-tight uppercase font-display">
+              Pertubuhan Khairat Kematian Dan Kebajikan Kampung Gong Badak
+            </h1>
+            <p className="text-xs md:text-sm text-slate-700 font-bold mt-1">21300 Kuala Nerus, Terengganu Darul Iman</p>
+            <p className="text-[11px] text-slate-500 font-mono mt-0.5">Sistem Pengurusan Khairat Kematian | E-mel: khairatkematiantpgb@gmail.com</p>
           </div>
 
           {/* Report Title */}
-          <div className="flex justify-between items-end border-b border-slate-200 pb-3 mb-5 text-slate-900">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end border-b-2 border-slate-300 pb-3 mb-5 text-slate-900 gap-2">
             <div>
-              <h2 className="text-sm font-extrabold tracking-tight uppercase text-black">LAPORAN PENYATA KIRA-KIRA ALIRAN TUNAI & PELABURAN</h2>
-              <p className="text-[10px] text-slate-500 font-medium mt-1">
+              <h2 className="text-base md:text-lg font-black tracking-tight uppercase text-black flex items-center gap-2">
+                LAPORAN PENYATA KIRA-KIRA ALIRAN TUNAI & PELABURAN
+                <span className="text-xs font-bold font-sans bg-slate-200 text-slate-800 px-2 py-0.5 rounded border border-slate-300">
+                  {printFormat === 'lejar' ? 'Format Lejar Mesyuarat (7 Kolum)' : 'Format Matriks Saluran'}
+                </span>
+              </h2>
+              <p className="text-xs text-slate-600 font-semibold mt-1">
                 Laporan Kewangan bagi tahun {selectedYearFilter === 'semua' ? 'Keseluruhan' : selectedYearFilter} setakat {new Date().toLocaleDateString('ms-MY', { day: 'numeric', month: 'long', year: 'numeric' })}
+                {printAccountFilter !== 'all' && (
+                  <span className="ml-2 text-emerald-800 font-bold">
+                    (Tapisan: {printAccountFilter === 'bank_tunai' ? 'Bank & Tunai' : printAccountFilter === 'bank' ? 'Bank' : printAccountFilter === 'tunai' ? 'Tunai' : 'Pelaburan'})
+                  </span>
+                )}
               </p>
             </div>
-            <div className="text-right text-[10px] font-mono text-slate-500">
-              Jumlah Transaksi: {filteredDisplayRows.length} Baris
+            <div className="text-left md:text-right text-xs font-mono font-bold text-slate-700">
+              Jumlah Transaksi: {printFormat === 'lejar' ? lejarRows.length : filteredDisplayRows.length} Rekod
             </div>
           </div>
 
-          {/* Financial summary Cards on top of printable PDF */}
+          {/* Financial summary Cards on top of printable PDF - High contrast & large fonts */}
           <div className="mb-6 space-y-3">
-            <div className="grid grid-cols-5 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 bg-slate-100/80 p-3.5 rounded-xl border-2 border-slate-400">
               {ACCOUNTS_LIST.map((acc, keyIdx) => {
                 const currentBal = processedData.finalBalances[acc];
                 return (
-                  <div key={keyIdx} className="text-center">
-                    <span className="text-[8px] font-bold text-slate-500 uppercase block tracking-wider truncate mb-1">
+                  <div key={keyIdx} className="text-center bg-white p-2.5 rounded-lg border border-slate-300 shadow-xs">
+                    <span className="text-[11px] print:text-[10pt] font-black text-slate-700 uppercase block tracking-tight truncate mb-1">
                       {getAccountDisplayName(acc)}
                     </span>
-                    <strong className="text-xs font-mono font-black text-slate-900">
+                    <strong className="text-sm md:text-base print:text-[13pt] font-mono font-black text-slate-950 block">
                       RM {formatCur(currentBal)}
                     </strong>
                   </div>
                 );
               })}
             </div>
-            <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl flex justify-between items-center px-5">
-              <span className="text-[9px] font-extrabold text-emerald-800 uppercase tracking-wider">
-                JUMLAH KESELURUHAN (SEMUA SALURAN)
-              </span>
-              <strong className="text-sm font-mono font-black text-emerald-900">
+            
+            <div className="bg-emerald-50 border-2 border-emerald-700 p-3.5 rounded-xl flex justify-between items-center px-6 shadow-xs">
+              <div>
+                <span className="text-xs md:text-sm print:text-[12pt] font-black text-emerald-950 uppercase tracking-wide block">
+                  JUMLAH KESELURUHAN DANA KHAIRAT (SEMUA SALURAN)
+                </span>
+                <span className="text-[10px] md:text-xs print:text-[9.5pt] text-emerald-800 font-medium">
+                  Baki terkumpul akhir dana khairat setakat tarikh laporan dijana
+                </span>
+              </div>
+              <strong className="text-lg md:text-2xl print:text-[16pt] font-mono font-black text-emerald-950">
                 RM {formatCur(totalBalance)}
               </strong>
             </div>
           </div>
 
-          {/* Printable Table */}
-          <table className="w-full text-left border-collapse table-fixed text-[9.5px] border border-slate-300">
-            <thead className="bg-slate-100 text-black border-b border-slate-400">
-              <tr>
-                <th className="px-1 py-2 text-center border-r border-slate-300 w-[35px]" rowSpan={2}>BIL</th>
-                <th className="px-1.5 py-2 text-center border-r border-slate-300 w-[75px]" rowSpan={2}>TARIKH</th>
-                <th className="px-2 py-2 border-r border-slate-300 text-left w-[200px]" rowSpan={2}>KENYATAAN</th>
-                
-                {ACCOUNTS_LIST.map((acc, idx) => (
-                  <th key={idx} className="px-1.5 py-1 text-center border-r border-slate-300 text-[8px] tracking-tight font-black" colSpan={3}>
-                    {getAccountDisplayName(acc)}
-                  </th>
-                ))}
-              </tr>
-              <tr className="bg-slate-100 border-b border-slate-300 text-[7.5px]">
-                {ACCOUNTS_LIST.map((_, idx) => (
-                  <React.Fragment key={idx}>
-                    <th className="px-1 py-1 text-right border-r border-slate-300">Masuk</th>
-                    <th className="px-1 py-1 text-right border-r border-slate-300 text-rose-800">Keluar</th>
-                    <th className="px-1 py-1 text-right border-r border-slate-300 font-bold bg-slate-200">Baki</th>
-                  </React.Fragment>
-                ))}
-              </tr>
-            </thead>
+          {/* ==================== FORMAT 1: FORMAT LEJAR MESYUARAT (DISYORKAN) ==================== */}
+          {printFormat === 'lejar' && (
+            <div className="overflow-x-auto">
+              <table 
+                className={`w-full text-left border-collapse border-2 border-slate-600 print-font-${printFontSize}`}
+                style={{ fontSize: `${printFontSize}pt` }}
+              >
+                <thead className="bg-slate-200 text-black border-b-2 border-slate-600">
+                  <tr className="uppercase font-extrabold text-slate-950">
+                    <th className="px-2.5 py-3 text-center border-r border-slate-500 w-[45px]">BIL</th>
+                    <th className="px-3 py-3 text-center border-r border-slate-500 w-[105px]">TARIKH</th>
+                    <th className="px-3 py-3 border-r border-slate-500 text-left min-w-[240px]">KENYATAAN / BUTIRAN</th>
+                    <th className="px-3 py-3 border-r border-slate-500 text-center w-[150px]">AKAUN / SALURAN</th>
+                    <th className="px-3 py-3 border-r border-slate-500 text-right w-[140px] text-emerald-950">WANG MASUK (RM)</th>
+                    <th className="px-3 py-3 border-r border-slate-500 text-right w-[140px] text-rose-950">WANG KELUAR (RM)</th>
+                    <th className="px-3 py-3 text-right w-[150px] bg-slate-300/80 font-black text-slate-950">BAKI SALURAN (RM)</th>
+                  </tr>
+                </thead>
 
-            <tbody className="divide-y divide-slate-200 text-slate-800">
-              {filteredDisplayRows.map((row, rowIdx) => (
-                <tr key={rowIdx} className="page-break-inside-avoid">
-                  <td className="px-1 py-1.5 text-center font-mono border-r border-slate-300">{rowIdx + 1}</td>
-                  <td className="px-1 py-1.5 text-center font-mono border-r border-slate-300">{parseDateMalay(row.tarikh)}</td>
-                  <td className="px-2 py-1.5 text-left font-sans font-bold leading-tight border-r border-slate-300 whitespace-normal break-words">
-                    {row.kenyataan}
-                  </td>
-                  
-                  {ACCOUNTS_LIST.map((acc, keyIdx) => {
-                    const data = row.accountsData[acc];
-                    const showInBakiOnly = data.isBakiAwal;
-                    
+                <tbody className="divide-y divide-slate-400 text-slate-950">
+                  {lejarRows.map((row, rowIdx) => {
+                    const rowPad = printRowSpacing === 'relaxed' ? 'py-3.5 px-3' : 'py-2 px-3';
+                    const isEven = rowIdx % 2 === 0;
+
+                    if (row.isBakiAwal) {
+                      return (
+                        <tr key={rowIdx} className="page-break-inside-avoid bg-amber-50/70 border-b-2 border-slate-500">
+                          <td className={`${rowPad} text-center font-mono font-bold border-r border-slate-400`}>
+                            {row.bil}
+                          </td>
+                          <td className={`${rowPad} text-center font-mono font-bold border-r border-slate-400 whitespace-nowrap`}>
+                            {parseDateMalay(row.tarikh)}
+                          </td>
+                          <td className={`${rowPad} text-left font-bold border-r border-slate-400`} colSpan={2}>
+                            <div className="font-extrabold text-slate-950 uppercase tracking-tight mb-1">
+                              {row.kenyataan}
+                            </div>
+                            {row.allBakiAwalList && (
+                              <div className="flex flex-wrap gap-2 text-[10px] print:text-[9.5pt] font-mono text-slate-700">
+                                {row.allBakiAwalList.map((item, bIdx) => (
+                                  <span key={bIdx} className="bg-white px-2 py-0.5 rounded border border-slate-300">
+                                    <strong>{getAccountDisplayName(item.acc)}:</strong> RM {formatCur(item.baki)}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td className={`${rowPad} text-center font-bold text-slate-400 border-r border-slate-400`}>
+                            -
+                          </td>
+                          <td className={`${rowPad} text-center font-bold text-slate-400 border-r border-slate-400`}>
+                            -
+                          </td>
+                          <td className={`${rowPad} text-right font-mono font-black text-slate-950 bg-amber-100/80`}>
+                            RM {formatCur(row.baki)}
+                          </td>
+                        </tr>
+                      );
+                    }
+
                     return (
-                      <React.Fragment key={keyIdx}>
-                        <td className="px-1 py-1.5 text-right border-r border-slate-300 font-mono text-emerald-800 text-[8.5px]">
-                          {!showInBakiOnly && data.masuk ? formatCur(data.masuk) : ''}
+                      <tr 
+                        key={rowIdx} 
+                        className={`page-break-inside-avoid border-b border-slate-300 ${
+                          isEven ? 'bg-white' : 'bg-slate-100/70'
+                        }`}
+                      >
+                        <td className={`${rowPad} text-center font-mono font-bold border-r border-slate-400`}>
+                          {row.bil}
                         </td>
-                        <td className="px-1 py-1.5 text-right border-r border-slate-300 font-mono text-rose-800 text-[8.5px]">
-                          {!showInBakiOnly && data.keluar ? formatCur(data.keluar) : ''}
+                        <td className={`${rowPad} text-center font-mono font-bold border-r border-slate-400 whitespace-nowrap`}>
+                          {parseDateMalay(row.tarikh)}
                         </td>
-                        <td className="px-1 py-1.5 text-right border-r border-slate-300 font-mono font-bold bg-slate-50 text-[8.5px]">
-                          {data.hasTx ? formatCur(data.baki) : ''}
+                        <td className={`${rowPad} text-left font-sans font-bold leading-snug border-r border-slate-400 whitespace-normal break-words text-slate-950`}>
+                          {row.kenyataan}
                         </td>
-                      </React.Fragment>
+                        <td className={`${rowPad} text-center font-bold border-r border-slate-400 whitespace-nowrap`}>
+                          <span className="inline-block px-2 py-0.5 bg-white rounded border border-slate-300 text-slate-800 font-extrabold">
+                            {row.saluran}
+                          </span>
+                        </td>
+                        <td className={`${rowPad} text-right font-mono font-extrabold text-emerald-950 border-r border-slate-400 whitespace-nowrap`}>
+                          {row.masuk ? `RM ${formatCur(row.masuk)}` : '-'}
+                        </td>
+                        <td className={`${rowPad} text-right font-mono font-extrabold text-rose-950 border-r border-slate-400 whitespace-nowrap`}>
+                          {row.keluar ? `RM ${formatCur(row.keluar)}` : '-'}
+                        </td>
+                        <td className={`${rowPad} text-right font-mono font-black text-slate-950 bg-slate-200/50 whitespace-nowrap`}>
+                          RM {formatCur(row.baki)}
+                        </td>
+                      </tr>
                     );
                   })}
-                </tr>
-              ))}
+                </tbody>
 
-              {/* Cumulative balance Footer row inside printed table */}
-              <tr className="bg-slate-100 font-bold border-t border-slate-400 border-b text-black text-[9px]">
-                <td className="px-1 py-2 text-center border-r border-slate-300" colSpan={3}>BAKI TERKUMPUL (RM)</td>
-                
-                {ACCOUNTS_LIST.map((acc, keyIdx) => {
-                  const currentBal = processedData.finalBalances[acc];
-                  return (
-                    <React.Fragment key={keyIdx}>
-                      <td className="px-1 py-2 bg-slate-100 border-r border-slate-200" colSpan={2}></td>
-                      <td className="px-1 py-2 text-right font-mono font-bold bg-slate-200 border-r border-slate-300 text-emerald-950">
-                        {formatCur(currentBal)}
+                {/* Table Footer Totals */}
+                <tfoot className="bg-slate-200 font-black border-t-2 border-slate-700 text-slate-950">
+                  <tr className="border-b border-slate-400">
+                    <td className="px-3 py-2.5 text-center border-r border-slate-500 font-extrabold" colSpan={4}>
+                      JUMLAH PERGERAKAN WANG SEPANJANG TEMPOH LAPORAN:
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-mono text-emerald-950 border-r border-slate-500">
+                      RM {formatCur(totalPeriodMasuk)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-mono text-rose-950 border-r border-slate-500">
+                      RM {formatCur(totalPeriodKeluar)}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-mono bg-slate-300/80">
+                      -
+                    </td>
+                  </tr>
+                  <tr className="bg-slate-300/90 text-slate-950 text-sm print:text-[13pt]">
+                    <td className="px-3 py-3 text-center border-r border-slate-500 font-black" colSpan={4}>
+                      BAKI KESELURUHAN DANA KHAIRAT SEMUA SALURAN:
+                    </td>
+                    <td className="px-3 py-3 text-right font-mono font-black text-emerald-950 border-r border-slate-500" colSpan={3}>
+                      RM {formatCur(totalBalance)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+
+          {/* ==================== FORMAT 2: FORMAT MATRIKS SALURAN ==================== */}
+          {printFormat === 'matriks' && (
+            <div className="overflow-x-auto">
+              <table 
+                className={`w-full text-left border-collapse border-2 border-slate-600 print-font-${printFontSize}`}
+                style={{ fontSize: `${printFontSize}pt` }}
+              >
+                <thead className="bg-slate-200 text-black border-b-2 border-slate-600">
+                  <tr>
+                    <th className="px-2 py-2 text-center border-r border-slate-500 w-[40px]" rowSpan={2}>BIL</th>
+                    <th className="px-2 py-2 text-center border-r border-slate-500 w-[95px]" rowSpan={2}>TARIKH</th>
+                    <th className="px-3 py-2 border-r border-slate-500 text-left min-w-[200px]" rowSpan={2}>KENYATAAN</th>
+                    
+                    {printMatrixAccounts.map((acc, idx) => (
+                      <th key={idx} className="px-2 py-1.5 text-center border-r border-slate-500 font-black" colSpan={3}>
+                        {getAccountDisplayName(acc)}
+                      </th>
+                    ))}
+                  </tr>
+                  <tr className="bg-slate-200 border-b border-slate-500">
+                    {printMatrixAccounts.map((_, idx) => (
+                      <React.Fragment key={idx}>
+                        <th className="px-1.5 py-1 text-right border-r border-slate-400 text-emerald-950 font-extrabold">Masuk</th>
+                        <th className="px-1.5 py-1 text-right border-r border-slate-400 text-rose-950 font-extrabold">Keluar</th>
+                        <th className="px-1.5 py-1 text-right border-r border-slate-500 font-black bg-slate-300">Baki</th>
+                      </React.Fragment>
+                    ))}
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-slate-400 text-slate-900">
+                  {filteredDisplayRows.map((row, rowIdx) => (
+                    <tr 
+                      key={rowIdx} 
+                      className={`page-break-inside-avoid border-b border-slate-300 ${
+                        rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-100/70'
+                      }`}
+                    >
+                      <td className="px-2 py-2 text-center font-mono font-bold border-r border-slate-400">{rowIdx + 1}</td>
+                      <td className="px-2 py-2 text-center font-mono font-bold border-r border-slate-400 whitespace-nowrap">{parseDateMalay(row.tarikh)}</td>
+                      <td className="px-3 py-2 text-left font-sans font-bold leading-tight border-r border-slate-400 whitespace-normal break-words">
+                        {row.kenyataan}
                       </td>
-                    </React.Fragment>
-                  );
-                })}
-              </tr>
-            </tbody>
-          </table>
+                      
+                      {printMatrixAccounts.map((acc, keyIdx) => {
+                        const data = row.accountsData[acc] || { baki: 0, hasTx: false, isBakiAwal: false };
+                        const showInBakiOnly = data.isBakiAwal;
+                        
+                        return (
+                          <React.Fragment key={keyIdx}>
+                            <td className="px-1.5 py-2 text-right border-r border-slate-300 font-mono font-bold text-emerald-950">
+                              {!showInBakiOnly && data.masuk ? formatCur(data.masuk) : ''}
+                            </td>
+                            <td className="px-1.5 py-2 text-right border-r border-slate-300 font-mono font-bold text-rose-950">
+                              {!showInBakiOnly && data.keluar ? formatCur(data.keluar) : ''}
+                            </td>
+                            <td className="px-1.5 py-2 text-right border-r border-slate-400 font-mono font-black bg-slate-100 text-slate-950">
+                              {data.hasTx ? formatCur(data.baki) : ''}
+                            </td>
+                          </React.Fragment>
+                        );
+                      })}
+                    </tr>
+                  ))}
 
-          {/* Validation/Sign-off Fields */}
-          <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-6 text-center text-xs text-slate-800 print:block print:mt-16">
-            <div className="print:inline-block print:w-[22%] text-center">
-              <p className="font-bold underline pb-16">Disediakan Oleh:</p>
-              <p className="text-[10px] text-slate-500">Bendahari Pertubuhan</p>
-              <p className="text-[9px] text-slate-400 mt-1">Tarikh: _______________</p>
+                  {/* Cumulative balance Footer row */}
+                  <tr className="bg-slate-200 font-black border-t-2 border-slate-600 border-b text-black">
+                    <td className="px-2 py-2.5 text-center border-r border-slate-500 font-extrabold" colSpan={3}>
+                      BAKI TERKUMPUL (RM)
+                    </td>
+                    
+                    {printMatrixAccounts.map((acc, keyIdx) => {
+                      const currentBal = processedData.finalBalances[acc];
+                      return (
+                        <React.Fragment key={keyIdx}>
+                          <td className="px-1.5 py-2.5 bg-slate-200 border-r border-slate-300" colSpan={2}></td>
+                          <td className="px-1.5 py-2.5 text-right font-mono font-black bg-slate-300 border-r border-slate-500 text-slate-950">
+                            {formatCur(currentBal)}
+                          </td>
+                        </React.Fragment>
+                      );
+                    })}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Validation/Sign-off Fields - Clean & guaranteed together */}
+          <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-6 text-center text-slate-900 print:block print:mt-12 page-break-inside-avoid">
+            <div className="print:inline-block print:w-[22%] text-center border-t-2 border-slate-800 pt-3">
+              <p className="font-extrabold text-sm print:text-[12pt] pb-14 text-black underline">Disediakan Oleh:</p>
+              <p className="text-xs print:text-[11pt] font-bold text-slate-800">Bendahari Pertubuhan</p>
+              <p className="text-[10px] print:text-[9.5pt] text-slate-600 mt-1 font-mono">Tarikh: _______________</p>
             </div>
             
-            <div className="print:inline-block print:w-[22%] print:ml-[4%] text-center">
-              <p className="font-bold underline pb-16 font-sans">Disemak Oleh:</p>
-              <p className="text-[10px] text-slate-500">Pemeriksa Kira-Kira 1</p>
-              <p className="text-[9px] text-slate-400 mt-1">Tarikh: _______________</p>
+            <div className="print:inline-block print:w-[22%] print:ml-[4%] text-center border-t-2 border-slate-800 pt-3">
+              <p className="font-extrabold text-sm print:text-[12pt] pb-14 text-black underline">Disemak Oleh:</p>
+              <p className="text-xs print:text-[11pt] font-bold text-slate-800">Pemeriksa Kira-Kira 1</p>
+              <p className="text-[10px] print:text-[9.5pt] text-slate-600 mt-1 font-mono">Tarikh: _______________</p>
             </div>
 
-            <div className="print:inline-block print:w-[22%] print:ml-[4%] text-center">
-              <p className="font-bold underline pb-16 font-sans">Disemak Oleh:</p>
-              <p className="text-[10px] text-slate-500">Pemeriksa Kira-Kira 2</p>
-              <p className="text-[9px] text-slate-400 mt-1">Tarikh: _______________</p>
+            <div className="print:inline-block print:w-[22%] print:ml-[4%] text-center border-t-2 border-slate-800 pt-3">
+              <p className="font-extrabold text-sm print:text-[12pt] pb-14 text-black underline">Disemak Oleh:</p>
+              <p className="text-xs print:text-[11pt] font-bold text-slate-800">Pemeriksa Kira-Kira 2</p>
+              <p className="text-[10px] print:text-[9.5pt] text-slate-600 mt-1 font-mono">Tarikh: _______________</p>
             </div>
 
-            <div className="print:inline-block print:w-[22%] print:ml-[4%] text-center">
-              <p className="font-bold underline pb-16">Disahkan Oleh:</p>
-              <p className="text-[10px] text-slate-500">Pengerusi Jawatankuasa</p>
-              <p className="text-[9px] text-slate-400 mt-1">Tarikh: _______________</p>
+            <div className="print:inline-block print:w-[22%] print:ml-[4%] text-center border-t-2 border-slate-800 pt-3">
+              <p className="font-extrabold text-sm print:text-[12pt] pb-14 text-black underline">Disahkan Oleh:</p>
+              <p className="text-xs print:text-[11pt] font-bold text-slate-800">Pengerusi Jawatankuasa</p>
+              <p className="text-[10px] print:text-[9.5pt] text-slate-600 mt-1 font-mono">Tarikh: _______________</p>
             </div>
           </div>
 
