@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { AppState, KewanganTransaction } from '../types';
-import { PlusCircle, Trash2, Printer, Search, Calendar, FileSpreadsheet, ArrowDownCircle, ArrowUpCircle, Info, Pencil, X, Loader2, SlidersHorizontal, LayoutList, Table, Check } from 'lucide-react';
+import { PlusCircle, Trash2, Printer, Search, Calendar, FileSpreadsheet, ArrowDownCircle, ArrowUpCircle, Info, Pencil, X, Loader2, SlidersHorizontal, LayoutList, Table, Check, Download, Filter } from 'lucide-react';
 import { writeToAppsScript } from '../lib/database';
 import { createPortal } from 'react-dom';
 
@@ -25,6 +25,67 @@ export const SHORT_NAMES: { [key: string]: string } = {
   'Pelaburan Bank Rakyat (33007456390004/2024/TM/ 28.01.2026)': 'Pelaburan Rakyat 3',
   'Bank': 'Bank',
   'Tunai': 'Tunai'
+};
+
+const MONTH_MAP: Record<string, string> = {
+  jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+  jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
+  mac: '03', mei: '05', ogo: '08', ogos: '08', okt: '10', dis: '12'
+};
+
+export const normalizeToIsoDate = (dateVal: any): string => {
+  if (!dateVal) return '';
+  const s = String(dateVal).trim();
+  if (!s) return '';
+
+  // 1. Check YYYY-MM-DD (e.g. 2026-07-01 or 2026-07-01T...)
+  const isoMatch = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (isoMatch) {
+    const y = isoMatch[1];
+    const m = isoMatch[2].padStart(2, '0');
+    const d = isoMatch[3].padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  // 2. Check DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY (e.g. 01.07.2026 or 1/7/2026)
+  const dmyMatch = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+  if (dmyMatch) {
+    const d = dmyMatch[1].padStart(2, '0');
+    const m = dmyMatch[2].padStart(2, '0');
+    const y = dmyMatch[3];
+    return `${y}-${m}-${d}`;
+  }
+
+  // 3. Check text format: "Wed Jul 01 2026 00:00:00 GMT+0800..." or "Jul 01 2026"
+  const mdyTextMatch = s.match(/(Jan|Feb|Mar|Mac|Apr|May|Mei|Jun|Jul|Aug|Ogo|Ogos|Sep|Oct|Okt|Nov|Dec|Dis)[a-z]*\s+(\d{1,2})[,\s]+(\d{4})/i);
+  if (mdyTextMatch) {
+    const monthKey = mdyTextMatch[1].toLowerCase();
+    const m = MONTH_MAP[monthKey] || '01';
+    const d = mdyTextMatch[2].padStart(2, '0');
+    const y = mdyTextMatch[3];
+    return `${y}-${m}-${d}`;
+  }
+
+  // Day followed by Month name and Year: "1 Julai 2026" or "01 Jul 2026"
+  const dmyTextMatch = s.match(/(\d{1,2})\s+(Jan|Feb|Mar|Mac|Apr|May|Mei|Jun|Jul|Aug|Ogo|Ogos|Sep|Oct|Okt|Nov|Dec|Dis)[a-z]*[,\s]+(\d{4})/i);
+  if (dmyTextMatch) {
+    const d = dmyTextMatch[1].padStart(2, '0');
+    const monthKey = dmyTextMatch[2].toLowerCase();
+    const m = MONTH_MAP[monthKey] || '01';
+    const y = dmyTextMatch[3];
+    return `${y}-${m}-${d}`;
+  }
+
+  // 4. Fallback: JavaScript Date parser
+  const parsed = new Date(s);
+  if (!isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+    const d = String(parsed.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  return s.slice(0, 10);
 };
 
 export default function PenyataKiraKira({ state, onChangeState, currentRole }: PenyataKiraKiraProps) {
@@ -56,7 +117,10 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
 
   // Search/Filter states
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterMode, setFilterMode] = useState<'year' | 'range'>('year');
   const [selectedYearFilter, setSelectedYearFilter] = useState('2026');
+  const [dateRangeStart, setDateRangeStart] = useState<string>('2026-09-16');
+  const [dateRangeEnd, setDateRangeEnd] = useState<string>('2026-09-19');
 
   // PRINT PREVIEW OVERLAY STATE
   const [isPrinting, setIsPrinting] = useState(false);
@@ -68,9 +132,11 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
 
   // Parse chronological order and compute running balances
   const processedData = useMemo(() => {
-    // 1. Sort transactions by date ascending
+    // 1. Sort transactions by normalized date ascending
     const sorted = [...transactions].sort((a, b) => {
-      const dateDiff = new Date(a.tarikh).getTime() - new Date(b.tarikh).getTime();
+      const dateA = normalizeToIsoDate(a.tarikh);
+      const dateB = normalizeToIsoDate(b.tarikh);
+      const dateDiff = dateA.localeCompare(dateB);
       if (dateDiff !== 0) return dateDiff;
       // If same date, keep alphabetical order of id or treat "Baki pada" first
       const aIsBaki = a.kenyataan.toLowerCase().startsWith('baki');
@@ -80,13 +146,48 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
       return a.id.localeCompare(b.id);
     });
 
-    // 2. Track running balances sequentially
-    const runningBalances: { [key: string]: number } = {};
+    const isRangeActive = filterMode === 'range' && Boolean(dateRangeStart || dateRangeEnd);
+    const startDate = filterMode === 'range' && dateRangeStart ? normalizeToIsoDate(dateRangeStart.trim()) : '';
+    const endDate = filterMode === 'range' && dateRangeEnd ? normalizeToIsoDate(dateRangeEnd.trim()) : '';
+
+    // If Range mode is active and startDate is given, calculate opening balances strictly before startDate
+    const openingBalances: { [key: string]: number } = {};
     ACCOUNTS_LIST.forEach(acc => {
-      runningBalances[acc] = 0;
+      openingBalances[acc] = 0;
     });
 
-    const txsWithBalances = sorted.map(tx => {
+    if (isRangeActive && startDate) {
+      sorted.forEach(tx => {
+        const txDate = normalizeToIsoDate(tx.tarikh);
+        if (txDate && txDate < startDate) {
+          if (tx.jenisTransaksi === 'masuk') {
+            openingBalances[tx.kategoriAkaun] += tx.amaun;
+          } else if (tx.jenisTransaksi === 'keluar') {
+            openingBalances[tx.kategoriAkaun] -= tx.amaun;
+          }
+        }
+      });
+    }
+
+    // Filter active transactions for the period
+    let activeTxs = sorted;
+    if (isRangeActive) {
+      activeTxs = sorted.filter(tx => {
+        const txDate = normalizeToIsoDate(tx.tarikh);
+        if (!txDate) return false;
+        if (startDate && txDate < startDate) return false;
+        if (endDate && txDate > endDate) return false;
+        return true;
+      });
+    }
+
+    // 2. Track running balances sequentially starting from opening balances
+    const runningBalances: { [key: string]: number } = {};
+    ACCOUNTS_LIST.forEach(acc => {
+      runningBalances[acc] = isRangeActive && startDate ? openingBalances[acc] : 0;
+    });
+
+    const txsWithBalances = activeTxs.map(tx => {
       const isBakiAwal = tx.kenyataan.toLowerCase().startsWith('baki pada');
       
       if (tx.jenisTransaksi === 'masuk') {
@@ -105,7 +206,8 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
     // 3. Group by (tarikh, kenyataan)
     const groupedMap: { [key: string]: typeof txsWithBalances } = {};
     txsWithBalances.forEach(tx => {
-      const groupKey = `${tx.tarikh}|||${tx.kenyataan}`;
+      const normDate = normalizeToIsoDate(tx.tarikh);
+      const groupKey = `${normDate}|||${tx.kenyataan}`;
       if (!groupedMap[groupKey]) {
         groupedMap[groupKey] = [];
       }
@@ -113,11 +215,64 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
     });
 
     // 4. Construct final display rows
-    const displayRows = Object.keys(groupedMap).map(key => {
+    const displayRows: Array<{
+      tarikh: string;
+      kenyataan: string;
+      accountsData: {
+        [kategori: string]: {
+          masuk?: number;
+          keluar?: number;
+          baki: number;
+          hasTx: boolean;
+          isBakiAwal: boolean;
+        };
+      };
+      originalTxs: KewanganTransaction[];
+    }> = [];
+
+    // Synthesize Opening Balance Row if in custom date range with a startDate
+    if (isRangeActive && startDate) {
+      const accountsDataOpening: {
+        [kategori: string]: {
+          masuk?: number;
+          keluar?: number;
+          baki: number;
+          hasTx: boolean;
+          isBakiAwal: boolean;
+        };
+      } = {};
+
+      ACCOUNTS_LIST.forEach(acc => {
+        accountsDataOpening[acc] = {
+          masuk: undefined,
+          keluar: undefined,
+          baki: openingBalances[acc],
+          hasTx: true,
+          isBakiAwal: true
+        };
+      });
+
+      // Format date for title (e.g. 01.07.2026)
+      let formattedStartDate = startDate;
+      try {
+        const parts = startDate.split('-');
+        if (parts.length === 3) formattedStartDate = `${parts[2]}.${parts[1]}.${parts[0]}`;
+      } catch (e) {}
+
+      displayRows.push({
+        tarikh: startDate,
+        kenyataan: `Baki Bawa Hadapan (sehingga ${formattedStartDate})`,
+        accountsData: accountsDataOpening,
+        originalTxs: []
+      });
+    }
+
+    // Append active period transactions
+    Object.keys(groupedMap).forEach(key => {
       const groupTxs = groupedMap[key];
       const firstTx = groupTxs[0];
+      const normDate = normalizeToIsoDate(firstTx.tarikh);
       
-      // Compute grouped entries
       const accountsData: {
         [kategori: string]: {
           masuk?: number;
@@ -125,7 +280,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
           baki: number;
           hasTx: boolean;
           isBakiAwal: boolean;
-        }
+        };
       } = {};
 
       ACCOUNTS_LIST.forEach(acc => {
@@ -136,7 +291,6 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
         };
       });
 
-      // Sum up same-category items in same row if any
       groupTxs.forEach(tx => {
         const item = accountsData[tx.kategoriAkaun];
         item.hasTx = true;
@@ -147,13 +301,9 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
         } else if (tx.jenisTransaksi === 'keluar') {
           item.keluar = (item.keluar || 0) + tx.amaun;
         }
-        // Take the balance at this transaction
         item.baki = tx.balancesSnapshot[tx.kategoriAkaun];
       });
 
-      // Also carry forward the current balance for non-transaction accounts in this group
-      // so we can reference it, though we only display it on screen when hasTx is true.
-      // The last transaction in this group has the absolute latest running balance of ALL accounts.
       const lastTxInGroup = groupTxs[groupTxs.length - 1];
       ACCOUNTS_LIST.forEach(acc => {
         if (!accountsData[acc].hasTx) {
@@ -161,16 +311,26 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
         }
       });
 
-      return {
-        tarikh: firstTx.tarikh,
+      displayRows.push({
+        tarikh: normDate,
         kenyataan: firstTx.kenyataan,
         accountsData,
-        originalTxs: groupTxs // keep to allow deletion
-      };
+        originalTxs: groupTxs
+      });
     });
 
     // Sort the display rows chronologically
-    displayRows.sort((a, b) => new Date(a.tarikh).getTime() - new Date(b.tarikh).getTime());
+    displayRows.sort((a, b) => {
+      const dateA = normalizeToIsoDate(a.tarikh);
+      const dateB = normalizeToIsoDate(b.tarikh);
+      const dateDiff = dateA.localeCompare(dateB);
+      if (dateDiff !== 0) return dateDiff;
+      const aIsBaki = a.kenyataan.toLowerCase().startsWith('baki');
+      const bIsBaki = b.kenyataan.toLowerCase().startsWith('baki');
+      if (aIsBaki && !bIsBaki) return -1;
+      if (!aIsBaki && bIsBaki) return 1;
+      return 0;
+    });
 
     // Compute final cumulative footers
     const finalBalances: { [key: string]: number } = {};
@@ -181,9 +341,11 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
     return {
       displayRows,
       finalBalances,
-      allSortedTxs: txsWithBalances
+      allSortedTxs: txsWithBalances,
+      openingBalances,
+      isRangeActive
     };
-  }, [transactions]);
+  }, [transactions, filterMode, dateRangeStart, dateRangeEnd]);
 
   // Calculate the grand total of all current balances
   const totalBalance = useMemo(() => {
@@ -195,27 +357,30 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
     return processedData.displayRows.filter(row => {
       // Filter by Search Keyword
       const matchesSearch = row.kenyataan.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            row.tarikh.includes(searchTerm);
+                            row.tarikh.includes(searchTerm) ||
+                            normalizeToIsoDate(row.tarikh).includes(searchTerm);
       
-      // Filter by Year
+      // Filter by Year ONLY when in Year mode
       let matchesYear = true;
-      if (selectedYearFilter && selectedYearFilter !== 'semua') {
-        const rowYear = new Date(row.tarikh).getFullYear().toString();
+      if (filterMode === 'year' && selectedYearFilter && selectedYearFilter !== 'semua') {
+        const iso = normalizeToIsoDate(row.tarikh);
+        const rowYear = iso.split('-')[0];
         matchesYear = rowYear === selectedYearFilter;
       }
 
       return matchesSearch && matchesYear;
     });
-  }, [processedData.displayRows, searchTerm, selectedYearFilter]);
+  }, [processedData.displayRows, searchTerm, filterMode, selectedYearFilter]);
 
   // Unique years list for filter dropdown
   const yearsList = useMemo(() => {
     const years = new Set<string>();
     transactions.forEach(t => {
       try {
-        const y = new Date(t.tarikh).getFullYear();
-        if (!isNaN(y)) {
-          years.add(y.toString());
+        const iso = normalizeToIsoDate(t.tarikh);
+        const y = iso.split('-')[0];
+        if (y && y.length === 4) {
+          years.add(y);
         }
       } catch (e) {}
     });
@@ -333,7 +498,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
       return;
     }
     setEditingTransactionId(tx.id);
-    setTarikh(tx.tarikh);
+    setTarikh(normalizeToIsoDate(tx.tarikh));
     setKenyataan(tx.kenyataan);
     setKategoriAkaun(tx.kategoriAkaun);
     setJenisTransaksi(tx.jenisTransaksi);
@@ -378,12 +543,16 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
       return;
     }
 
-    const tYear = new Date(tarikh).getFullYear();
+    const isoTarikh = normalizeToIsoDate(tarikh);
+    const tYear = parseInt(isoTarikh.split('-')[0], 10) || new Date(tarikh).getFullYear();
     const cleanKenyataan = kenyataan.trim();
 
     // Check custom instruction rules: "Kenyataan pertama untuk setiap tahun mestilah bermula dengan 'Baki pada 1 Jan [Tahun Tersebut]'"
     // Compare with transactions excluding the one being edited
-    const yearTxs = transactions.filter(t => new Date(t.tarikh).getFullYear() === tYear && t.id !== editingTransactionId);
+    const yearTxs = transactions.filter(t => {
+      const y = parseInt(normalizeToIsoDate(t.tarikh).split('-')[0], 10);
+      return y === tYear && t.id !== editingTransactionId;
+    });
     if (yearTxs.length === 0) {
       const lowerKenyataan = cleanKenyataan.toLowerCase();
       if (!lowerKenyataan.startsWith('baki pada 1 jan')) {
@@ -398,7 +567,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
         if (t.id === editingTransactionId) {
           return {
             ...t,
-            tarikh,
+            tarikh: isoTarikh,
             kenyataan: cleanKenyataan,
             kategoriAkaun,
             jenisTransaksi,
@@ -551,17 +720,132 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
     return num.toLocaleString('ms-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  // Human Readable Date
-  const parseDateMalay = (dateStr: string) => {
+  // Full Malay Date for Report Title and Labels (e.g., 16 September 2026)
+  const formatMalayFullDate = (dateStr: string) => {
     try {
-      const d = new Date(dateStr);
-      const day = String(d.getDate()).padStart(2, '0');
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const year = d.getFullYear();
-      return `${day}.${month}.${year}`;
+      if (!dateStr) return '';
+      const iso = normalizeToIsoDate(dateStr);
+      const parts = iso.split('-');
+      if (parts.length === 3) {
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        const d = parseInt(parts[2], 10);
+        const malayMonths = [
+          'Januari', 'Februari', 'Mac', 'April', 'Mei', 'Jun',
+          'Julai', 'Ogos', 'September', 'Oktober', 'November', 'Disember'
+        ];
+        if (m >= 1 && m <= 12) {
+          return `${d} ${malayMonths[m - 1]} ${y}`;
+        }
+      }
+      return dateStr;
     } catch (e) {
       return dateStr;
     }
+  };
+
+  // Human Readable Date (DD.MM.YYYY)
+  const parseDateMalay = (dateStr: string) => {
+    try {
+      if (!dateStr) return '';
+      const iso = normalizeToIsoDate(dateStr);
+      const parts = iso.split('-');
+      if (parts.length === 3) {
+        return `${parts[2]}.${parts[1]}.${parts[0]}`;
+      }
+      return dateStr;
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
+  // Download Statement as Excel-compatible CSV with UTF-8 BOM
+  const handleDownloadCSV = () => {
+    const bom = '\uFEFF';
+    const isRange = filterMode === 'range' && (dateRangeStart || dateRangeEnd);
+    const subtitle = isRange
+      ? `Tempoh: ${dateRangeStart ? formatMalayFullDate(dateRangeStart) : 'Awal Rekod'} hingga ${dateRangeEnd ? formatMalayFullDate(dateRangeEnd) : 'Kini'}`
+      : `Tahun: ${selectedYearFilter === 'semua' ? 'Semua Transaksi' : selectedYearFilter}`;
+
+    const csvLines: string[] = [
+      `"PERTUBUHAN KHAIRAT KEMATIAN DAN KEBAJIKAN KAMPUNG GONG BADAK"`,
+      `"LAPORAN PENYATA KIRA-KIRA ALIRAN TUNAI & PELABURAN"`,
+      `"${subtitle}"`,
+      `"Tarikh Dijana: ${new Date().toLocaleDateString('ms-MY', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}"`,
+      ''
+    ];
+
+    if (printFormat === 'matriks') {
+      // Header 1: Bil, Tarikh, Butiran, then Account names spanning 3 columns
+      const h1 = ['"BIL"', '"TARIKH"', '"KENYATAAN / BUTIRAN"'];
+      printMatrixAccounts.forEach(acc => {
+        h1.push(`"${getAccountDisplayName(acc)}"`, '""', '""');
+      });
+      csvLines.push(h1.join(','));
+
+      // Header 2: Masuk, Keluar, Baki
+      const h2 = ['""', '""', '""'];
+      printMatrixAccounts.forEach(() => {
+        h2.push('"Masuk (RM)"', '"Keluar (RM)"', '"Baki (RM)"');
+      });
+      csvLines.push(h2.join(','));
+
+      // Rows
+      filteredDisplayRows.forEach((row, idx) => {
+        const line = [
+          `"${idx + 1}"`,
+          `"${parseDateMalay(row.tarikh)}"`,
+          `"${row.kenyataan.replace(/"/g, '""')}"`
+        ];
+        printMatrixAccounts.forEach(acc => {
+          const d = row.accountsData[acc];
+          if (!d) {
+            line.push('""', '""', '""');
+          } else {
+            const masukVal = !d.isBakiAwal && d.masuk ? d.masuk.toFixed(2) : '';
+            const keluarVal = !d.isBakiAwal && d.keluar ? d.keluar.toFixed(2) : '';
+            const bakiVal = d.hasTx ? d.baki.toFixed(2) : '';
+            line.push(`"${masukVal}"`, `"${keluarVal}"`, `"${bakiVal}"`);
+          }
+        });
+        csvLines.push(line.join(','));
+      });
+
+      // Footer
+      const fLine = ['"BAKI TERKUMPUL (RM)"', '""', '""'];
+      printMatrixAccounts.forEach(acc => {
+        const bal = processedData.finalBalances[acc] || 0;
+        fLine.push('""', '""', `"${bal.toFixed(2)}"`);
+      });
+      csvLines.push(fLine.join(','));
+    } else {
+      // Format Lejar (7 columns)
+      csvLines.push(['"BIL"', '"TARIKH"', '"KENYATAAN / BUTIRAN"', '"SALURAN / AKAUN"', '"MASUK (RM)"', '"KELUAR (RM)"', '"BAKI (RM)"'].join(','));
+      lejarRows.forEach(r => {
+        csvLines.push([
+          `"${r.bil}"`,
+          `"${parseDateMalay(r.tarikh)}"`,
+          `"${r.kenyataan.replace(/"/g, '""')}"`,
+          `"${r.saluran}"`,
+          `"${r.masuk ? r.masuk.toFixed(2) : ''}"`,
+          `"${r.keluar ? r.keluar.toFixed(2) : ''}"`,
+          `"${r.baki !== undefined ? r.baki.toFixed(2) : ''}"`
+        ].join(','));
+      });
+    }
+
+    const blob = new Blob([bom + csvLines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    const fileName = isRange && dateRangeStart && dateRangeEnd
+      ? `penyata_kewangan_${dateRangeStart}_hingga_${dateRangeEnd}.csv`
+      : `penyata_kewangan_${selectedYearFilter}.csv`;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -586,12 +870,20 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2.5">
           <button
+            onClick={handleDownloadCSV}
+            className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs tracking-wide uppercase px-4 py-2.5 rounded-xl cursor-pointer shadow-sm transition-all"
+            title="Muat turun fail Excel / CSV bagi data dipaparkan"
+          >
+            <Download className="h-4 w-4" />
+            <span>Muat Turun Excel (CSV)</span>
+          </button>
+          <button
             onClick={() => setIsPrinting(true)}
             className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs tracking-wide uppercase px-4 py-2.5 rounded-xl cursor-pointer shadow-sm transition-all"
             title="Sediakan paparan cetak PDF laporan"
           >
             <Printer className="h-4 w-4" />
-            <span>Paparan Cetak Laporan</span>
+            <span>Paparan Cetak / PDF</span>
           </button>
         </div>
       </div>
@@ -865,9 +1157,9 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
           </div>
           
           {/* Filtering Ribbon */}
-          <div className="flex flex-col sm:flex-row gap-3 items-center shrink-0">
+          <div className="flex flex-col xl:flex-row gap-3 items-stretch xl:items-center shrink-0 w-full xl:w-auto">
             {/* Search */}
-            <div className="relative w-full sm:w-64">
+            <div className="relative w-full xl:w-60">
               <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
               <input
                 type="text"
@@ -878,20 +1170,102 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
               />
             </div>
 
-            {/* Year Filter */}
-            <div className="flex items-center gap-2 shrink-0 justify-end w-full sm:w-auto">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tapis Tahun:</span>
-              <select
-                value={selectedYearFilter}
-                onChange={(e) => setSelectedYearFilter(e.target.value)}
-                className="text-xs bg-slate-50 border border-slate-200 p-1.5 px-3 rounded-md focus:outline-none shadow-3xs"
+            {/* Mode Toggle: Tahun vs Julat Tarikh */}
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setFilterMode('year')}
+                className={`px-2.5 py-1 rounded-md text-xs font-bold transition cursor-pointer ${
+                  filterMode === 'year' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
               >
-                <option value="semua">Semua Transaksi</option>
-                {yearsList.map(yr => (
-                  <option key={yr} value={yr}>{yr}</option>
-                ))}
-              </select>
+                Ikut Tahun
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterMode('range')}
+                className={`px-2.5 py-1 rounded-md text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
+                  filterMode === 'range' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Calendar className="h-3 w-3" />
+                <span>Julat Tarikh Pilihan</span>
+              </button>
             </div>
+
+            {filterMode === 'year' ? (
+              /* Year Filter */
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tahun:</span>
+                <select
+                  value={selectedYearFilter}
+                  onChange={(e) => setSelectedYearFilter(e.target.value)}
+                  className="text-xs bg-slate-50 border border-slate-200 p-1.5 px-3 rounded-md focus:outline-none shadow-3xs font-bold text-slate-700"
+                >
+                  <option value="semua">Semua Transaksi</option>
+                  {yearsList.map(yr => (
+                    <option key={yr} value={yr}>{yr}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              /* Date Range Inputs */
+              <div className="flex flex-wrap items-center gap-2 bg-amber-50/60 p-1.5 px-2.5 rounded-lg border border-amber-200">
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-bold text-slate-700">Dari:</span>
+                  <input
+                    type="date"
+                    value={dateRangeStart}
+                    onChange={(e) => setDateRangeStart(e.target.value)}
+                    className="text-xs bg-white border border-slate-300 rounded px-1.5 py-1 font-semibold text-slate-800"
+                  />
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-bold text-slate-700">Hingga:</span>
+                  <input
+                    type="date"
+                    value={dateRangeEnd}
+                    onChange={(e) => setDateRangeEnd(e.target.value)}
+                    className="text-xs bg-white border border-slate-300 rounded px-1.5 py-1 font-semibold text-slate-800"
+                  />
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDateRangeStart('2026-07-01');
+                      setDateRangeEnd('2026-09-18');
+                    }}
+                    className="text-[10px] font-bold bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 rounded px-2 py-1 transition cursor-pointer"
+                    title="Pilihan Julat: 1 Julai 2026 hingga 18 September 2026"
+                  >
+                    1 Jul - 18 Sept 2026
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDateRangeStart('2026-09-16');
+                      setDateRangeEnd('2026-09-19');
+                    }}
+                    className="text-[10px] font-bold bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 rounded px-2 py-1 transition cursor-pointer"
+                    title="Pilihan Julat: 16 Sept 2026 hingga 19 Sept 2026"
+                  >
+                    16-19 Sept 2026
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDateRangeStart('2026-01-01');
+                      setDateRangeEnd('2026-12-31');
+                    }}
+                    className="text-[10px] font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded px-1.5 py-1 transition cursor-pointer"
+                    title="Sepanjang Tahun 2026"
+                  >
+                    Tahun 2026
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1117,11 +1491,123 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
                   Cetak Fizikal / Muat Turun PDF
                 </button>
                 <button
+                  onClick={handleDownloadCSV}
+                  className="px-4 py-3 bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-xs tracking-wide uppercase rounded-xl cursor-pointer shrink-0 transition flex items-center gap-2 shadow-sm"
+                  title="Muat turun fail Excel (format CSV)"
+                >
+                  <Download className="h-4 w-4" />
+                  Muat Turun Excel (CSV)
+                </button>
+                <button
                   onClick={() => setIsPrinting(false)}
                   className="px-4 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs tracking-wide uppercase rounded-xl cursor-pointer shrink-0 transition"
                 >
                   Tutup Pratonton
                 </button>
+              </div>
+            </div>
+
+            {/* Date Range Selector for Printable Statement */}
+            <div className="bg-white p-3.5 rounded-xl border border-amber-300 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-amber-500/10 text-amber-800 rounded-lg">
+                  <Calendar className="h-4 w-4" />
+                </div>
+                <div>
+                  <span className="font-extrabold uppercase text-slate-800 block text-[11px]">
+                    Tempoh Tarikh Penyata Yang Dijana:
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    {filterMode === 'range' 
+                      ? 'Baki akaun terdahulu dihitung automatik sebagai baki bawa hadapan sehingga tarikh mula.'
+                      : 'Memaparkan transaksi mengikut tahun yang dipilih.'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setFilterMode('year')}
+                    className={`px-2.5 py-1 rounded-md text-xs font-bold transition cursor-pointer ${
+                      filterMode === 'year' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Ikut Tahun ({selectedYearFilter === 'semua' ? 'Semua' : selectedYearFilter})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilterMode('range');
+                      if (!dateRangeStart) setDateRangeStart('2026-09-16');
+                      if (!dateRangeEnd) setDateRangeEnd('2026-09-19');
+                    }}
+                    className={`px-2.5 py-1 rounded-md text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
+                      filterMode === 'range' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>📅 Pilihan Julat Tarikh</span>
+                  </button>
+                </div>
+
+                {filterMode === 'range' && (
+                  <div className="flex flex-wrap items-center gap-2 bg-amber-50 p-1.5 px-2.5 rounded-lg border border-amber-200">
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] font-bold text-slate-700">Dari:</span>
+                      <input
+                        type="date"
+                        value={dateRangeStart}
+                        onChange={(e) => setDateRangeStart(e.target.value)}
+                        className="text-xs bg-white border border-slate-300 rounded px-1.5 py-1 font-semibold text-slate-800"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] font-bold text-slate-700">Hingga:</span>
+                      <input
+                        type="date"
+                        value={dateRangeEnd}
+                        onChange={(e) => setDateRangeEnd(e.target.value)}
+                        className="text-xs bg-white border border-slate-300 rounded px-1.5 py-1 font-semibold text-slate-800"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDateRangeStart('2026-07-01');
+                          setDateRangeEnd('2026-09-18');
+                        }}
+                        className="text-[10px] font-bold bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 rounded px-2 py-1 transition cursor-pointer"
+                        title="Pilihan Julat: 1 Julai 2026 hingga 18 September 2026"
+                      >
+                        1 Jul - 18 Sept 2026
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDateRangeStart('2026-09-16');
+                          setDateRangeEnd('2026-09-19');
+                        }}
+                        className="text-[10px] font-bold bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 rounded px-2 py-1 transition cursor-pointer"
+                        title="Pilihan Julat: 16 Sept 2026 hingga 19 Sept 2026"
+                      >
+                        16-19 Sept 2026
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDateRangeStart('2026-01-01');
+                          setDateRangeEnd('2026-12-31');
+                        }}
+                        className="text-[10px] font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded px-1.5 py-1 transition cursor-pointer"
+                        title="Sepanjang Tahun 2026"
+                      >
+                        Tahun 2026
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1305,7 +1791,15 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
                 </span>
               </h2>
               <p className="text-xs text-slate-600 font-semibold mt-1">
-                Laporan Kewangan bagi tahun {selectedYearFilter === 'semua' ? 'Keseluruhan' : selectedYearFilter} setakat {new Date().toLocaleDateString('ms-MY', { day: 'numeric', month: 'long', year: 'numeric' })}
+                {filterMode === 'range' && (dateRangeStart || dateRangeEnd) ? (
+                  <span>
+                    Laporan Kewangan bagi tempoh <strong className="text-slate-950 font-black">{dateRangeStart ? formatMalayFullDate(dateRangeStart) : 'Awal Rekod'}</strong> hingga <strong className="text-slate-950 font-black">{dateRangeEnd ? formatMalayFullDate(dateRangeEnd) : 'Kini'}</strong>
+                  </span>
+                ) : (
+                  <span>
+                    Laporan Kewangan bagi tahun {selectedYearFilter === 'semua' ? 'Keseluruhan' : selectedYearFilter} setakat {new Date().toLocaleDateString('ms-MY', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </span>
+                )}
                 {printAccountFilter !== 'all' && (
                   <span className="ml-2 text-emerald-800 font-bold">
                     (Tapisan: {printAccountFilter === 'bank_tunai' ? 'Bank & Tunai' : printAccountFilter === 'bank' ? 'Bank' : printAccountFilter === 'tunai' ? 'Tunai' : 'Pelaburan'})
@@ -1444,6 +1938,13 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
                       </tr>
                     );
                   })}
+                  {filterMode === 'range' && lejarRows.length === 1 && lejarRows[0].isBakiAwal && (
+                    <tr className="bg-amber-50/50 italic border-b border-slate-400">
+                      <td colSpan={7} className="py-3 px-3 text-center text-xs font-semibold text-slate-700">
+                        ℹ️ Tiada pergerakan aktiviti keluar / masuk direkodkan dalam tempoh {dateRangeStart ? formatMalayFullDate(dateRangeStart) : 'awal'} hingga {dateRangeEnd ? formatMalayFullDate(dateRangeEnd) : 'kini'}. Baki saluran kekal seperti baki bawa hadapan di atas.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
 
                 {/* Table Footer Totals */}
@@ -1560,6 +2061,13 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
                       </tr>
                     );
                   })}
+                  {filterMode === 'range' && filteredDisplayRows.length === 1 && filteredDisplayRows[0].kenyataan.toLowerCase().startsWith('baki') && (
+                    <tr className="bg-amber-50/50 italic border-b border-slate-400">
+                      <td colSpan={3 + printMatrixAccounts.length * 3} className="py-2.5 px-3 text-center text-xs font-semibold text-slate-700">
+                        ℹ️ Tiada pergerakan aktiviti keluar / masuk direkodkan dalam tempoh {dateRangeStart ? formatMalayFullDate(dateRangeStart) : 'awal'} hingga {dateRangeEnd ? formatMalayFullDate(dateRangeEnd) : 'kini'}. Baki saluran kekal seperti baki bawa hadapan di atas.
+                      </td>
+                    </tr>
+                  )}
 
                   {/* Cumulative balance Footer row */}
                   <tr className="bg-slate-300 font-black border-t-2 border-slate-700 border-b-2 text-black">
