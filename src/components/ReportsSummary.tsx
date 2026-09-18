@@ -156,7 +156,7 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
   const countTiada = memberStats.filter(m => m.status !== 'Aktif').length; 
   const countLunas = memberStats.filter(m => m.status === 'Aktif' && m.dues === 0).length;
   const countAdaTunggakan = memberStats.filter(m => m.status === 'Aktif' && m.dues > 0).length;
-  const countTunggakanLebih50 = memberStats.filter(m => m.status === 'Aktif' && m.dues > 50).length;
+  const countTunggakanLebih36 = memberStats.filter(m => m.status === 'Aktif' && m.dues > 36).length;
 
   const categories = [
     { id: 'all', label: 'Semua Ahli', count: countSemua },
@@ -165,7 +165,7 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
     { id: 'tiada', label: '3. Tiada (Tidak Aktif)', count: countTiada },
     { id: 'lunas', label: '4. Lunas / Cemerlang', count: countLunas },
     { id: 'ada_tunggakan', label: '5. Ada Tunggakan', count: countAdaTunggakan },
-    { id: 'tunggakan_50', label: '6. Tunggakan > RM50', count: countTunggakanLebih50 },
+    { id: 'tunggakan_36', label: '6. Tunggakan > RM36', count: countTunggakanLebih36 },
   ];
 
   // Filter and sort members list based on query and group filter
@@ -196,8 +196,8 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
             passGroup = stats.status === 'Aktif' && stats.dues === 0;
           } else if (filterGroup === 'ada_tunggakan') {
             passGroup = stats.status === 'Aktif' && stats.dues > 0;
-          } else if (filterGroup === 'tunggakan_50') {
-            passGroup = stats.status === 'Aktif' && stats.dues > 50;
+          } else if (filterGroup === 'tunggakan_36' || filterGroup === 'tunggakan_50') {
+            passGroup = stats.status === 'Aktif' && stats.dues > 36;
           }
         } else {
           passGroup = false;
@@ -710,7 +710,7 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
                 badgeColor = 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100/80 hover:text-emerald-800';
               } else if (cat.id === 'ada_tunggakan') {
                 badgeColor = 'bg-amber-50 text-amber-700 hover:bg-amber-100/80 hover:text-amber-800';
-              } else if (cat.id === 'tunggakan_50') {
+              } else if (cat.id === 'tunggakan_36' || cat.id === 'tunggakan_50') {
                 badgeColor = 'bg-red-50 text-red-700 hover:bg-red-100/80 hover:text-red-800';
               }
 
