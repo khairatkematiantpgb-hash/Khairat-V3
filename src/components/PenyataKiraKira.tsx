@@ -352,6 +352,13 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
     return ACCOUNTS_LIST.reduce((sum, acc) => sum + (processedData.finalBalances[acc] || 0), 0);
   }, [processedData.finalBalances]);
 
+  // Calculate total for Bank and Tunai only
+  const bankAndTunaiBalance = useMemo(() => {
+    const bankBal = processedData.finalBalances['Bank'] || 0;
+    const tunaiBal = processedData.finalBalances['Tunai'] || 0;
+    return bankBal + tunaiBal;
+  }, [processedData.finalBalances]);
+
   // Apply Search and Year Filters
   const filteredDisplayRows = useMemo(() => {
     return processedData.displayRows.filter(row => {
@@ -834,6 +841,10 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
       });
     }
 
+    csvLines.push('');
+    csvLines.push(`"JUMLAH KESELURUHAN DANA KHAIRAT (SEMUA SALURAN)","RM ${totalBalance.toFixed(2)}"`);
+    csvLines.push(`"JUMLAH DANA KHAIRAT (BANK DAN TUNAI SAHAJA)","RM ${bankAndTunaiBalance.toFixed(2)}"`);
+
     const blob = new Blob([bom + csvLines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -1120,7 +1131,7 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
           <div className="bg-emerald-950 text-white border border-emerald-900 p-5 rounded-2xl shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4 transition-all hover:bg-emerald-900/90 my-2">
             <div>
               <span className="text-[10px] font-extrabold text-emerald-350 uppercase tracking-widest block mb-0.5">
-                JUMLAH KESELURUHAN (SEMUA SALURAN)
+                JUMLAH KESELURUHAN DANA KHAIRAT (SEMUA SALURAN)
               </span>
               <p className="text-[11px] text-slate-300 font-sans leading-none">
                 Gabungan keseluruhan nilai baki aktif dari lima akaun saluran pertubuhan.
@@ -1129,6 +1140,23 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
             <div className="text-right">
               <strong className={`block text-2xl md:text-3xl font-mono font-black tracking-tight ${totalBalance < 0 ? 'text-rose-400' : 'text-amber-300'}`}>
                 RM {formatCur(totalBalance)}
+              </strong>
+            </div>
+          </div>
+
+          {/* Bank & Tunai Only Card */}
+          <div className="bg-slate-900 text-white border border-sky-800/80 p-4.5 rounded-2xl shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4 transition-all hover:bg-slate-850 my-1">
+            <div>
+              <span className="text-[10px] font-extrabold text-sky-300 uppercase tracking-widest block mb-0.5">
+                JUMLAH DANA KHAIRAT (BANK DAN TUNAI SAHAJA)
+              </span>
+              <p className="text-[11px] text-slate-300 font-sans leading-none">
+                Aliran tunai sedia guna (Bank: RM {formatCur(processedData.finalBalances['Bank'] || 0)} | Tunai: RM {formatCur(processedData.finalBalances['Tunai'] || 0)})
+              </p>
+            </div>
+            <div className="text-right">
+              <strong className={`block text-xl md:text-2xl font-mono font-black tracking-tight ${bankAndTunaiBalance < 0 ? 'text-rose-400' : 'text-sky-300'}`}>
+                RM {formatCur(bankAndTunaiBalance)}
               </strong>
             </div>
           </div>
@@ -1843,6 +1871,21 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
                 RM {formatCur(totalBalance)}
               </strong>
             </div>
+
+            {/* Jumlah dana khairat (Bank dan tunai sahaja) */}
+            <div className="bg-sky-50 border-2 border-sky-700 p-3.5 rounded-xl flex justify-between items-center px-6 shadow-xs">
+              <div>
+                <span className="text-xs md:text-sm print:text-[12pt] font-black text-sky-950 uppercase tracking-wide block">
+                  JUMLAH DANA KHAIRAT (BANK DAN TUNAI SAHAJA)
+                </span>
+                <span className="text-[10px] md:text-xs print:text-[9.5pt] text-sky-850 font-medium">
+                  Baki kecairan sedia guna (Bank: RM {formatCur(processedData.finalBalances['Bank'] || 0)} + Tunai: RM {formatCur(processedData.finalBalances['Tunai'] || 0)})
+                </span>
+              </div>
+              <strong className="text-lg md:text-2xl print:text-[16pt] font-mono font-black text-sky-950">
+                RM {formatCur(bankAndTunaiBalance)}
+              </strong>
+            </div>
           </div>
 
           {/* ==================== FORMAT 1: FORMAT LEJAR MESYUARAT (DISYORKAN) ==================== */}
@@ -1969,6 +2012,14 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
                     </td>
                     <td className="px-3 py-3 text-right font-mono font-black text-emerald-950 border-r border-slate-500" colSpan={3}>
                       RM {formatCur(totalBalance)}
+                    </td>
+                  </tr>
+                  <tr className="bg-sky-100/90 text-slate-950 text-sm print:text-[13pt] border-t border-slate-400">
+                    <td className="px-3 py-3 text-center border-r border-slate-500 font-black" colSpan={4}>
+                      JUMLAH DANA KHAIRAT (BANK DAN TUNAI SAHAJA):
+                    </td>
+                    <td className="px-3 py-3 text-right font-mono font-black text-sky-950 border-r border-slate-500" colSpan={3}>
+                      RM {formatCur(bankAndTunaiBalance)}
                     </td>
                   </tr>
                 </tfoot>
