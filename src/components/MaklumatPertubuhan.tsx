@@ -91,7 +91,7 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
         tajuk: 'Prosedur Tuntutan Manfaat Kematian & Bantuan Kebajikan Wad',
         kandungan: `Untuk makluman semua pencarum aktif, berikut adalah ketetapan prosedur rasmi bagi tuntutan khairat kematian dan bantuan kebajikan wad:\n\n1. Tuntutan Kematian (Ahli / Tanggungan):\n   - Salinan Sijil Kematian (Sijil Daftar Kematian) mestilah dikemukakan kepada Setiausaha dalam tempoh 14 hari.\n   - Kadar bantuan kematian ahli aktif adalah sebanyak RM700, manakala bantuan bagi tanggungan berdaftar adalah sebanyak RM400.\n\n2. Bantuan Kebajikan Wad (Warded):\n   - Bantuan sebanyak RM50 (rawatan biasa) sehingga RM100 (tahan wad melebihi 3 hari) akan diberikan sekali setahun bagi rawatan dalam wad hospital kerajaan.\n   - Sila lampirkan surat discaj wad (discharge note) kepada Setiausaha/PIC kebajikan bagi tujuan pengesahan.\n\nSemua tuntutan akan diproses and diluluskan secara tunai/pindahan bank dalam tempoh 48 jam bekerja.\n\nSekian untuk makluman seluruh ahli.`,
         penerbit: 'Haji Mamat bin Bakar',
-        jawatanPenerbit: 'Bendahari Kehormat',
+        jawatanPenerbit: 'Bendahari',
         kepentingan: 'Biasa'
       }
     ];
@@ -1147,7 +1147,7 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
                         else if (rawLabel === 'TIMB. PENGERUSI') formattedLabel = 'Timbalan Pengerusi';
                         else if (rawLabel === 'SETIAUSAHA') formattedLabel = 'Setiausaha Kehormat';
                         else if (rawLabel === 'PEN. SETIAUSAHA') formattedLabel = 'Penolong Setiausaha';
-                        else if (rawLabel === 'BENDAHARI') formattedLabel = 'Bendahari Kehormat';
+                        else if (rawLabel === 'BENDAHARI') formattedLabel = 'Bendahari';
                         else if (rawLabel === 'PEN. BENDAHARI') formattedLabel = 'Penolong Bendahari';
                         else {
                           // Titlecase AJK

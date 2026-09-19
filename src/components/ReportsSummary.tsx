@@ -6,8 +6,9 @@
 import React, { useState } from 'react';
 import { AppState } from '../types';
 import { calculateOutstandingDues, isSameMemberId, getArrearsDetails } from '../lib/database';
-import { FileText, AlertTriangle, Eye, Search, FileSpreadsheet, Download, Printer } from 'lucide-react';
+import { FileText, AlertTriangle, Eye, Search, FileSpreadsheet, Download, Printer, Mail } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import SuratPeringatanModal from './SuratPeringatanModal';
 
 interface ReportsSummaryProps {
   state: AppState;
@@ -18,6 +19,7 @@ interface ReportsSummaryProps {
 export default function ReportsSummary({ state, onViewProfile, currentRole }: ReportsSummaryProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isPrinting, setIsPrinting] = useState(false);
+  const [showSuratPeringatan, setShowSuratPeringatan] = useState(false);
   const [printFontSize, setPrintFontSize] = useState<number>(12); // Minima 12pt untuk kemudahan AJK warga emas
   const [printOrientation, setPrintOrientation] = useState<'portrait' | 'landscape'>('landscape');
   const [printRowSpacing, setPrintRowSpacing] = useState<'normal' | 'relaxed'>('normal');
@@ -159,7 +161,7 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
   const countTiada = memberStats.filter(m => m.status !== 'Aktif').length; 
   const countLunas = memberStats.filter(m => m.status === 'Aktif' && m.dues === 0).length;
   const countAdaTunggakan = memberStats.filter(m => m.status === 'Aktif' && m.dues > 0).length;
-  const countTunggakanLebih36 = memberStats.filter(m => m.status === 'Aktif' && m.dues > 36).length;
+  const countTunggakanLebih36 = memberStats.filter(m => m.status === 'Aktif' && m.dues >= 36).length;
 
   const categories = [
     { id: 'all', label: 'Semua Ahli', count: countSemua },
@@ -168,7 +170,7 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
     { id: 'tiada', label: '3. Tiada (Tidak Aktif)', count: countTiada },
     { id: 'lunas', label: '4. Lunas / Cemerlang', count: countLunas },
     { id: 'ada_tunggakan', label: '5. Ada Tunggakan', count: countAdaTunggakan },
-    { id: 'tunggakan_36', label: '6. Tunggakan > RM36', count: countTunggakanLebih36 },
+    { id: 'tunggakan_36', label: '6. Tunggakan \u2265 RM36', count: countTunggakanLebih36 },
   ];
 
   // Filter and sort members list based on query and group filter
@@ -795,6 +797,16 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
         <p className="text-[10px] text-slate-400 font-sans max-w-sm leading-relaxed">
           Jumlah keseluruhan sumbangan tertunggak Kampung Gong Badak yang belum dibayar oleh kesemua pencarum berdaftar yang aktif.
         </p>
+
+        {currentRole !== 'user' && countTunggakanLebih36 > 0 && (
+          <button
+            onClick={() => setShowSuratPeringatan(true)}
+            className="mt-1 px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+          >
+            <Mail className="h-3.5 w-3.5 text-rose-600" />
+            <span>Jana Surat Peringatan ({countTunggakanLebih36} Ahli Tertunggak RM36+)</span>
+          </button>
+        )}
       </div>
 
       {/* Main Table Card */}
@@ -809,7 +821,20 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
 
           {/* Action buttons on the right - Merged with only "Semua Ahli" layout */}
           {currentRole !== 'user' && (
-            <div className="flex items-center gap-1.5 self-stretch sm:self-auto ml-auto">
+            <div className="flex items-center gap-1.5 self-stretch sm:self-auto ml-auto flex-wrap">
+              <button
+                onClick={() => setShowSuratPeringatan(true)}
+                className="px-2.5 py-1.5 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 text-[10px] font-bold rounded-lg cursor-pointer transition flex items-center gap-1.5 shadow-2xs"
+                title="Jana Surat Peringatan Rasmi Tunggakan Yuran (RM36 dan ke atas)"
+              >
+                <Mail className="h-3.5 w-3.5 text-rose-600" />
+                <span>Surat Peringatan (RM36+)</span>
+                {countTunggakanLebih36 > 0 && (
+                  <span className="bg-rose-600 text-white text-[9px] px-1.5 py-0.2 rounded-full font-mono font-black">
+                    {countTunggakanLebih36}
+                  </span>
+                )}
+              </button>
               <button
                 onClick={() => setIsPrinting(true)}
                 className="px-2.5 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 text-[10px] font-bold rounded-lg cursor-pointer transition flex items-center gap-1"
@@ -1063,6 +1088,14 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
         </div>
 
       </div>
+
+      {/* Surat Peringatan Tunggakan RM36 & Ke Atas Modal */}
+      <SuratPeringatanModal
+        isOpen={showSuratPeringatan}
+        onClose={() => setShowSuratPeringatan(false)}
+        state={state}
+        kadarYuran={kadarYuran}
+      />
 
     </div>
   );
