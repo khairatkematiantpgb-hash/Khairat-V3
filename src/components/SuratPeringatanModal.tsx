@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { AppState, Member } from '../types';
 import { calculateOutstandingDues, isSameMemberId, getArrearsDetails } from '../lib/database';
@@ -24,14 +24,27 @@ import {
   CheckCircle2,
   FileCheck,
   MessageSquare,
-  Type
+  Type,
+  ExternalLink,
+  Clock,
+  ShieldAlert
 } from 'lucide-react';
+
+export interface ArrearsRecipient {
+  member: Member;
+  actualDues: number;
+  nextMonthDues: number;
+  arrearsPeriod: string;
+  latestPaid: string;
+  category: 'semasa' | 'amaran_awal';
+}
 
 interface SuratPeringatanModalProps {
   isOpen: boolean;
   onClose: () => void;
   state: AppState;
   kadarYuran: number;
+  initialCategory?: 'semua' | 'semasa' | 'amaran_awal';
 }
 
 interface LetterConfig {
@@ -53,18 +66,30 @@ interface LetterConfig {
   notaJanaanKomputer: string;
 }
 
-const STORAGE_KEY = 'khairat_surat_peringatan_config_v1';
+const STORAGE_KEY_SEMASA = 'khairat_surat_peringatan_config_v1';
+const STORAGE_KEY_AWAL = 'khairat_surat_amaran_awal_config_v1';
 
 export default function SuratPeringatanModal({
   isOpen,
   onClose,
   state,
-  kadarYuran
+  kadarYuran,
+  initialCategory = 'semua'
 }: SuratPeringatanModalProps) {
   if (!isOpen) return null;
 
-  // Active Tab
+  // Active Navigation Tab
   const [activeTab, setActiveTab] = useState<'senarai' | 'sunting' | 'pratonton'>('senarai');
+  
+  // Category Filter in List: 'semua' | 'amaran_awal' | 'semasa'
+  const [categoryFilter, setCategoryFilter] = useState<'semua' | 'amaran_awal' | 'semasa'>(initialCategory);
+  
+  // Which template to edit in Tab 2: 'semasa' | 'amaran_awal'
+  const [selectedTemplateToEdit, setSelectedTemplateToEdit] = useState<'semasa' | 'amaran_awal'>('semasa');
+
+  // Preview format mode in Tab 3: 'auto' (based on member's category) | 'semasa' | 'amaran_awal'
+  const [previewFormatMode, setPreviewFormatMode] = useState<'auto' | 'semasa' | 'amaran_awal'>('auto');
+
   const [searchMemberQuery, setSearchMemberQuery] = useState('');
   const [previewMemberIndex, setPreviewMemberIndex] = useState(0);
   const [isPrintingPortal, setIsPrintingPortal] = useState(false);
@@ -72,8 +97,8 @@ export default function SuratPeringatanModal({
   const [saveNotification, setSaveNotification] = useState(false);
 
   // Derive current Bendahari from org chart roles or fallback
-  const currentBendahariName = state.chartRoles?.bendahari?.nama || "HJ. JAMALUDDIN BIN MOHAMAD";
-  const currentBendahariTel = state.chartRoles?.bendahari?.tel || "013-4842213";
+  const currentBendahariName = state.chartRoles?.bendahari?.nama || 'HJ. JAMALUDDIN BIN MOHAMAD';
+  const currentBendahariTel = state.chartRoles?.bendahari?.tel || '013-4842213';
 
   // Today formatted in Malay
   const todayMalay = useMemo(() => {
@@ -86,13 +111,13 @@ export default function SuratPeringatanModal({
 
   const defaultYear = new Date().getFullYear();
 
-  // Initial Default Template
-  const getDefaultConfig = (): LetterConfig => ({
+  // Initial Default Template for Current Arrears (>= RM36)
+  const getDefaultConfigSemasa = (): LetterConfig => ({
     rujukanPrefix: `PKKGB/BND/PERINGATAN/${defaultYear}`,
     tarikhSurat: todayMalay,
     tajukSurat: 'PERINGATAN PENJELASAN TUNGGAKAN YURAN KHAIRAT KEMATIAN KAMPUNG GONG BADAK (RM36 & KE ATAS)',
     pembukaan:
-      'Dengan segala hormatnya, perkara di atas adalah dirujuk. Berdasarkan rekod pangkalan data kami setakat tarikh surat ini dikeluarkan, pihak pengurusan mendapati akaun yuran khairat kematian tuan/puan mempunyai baki tertunggak seperti yang dinyatakan di bawah.',
+      'Dengan segala hormatnya, perkara di atas adalah dirujuk. Berdasarkan semakan rekod pangkalan data kami setakat tarikh surat ini dikeluarkan, pihak pengurusan mendapati akaun yuran khairat kematian tuan/puan mempunyai baki tertunggak seperti yang dinyatakan di bawah.',
     arahanBayaran:
       'Sehubungan dengan itu, pihak Bendahari memohon jasa baik dan kerjasama tuan/puan agar dapat membuat penjelasan bayaran tunggakan tersebut dalam tempoh yang ditetapkan bagi memastikan akaun keahlian tuan/puan kembali aktif dan teratur.',
     tempohHari: '14 hari dari tarikh surat ini',
@@ -112,37 +137,80 @@ export default function SuratPeringatanModal({
       'Surat ini adalah cetakan janaan komputer dan tidak memerlukan tandatangan fizikal.'
   });
 
-  const [letterConfig, setLetterConfig] = useState<LetterConfig>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    const def = getDefaultConfig();
+  // Initial Default Template for Early Warning (Next Month >= RM36)
+  const getDefaultConfigAwal = (): LetterConfig => ({
+    rujukanPrefix: `PKKGB/BND/AMARAN-AWAL/${defaultYear}`,
+    tarikhSurat: todayMalay,
+    tajukSurat: 'SURAT AMARAN AWAL: PERINGATAN TUNGGAKAN YURAN KHAIRAT KEMATIAN KAMPUNG GONG BADAK',
+    pembukaan:
+      'Dengan segala hormatnya dimaklumkan bahawa semakan rekod akaun khairat kematian mendapati akaun tuan/puan mempunyai baki tunggakan yuran tahunan seperti yang dinyatakan di bawah. Pihak pengurusan mengeluarkan surat amaran awal ini sebagai peringatan mesra bahawa pada bulan seterusnya, jumlah tunggakan tuan/puan akan mencecah atau melebihi had RM36.00 (melebihi 12 bulan) sekiranya tiada bayaran dibuat.',
+    arahanBayaran:
+      'Sehubungan dengan itu, pihak Bendahari memohon kerjasama tuan/puan agar dapat mengambil tindakan awal membuat bayaran penjelasan tunggakan tersebut sebelum ketibaan bulan hadapan bagi mengelakkan akaun keahlian tuan/puan melepasi had kelayakan tunggakan yang ditetapkan.',
+    tempohHari: '14 hari dari tarikh surat ini (atau sebelum menjelang bulan seterusnya)',
+    namaBank: 'Bank Islam Malaysia Berhad (BIMB)',
+    noAkaunBank: '13017010088998',
+    namaPemegangAkaun: 'PERTUBUHAN KHAIRAT KEMATIAN KG GONG BADAK',
+    maklumanResitOnline:
+      'Resit bayaran secara atas talian/transfer perlu dihantar kepada Bendahari di nombor 017-9161615 melalui WhatsApp dengan menyatakan butiran seperti:\n1. Nama Ahli\n2. No. Ahli',
+    maklumanTunai:
+      'Bayaran tunai juga boleh diserahkan terus kepada Bendahari atau wakil AJK kariah berdekatan.',
+    peringatanKeahlian:
+      'Peringatan Penting: Mengikut Fasal Perlembagaan Pertubuhan, ahli yang mempunyai tunggakan yuran melebihi RM36 boleh digantung hak dan manfaat khairat kematian. Sila buat bayaran awal demi memastikan manfaat kebajikan dan perlindungan khairat kematian keluarga tuan/puan sentiasa terjamin dan berterusan.',
+    namaBendahari: currentBendahariName,
+    telBendahari: currentBendahariTel,
+    jawatanPengeluar: 'Bendahari',
+    notaJanaanKomputer:
+      'Surat ini adalah cetakan janaan komputer dan tidak memerlukan tandatangan fizikal.'
+  });
+
+  // State for Semasa Template
+  const [configSemasa, setConfigSemasa] = useState<LetterConfig>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_SEMASA);
+    const def = getDefaultConfigSemasa();
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         const jawatan = parsed.jawatanPengeluar || def.jawatanPengeluar;
         const cleanedJawatan = jawatan.replace(/\s*kehormat\s*/gi, '').trim() || 'Bendahari';
-        const cleanedMaklumanTunai = parsed.maklumanTunai
-          ? parsed.maklumanTunai.replace(/Bendahari Kehormat/gi, 'Bendahari')
-          : def.maklumanTunai;
-
         return {
           ...def,
           ...parsed,
           jawatanPengeluar: cleanedJawatan,
-          maklumanTunai: cleanedMaklumanTunai,
-          maklumanResitOnline: parsed.maklumanResitOnline || def.maklumanResitOnline,
-          // Always keep latest Bendahari from org chart if user didn't customize it
           namaBendahari: parsed.namaBendahari || currentBendahariName,
           telBendahari: parsed.telBendahari || currentBendahariTel
         };
       } catch (e) {
-        console.error('Failed to parse saved letter template', e);
+        console.error('Failed to parse saved semasa template', e);
       }
     }
     return def;
   });
 
-  // Calculate members with actual dues >= 36
-  const membersWithArrears36 = useMemo(() => {
+  // State for Amaran Awal Template
+  const [configAwal, setConfigAwal] = useState<LetterConfig>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_AWAL);
+    const def = getDefaultConfigAwal();
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const jawatan = parsed.jawatanPengeluar || def.jawatanPengeluar;
+        const cleanedJawatan = jawatan.replace(/\s*kehormat\s*/gi, '').trim() || 'Bendahari';
+        return {
+          ...def,
+          ...parsed,
+          jawatanPengeluar: cleanedJawatan,
+          namaBendahari: parsed.namaBendahari || currentBendahariName,
+          telBendahari: parsed.telBendahari || currentBendahariTel
+        };
+      } catch (e) {
+        console.error('Failed to parse saved awal template', e);
+      }
+    }
+    return def;
+  });
+
+  // Calculate all members with arrears (both Semasa >= RM36 and Amaran Awal where next month >= RM36)
+  const allArrearsRecipients = useMemo<ArrearsRecipient[]>(() => {
     return state.members
       .filter((m) => m.status === 'Aktif')
       .map((m) => {
@@ -150,6 +218,7 @@ export default function SuratPeringatanModal({
         const totalLebihanKredit = rows.reduce((acc, r) => acc + (r.lebihanKredit || 0), 0);
         const dues = calculateOutstandingDues(m.noAhli, state.ledger, state.members, kadarYuran);
         const actualDues = Math.max(0, dues - totalLebihanKredit);
+        const nextMonthDues = actualDues + kadarYuran;
         const arrearsPeriod = getArrearsDetails(m, state.ledger, state.members);
 
         // Compute latest month/year paid
@@ -171,62 +240,115 @@ export default function SuratPeringatanModal({
           }
         }
 
+        // Category Classification:
+        // 1. 'semasa': actualDues >= 36 (Sudah mencapai had RM36 dan ke atas bulan ini)
+        // 2. 'amaran_awal': actualDues < 36 && nextMonthDues >= 36 (Bulan semasa belum cecah 36, tapi bulan hadapan akan cecah/lebih RM36, e.g. RM33 + RM3 = RM36)
+        let category: 'semasa' | 'amaran_awal' | null = null;
+        if (actualDues >= 36) {
+          category = 'semasa';
+        } else if (nextMonthDues >= 36) {
+          category = 'amaran_awal';
+        }
+
+        if (!category) return null;
+
         return {
           member: m,
           actualDues,
+          nextMonthDues,
           arrearsPeriod,
-          latestPaid
+          latestPaid,
+          category
         };
       })
-      .filter((item) => item.actualDues >= 36)
-      .sort((a, b) => b.actualDues - a.actualDues); // Highest arrears first
+      .filter((item): item is ArrearsRecipient => item !== null)
+      .sort((a, b) => {
+        if (b.actualDues !== a.actualDues) return b.actualDues - a.actualDues;
+        return b.nextMonthDues - a.nextMonthDues;
+      });
   }, [state.members, state.ledger, kadarYuran]);
 
-  // Selected members for batch printing (set of member.noAhli)
-  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>(() => {
-    return membersWithArrears36.map((item) => item.member.noAhli);
-  });
+  // Counts for each category
+  const countSemasa = useMemo(() => allArrearsRecipients.filter((r) => r.category === 'semasa').length, [allArrearsRecipients]);
+  const countAmaranAwal = useMemo(() => allArrearsRecipients.filter((r) => r.category === 'amaran_awal').length, [allArrearsRecipients]);
+  const countSemua = allArrearsRecipients.length;
 
-  // Font size state (Standard Font 12 for official warning letters)
-  const [fontSizePt, setFontSizePt] = useState<number>(12);
+  // Filter recipients based on active category filter
+  const categoryFilteredRecipients = useMemo(() => {
+    if (categoryFilter === 'semasa') {
+      return allArrearsRecipients.filter((r) => r.category === 'semasa');
+    }
+    if (categoryFilter === 'amaran_awal') {
+      return allArrearsRecipients.filter((r) => r.category === 'amaran_awal');
+    }
+    return allArrearsRecipients;
+  }, [allArrearsRecipients, categoryFilter]);
 
   // Filtered members in modal search
   const filteredModalMembers = useMemo(() => {
     const q = searchMemberQuery.trim().toLowerCase();
-    if (!q) return membersWithArrears36;
-    return membersWithArrears36.filter((item) => {
+    if (!q) return categoryFilteredRecipients;
+    return categoryFilteredRecipients.filter((item) => {
       const m = item.member;
       return (
         m.nama.toLowerCase().includes(q) ||
         m.noAhli.toLowerCase().includes(q) ||
         (m.ic && m.ic.toLowerCase().includes(q)) ||
-        (m.alamat && m.alamat.toLowerCase().includes(q))
+        (m.alamat && m.alamat.toLowerCase().includes(q)) ||
+        (m.tel && m.tel.toLowerCase().includes(q))
       );
     });
-  }, [membersWithArrears36, searchMemberQuery]);
+  }, [categoryFilteredRecipients, searchMemberQuery]);
+
+  // Selected members for batch printing (set of member.noAhli)
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>(() => {
+    return allArrearsRecipients.map((item) => item.member.noAhli);
+  });
+
+  // Keep selected ids populated when recipients change
+  useEffect(() => {
+    if (selectedMemberIds.length === 0 && allArrearsRecipients.length > 0) {
+      setSelectedMemberIds(allArrearsRecipients.map((item) => item.member.noAhli));
+    }
+  }, [allArrearsRecipients]);
+
+  // Font size state (Standard Font 12 for official warning letters)
+  const [fontSizePt, setFontSizePt] = useState<number>(12);
 
   // Selected members list for printing
   const recipientsToPrint = useMemo(() => {
     if (printSingleMember) {
-      const found = membersWithArrears36.find((x) => isSameMemberId(x.member.noAhli, printSingleMember.noAhli));
+      const found = allArrearsRecipients.find((x) => isSameMemberId(x.member.noAhli, printSingleMember.noAhli));
       return found ? [found] : [];
     }
-    return membersWithArrears36.filter((x) => selectedMemberIds.includes(x.member.noAhli));
-  }, [membersWithArrears36, selectedMemberIds, printSingleMember]);
+    return allArrearsRecipients.filter((x) => selectedMemberIds.includes(x.member.noAhli));
+  }, [allArrearsRecipients, selectedMemberIds, printSingleMember]);
 
   // Save template edits
   const handleSaveConfig = () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(letterConfig));
+    localStorage.setItem(STORAGE_KEY_SEMASA, JSON.stringify(configSemasa));
+    localStorage.setItem(STORAGE_KEY_AWAL, JSON.stringify(configAwal));
     setSaveNotification(true);
     setTimeout(() => setSaveNotification(false), 3000);
   };
 
   // Reset template
   const handleResetConfig = () => {
-    if (window.confirm('Adakah anda pasti mahu mengembalikan teks kandungan surat kepada templat asal standard?')) {
-      const def = getDefaultConfig();
-      setLetterConfig(def);
-      localStorage.removeItem(STORAGE_KEY);
+    const isAwal = selectedTemplateToEdit === 'amaran_awal';
+    const msg = isAwal
+      ? 'Adakah anda pasti mahu mengembalikan templat SURAT AMARAN AWAL kepada tetapan piawai asal?'
+      : 'Adakah anda pasti mahu mengembalikan templat SURAT PERINGATAN SEMASA (RM36+) kepada tetapan piawai asal?';
+    
+    if (window.confirm(msg)) {
+      if (isAwal) {
+        const def = getDefaultConfigAwal();
+        setConfigAwal(def);
+        localStorage.removeItem(STORAGE_KEY_AWAL);
+      } else {
+        const def = getDefaultConfigSemasa();
+        setConfigSemasa(def);
+        localStorage.removeItem(STORAGE_KEY_SEMASA);
+      }
       setSaveNotification(true);
       setTimeout(() => setSaveNotification(false), 3000);
     }
@@ -234,10 +356,13 @@ export default function SuratPeringatanModal({
 
   // Toggle selection
   const handleToggleSelectAll = () => {
-    if (selectedMemberIds.length === membersWithArrears36.length) {
-      setSelectedMemberIds([]);
+    const currentListIds = categoryFilteredRecipients.map((x) => x.member.noAhli);
+    const allSelectedInCurrent = currentListIds.every((id) => selectedMemberIds.includes(id));
+    if (allSelectedInCurrent) {
+      setSelectedMemberIds(selectedMemberIds.filter((id) => !currentListIds.includes(id)));
     } else {
-      setSelectedMemberIds(membersWithArrears36.map((x) => x.member.noAhli));
+      const newSet = new Set([...selectedMemberIds, ...currentListIds]);
+      setSelectedMemberIds(Array.from(newSet));
     }
   };
 
@@ -249,8 +374,18 @@ export default function SuratPeringatanModal({
     }
   };
 
+  // Resolve config to use for a recipient based on category and preview mode
+  const getLetterConfigForRecipient = (recipient: ArrearsRecipient) => {
+    if (previewFormatMode === 'semasa') return configSemasa;
+    if (previewFormatMode === 'amaran_awal') return configAwal;
+    return recipient.category === 'amaran_awal' ? configAwal : configSemasa;
+  };
+
   // Preview current member
-  const currentPreviewRecipient = recipientsToPrint[previewMemberIndex] || membersWithArrears36[0];
+  const currentPreviewRecipient = recipientsToPrint[previewMemberIndex] || allArrearsRecipients[0];
+  const activePreviewConfig = currentPreviewRecipient
+    ? getLetterConfigForRecipient(currentPreviewRecipient)
+    : configSemasa;
 
   // Print launcher
   const triggerPrintBatch = (single?: Member) => {
@@ -260,6 +395,67 @@ export default function SuratPeringatanModal({
       setPrintSingleMember(null);
     }
     setIsPrintingPortal(true);
+  };
+
+  // WhatsApp quick reminder sender
+  const handleSendWhatsApp = (item: ArrearsRecipient) => {
+    const m = item.member;
+    if (!m.tel) {
+      alert(`Ahli ${m.nama} (${m.noAhli}) tidak mempunyai rekod nombor telefon.`);
+      return;
+    }
+    const cleanPhone = m.tel.replace(/\D/g, '');
+    const phoneFormatted = cleanPhone.startsWith('60')
+      ? cleanPhone
+      : cleanPhone.startsWith('0')
+      ? '60' + cleanPhone.slice(1)
+      : '60' + cleanPhone;
+
+    const isAwal = item.category === 'amaran_awal';
+    const cfg = isAwal ? configAwal : configSemasa;
+
+    let text = '';
+    if (isAwal) {
+      text =
+        `*SURAT AMARAN AWAL: PERINGATAN TUNGGAKAN YURAN KHAIRAT KEMATIAN KG GONG BADAK*\n\n` +
+        `Assalamualaikum & Salam Sejahtera,\n` +
+        `Kepada: *${m.nama}* (No. Ahli: *${m.noAhli}*)\n\n` +
+        `Semakan rekod akaun khairat kematian mendapati baki tunggakan semasa anda adalah sebanyak *RM ${item.actualDues}.00* (${item.arrearsPeriod}).\n\n` +
+        `⚠️ *PERINGATAN AWAL:*\n` +
+        `Pada *bulan seterusnya*, jumlah tunggakan anda akan mencecah *RM ${item.nextMonthDues}.00* (mencecah had kelayakan 12 bulan / RM36).\n\n` +
+        `Mengikut Perlembagaan Pertubuhan, sebarang tunggakan melebihi RM36 boleh menyebabkan hak dan manfaat khairat kematian digantung. Pihak Bendahari memohon kerjasama tuan/puan untuk membuat bayaran segera sebelum bulan hadapan.\n\n` +
+        `*Saluran Bayaran Rasmi:*\n` +
+        `• Bank: ${cfg.namaBank}\n` +
+        `• No. Akaun: *${cfg.noAkaunBank}*\n` +
+        `• Nama Akaun: ${cfg.namaPemegangAkaun}\n\n` +
+        `Sila hantarkan resit/bukti bayaran kepada Bendahari (${cfg.namaBendahari} di ${cfg.telBendahari}). Terima kasih.`;
+    } else {
+      text =
+        `*PERINGATAN PENJELASAN TUNGGAKAN YURAN KHAIRAT KEMATIAN KG GONG BADAK (RM36 & KE ATAS)*\n\n` +
+        `Assalamualaikum & Salam Sejahtera,\n` +
+        `Kepada: *${m.nama}* (No. Ahli: *${m.noAhli}*)\n\n` +
+        `Semakan rekod akaun khairat kematian mendapati baki tunggakan semasa anda adalah sebanyak *RM ${item.actualDues}.00* (${item.arrearsPeriod}).\n\n` +
+        `⚠️ *PERINGATAN:* Mengikut Perlembagaan Pertubuhan, tunggakan melebihi RM36 boleh menyebabkan kelayakan dan manfaat khairat kematian digantung sehingga semua tunggakan diselesaikan.\n\n` +
+        `Mohon kerjasama pihak tuan/puan agar dapat membuat penjelasan bayaran dalam tempoh *${cfg.tempohHari}*.\n\n` +
+        `*Saluran Bayaran Rasmi:*\n` +
+        `• Bank: ${cfg.namaBank}\n` +
+        `• No. Akaun: *${cfg.noAkaunBank}*\n` +
+        `• Nama Akaun: ${cfg.namaPemegangAkaun}\n\n` +
+        `Sila hantarkan resit bayaran kepada Bendahari (${cfg.namaBendahari} di ${cfg.telBendahari}). Terima kasih.`;
+    }
+
+    const url = `https://wa.me/${phoneFormatted}?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+  };
+
+  // Currently active configuration in Editor
+  const currentEditingConfig = selectedTemplateToEdit === 'amaran_awal' ? configAwal : configSemasa;
+  const setCurrentEditingConfig = (newCfg: LetterConfig) => {
+    if (selectedTemplateToEdit === 'amaran_awal') {
+      setConfigAwal(newCfg);
+    } else {
+      setConfigSemasa(newCfg);
+    }
   };
 
   return (
@@ -276,13 +472,13 @@ export default function SuratPeringatanModal({
               </div>
               <div>
                 <h2 className="text-sm sm:text-base font-black uppercase tracking-tight flex items-center gap-2">
-                  <span>Jana Surat Peringatan Tunggakan Yuran (RM36 & Ke Atas)</span>
+                  <span>Jana Surat Peringatan &amp; Amaran Awal Tunggakan Yuran</span>
                   <span className="bg-rose-500 text-white text-[10px] font-mono font-black px-2 py-0.5 rounded-full">
-                    {membersWithArrears36.length} Ahli Terlibat
+                    {countSemua} Ahli Terlibat
                   </span>
                 </h2>
                 <p className="text-[11px] text-slate-300 font-medium">
-                  Dikeluarkan rasmi oleh Bendahari &bull; Pengesahan sah cetakan janaan komputer
+                  Tunggakan Semasa (≥ RM36) &bull; Amaran Awal (Bulan Seterusnya ≥ RM36) &bull; Dikeluarkan oleh Bendahari
                 </p>
               </div>
             </div>
@@ -300,66 +496,108 @@ export default function SuratPeringatanModal({
           <div className="flex border-b border-slate-200 bg-slate-50/75 px-5 pt-2 gap-2 text-xs font-bold shrink-0">
             <button
               onClick={() => setActiveTab('senarai')}
-              className={`px-4 py-2.5 rounded-t-xl transition-all cursor-pointer flex items-center gap-2 border-b-2 ${
+              className={`pb-2.5 px-3 border-b-2 flex items-center gap-1.5 transition cursor-pointer ${
                 activeTab === 'senarai'
-                  ? 'bg-white border-rose-600 text-rose-700 shadow-2xs'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
+                  ? 'border-rose-600 text-rose-600 font-black'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
             >
               <CheckSquare className="h-4 w-4" />
-              <span>1. Senarai Penerima ({selectedMemberIds.length}/{membersWithArrears36.length})</span>
+              <span>1. Senarai Penerima ({categoryFilteredRecipients.length})</span>
             </button>
 
             <button
               onClick={() => setActiveTab('sunting')}
-              className={`px-4 py-2.5 rounded-t-xl transition-all cursor-pointer flex items-center gap-2 border-b-2 ${
+              className={`pb-2.5 px-3 border-b-2 flex items-center gap-1.5 transition cursor-pointer ${
                 activeTab === 'sunting'
-                  ? 'bg-white border-rose-600 text-rose-700 shadow-2xs'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
+                  ? 'border-rose-600 text-rose-600 font-black'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
             >
               <Edit3 className="h-4 w-4" />
-              <span>2. Kandungan Surat (Makluman Bendahari)</span>
+              <span>2. Sunting Kandungan &amp; Templat Surat</span>
             </button>
 
             <button
               onClick={() => setActiveTab('pratonton')}
-              className={`px-4 py-2.5 rounded-t-xl transition-all cursor-pointer flex items-center gap-2 border-b-2 ${
+              className={`pb-2.5 px-3 border-b-2 flex items-center gap-1.5 transition cursor-pointer ${
                 activeTab === 'pratonton'
-                  ? 'bg-white border-rose-600 text-rose-700 shadow-2xs'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
+                  ? 'border-rose-600 text-rose-600 font-black'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
             >
               <FileCheck className="h-4 w-4" />
-              <span>3. Pratonton & Cetak Surat</span>
+              <span>3. Pratonton &amp; Cetak Surat (A4)</span>
             </button>
           </div>
 
-          {/* Tab 1: SENARAI PENERIMA (RM36 & KE ATAS) */}
+          {/* TAB 1: SENARAI PENERIMA */}
           {activeTab === 'senarai' && (
             <div className="p-5 flex-1 overflow-y-auto space-y-4">
               
-              {/* Info banner */}
-              <div className="bg-rose-50 border border-rose-200 p-3.5 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                <div className="flex items-center gap-2.5">
-                  <AlertCircle className="h-5 w-5 text-rose-600 shrink-0" />
-                  <div className="text-xs text-rose-950">
-                    <strong>Syarat Tapisan Surat Peringatan:</strong> Ahli berstatus <strong>Aktif</strong> dengan jumlah tunggakan <strong>RM36.00 dan ke atas</strong> (bersamaan sekurang-kurangnya 12 bulan yuran).
-                  </div>
+              {/* Category Filter Pills and Controls */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs font-bold text-slate-600 mr-1">Kategori Notis:</span>
+                  <button
+                    onClick={() => setCategoryFilter('semua')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                      categoryFilter === 'semua'
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span>Semua Rekod</span>
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-700 text-white font-mono">
+                      {countSemua}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => setCategoryFilter('amaran_awal')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                      categoryFilter === 'amaran_awal'
+                        ? 'bg-amber-600 text-white shadow-xs'
+                        : 'bg-amber-50 border border-amber-200 text-amber-900 hover:bg-amber-100'
+                    }`}
+                    title="Surat Amaran Awal: Ahli yang tunggakan akan mencecah atau melebihi RM36 pada bulan seterusnya"
+                  >
+                    <Clock className="h-3.5 w-3.5" />
+                    <span>Amaran Awal (Bulan Seterusnya ≥ RM36)</span>
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-700 text-white font-mono">
+                      {countAmaranAwal}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => setCategoryFilter('semasa')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                      categoryFilter === 'semasa'
+                        ? 'bg-rose-600 text-white shadow-xs'
+                        : 'bg-rose-50 border border-rose-200 text-rose-900 hover:bg-rose-100'
+                    }`}
+                    title="Surat Peringatan Semasa: Ahli yang telah tertunggak RM36 dan ke atas pada bulan ini"
+                  >
+                    <ShieldAlert className="h-3.5 w-3.5" />
+                    <span>Tunggakan Semasa (≥ RM36)</span>
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-700 text-white font-mono">
+                      {countSemasa}
+                    </span>
+                  </button>
                 </div>
 
                 <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
                   <button
                     onClick={handleToggleSelectAll}
-                    className="px-3 py-1.5 bg-white border border-rose-300 text-rose-700 hover:bg-rose-100 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
+                    className="px-3 py-1.5 bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
                   >
-                    {selectedMemberIds.length === membersWithArrears36.length ? (
+                    {categoryFilteredRecipients.every((x) => selectedMemberIds.includes(x.member.noAhli)) && categoryFilteredRecipients.length > 0 ? (
                       <>
-                        <Square className="h-3.5 w-3.5" /> Nyahpilih Semua
+                        <Square className="h-3.5 w-3.5" /> Nyahpilih Kategori Ini
                       </>
                     ) : (
                       <>
-                        <CheckSquare className="h-3.5 w-3.5" /> Pilih Semua ({membersWithArrears36.length})
+                        <CheckSquare className="h-3.5 w-3.5" /> Pilih Kategori Ini ({categoryFilteredRecipients.length})
                       </>
                     )}
                   </button>
@@ -377,12 +615,31 @@ export default function SuratPeringatanModal({
                 </div>
               </div>
 
+              {/* Informational Guidance Banner */}
+              {categoryFilter === 'amaran_awal' && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2.5">
+                  <Clock className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <strong>Fungsi Surat Amaran Awal:</strong> Kategori ini memaparkan ahli aktif yang tunggakan semasanya belum digantung (contohnya RM33 atau di bawah RM36), namun <strong>pada bulan seterusnya</strong> tunggakan mereka akan mencecah atau melebihi had RM36 sekiranya tiada bayaran dibuat (+RM{kadarYuran}). Notis awal ini memberi peluang kepada ahli untuk menyelesaikan yuran sebelum hak khairat kematian digantung.
+                  </div>
+                </div>
+              )}
+
+              {categoryFilter === 'semasa' && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-900 flex items-start gap-2.5">
+                  <ShieldAlert className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+                  <div>
+                    <strong>Peringatan Tunggakan Semasa:</strong> Kategori ini menyenaraikan ahli yang telah pun mencapai atau melebihi had perlembagaan RM36 (12 bulan atau lebih) pada rekod terkini. Surat ini berfungsi sebagai peringatan rasmi dan penegasan penggantungan manfaat khairat.
+                  </div>
+                </div>
+              )}
+
               {/* Search Bar */}
               <div className="relative">
                 <Search className="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Cari penerima mengikut Nama, No. Ahli, No. IC atau Alamat..."
+                  placeholder="Cari penerima mengikut Nama, No. Ahli, No. IC, Telefon atau Alamat..."
                   value={searchMemberQuery}
                   onChange={(e) => setSearchMemberQuery(e.target.value)}
                   className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:border-rose-500 transition"
@@ -393,8 +650,8 @@ export default function SuratPeringatanModal({
               {filteredModalMembers.length === 0 ? (
                 <div className="text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-slate-500 space-y-2">
                   <CheckCircle2 className="h-8 w-8 mx-auto text-emerald-600" />
-                  <p className="text-sm font-bold text-slate-700">Tiada ahli tertunggak RM36 dan ke atas dijumpai.</p>
-                  <p className="text-xs text-slate-500">Semua ahli aktif berada dalam keadaan rekod pembayaran yang teratur.</p>
+                  <p className="text-sm font-bold text-slate-700">Tiada rekod ahli dijumpai untuk kriteria ini.</p>
+                  <p className="text-xs text-slate-500">Semua ahli aktif berada dalam status pembayaran yang teratur.</p>
                 </div>
               ) : (
                 <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs bg-white">
@@ -402,24 +659,32 @@ export default function SuratPeringatanModal({
                     <table className="w-full text-left text-xs border-collapse">
                       <thead className="bg-slate-100/90 text-slate-700 font-extrabold text-[11px] uppercase tracking-wide sticky top-0 z-10 border-b border-slate-200">
                         <tr>
-                          <th className="p-3 w-12 text-center">Pilih</th>
+                          <th className="p-3 w-10 text-center">Pilih</th>
                           <th className="p-3 w-24">No. Ahli</th>
                           <th className="p-3">Nama Ahli &amp; No. IC</th>
-                          <th className="p-3">Alamat Berdaftar</th>
+                          <th className="p-3">Alamat</th>
                           <th className="p-3 w-28 text-center">Lunas Hingga</th>
-                          <th className="p-3 w-32 text-center">Tunggakan (RM)</th>
-                          <th className="p-3 w-28 text-center">Tindakan</th>
+                          <th className="p-3 w-32 text-center">Tunggakan Semasa</th>
+                          <th className="p-3 w-36 text-center">Bulan Hadapan (+RM{kadarYuran})</th>
+                          <th className="p-3 w-36 text-center">Status / Jenis Notis</th>
+                          <th className="p-3 w-32 text-center">Tindakan</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {filteredModalMembers.map((item) => {
                           const m = item.member;
                           const isChecked = selectedMemberIds.includes(m.noAhli);
+                          const isAwal = item.category === 'amaran_awal';
+
                           return (
                             <tr
                               key={m.noAhli}
-                              className={`hover:bg-rose-50/40 transition-colors ${
-                                isChecked ? 'bg-rose-50/20' : ''
+                              className={`hover:bg-slate-50/80 transition-colors ${
+                                isChecked
+                                  ? isAwal
+                                    ? 'bg-amber-50/20'
+                                    : 'bg-rose-50/20'
+                                  : ''
                               }`}
                             >
                               <td className="p-3 text-center">
@@ -436,7 +701,7 @@ export default function SuratPeringatanModal({
                               <td className="p-3">
                                 <div className="font-bold text-slate-900">{m.nama}</div>
                                 <div className="text-[10px] text-slate-500 font-mono">
-                                  {m.ic || 'Tiada No. IC'} &bull; {m.tel || 'Tiada Telefon'}
+                                  {m.ic || 'Tiada No. IC'} {m.tel ? `• Tel: ${m.tel}` : '• Tiada Tel'}
                                 </div>
                               </td>
                               <td className="p-3 text-slate-600 text-[11px] max-w-xs truncate">
@@ -446,23 +711,63 @@ export default function SuratPeringatanModal({
                                 {item.latestPaid}
                               </td>
                               <td className="p-3 text-center">
-                                <span className="inline-block px-2 py-0.5 bg-rose-100 text-rose-800 font-mono font-black text-xs rounded-full border border-rose-200">
+                                <span className={`inline-block px-2 py-0.5 font-mono font-black text-xs rounded-full border ${
+                                  isAwal
+                                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                    : 'bg-rose-100 text-rose-900 border-rose-300'
+                                }`}>
                                   RM {item.actualDues}
                                 </span>
-                                <div className="text-[9px] text-rose-700/80 font-mono mt-0.5">
+                                <div className="text-[9px] text-slate-500 font-mono mt-0.5">
                                   {item.arrearsPeriod}
                                 </div>
                               </td>
+                              <td className="p-3 text-center font-mono font-bold text-slate-800">
+                                <span className="text-rose-700 font-black">RM {item.nextMonthDues}</span>
+                                <span className="block text-[9px] text-slate-400 font-sans">
+                                  {item.nextMonthDues >= 36 ? 'Mencecah/Lebih RM36' : ''}
+                                </span>
+                              </td>
                               <td className="p-3 text-center">
-                                <button
-                                  onClick={() => {
-                                    setPrintSingleMember(m);
-                                    setActiveTab('pratonton');
-                                  }}
-                                  className="px-2 py-1 bg-slate-100 hover:bg-rose-100 text-slate-700 hover:text-rose-800 font-bold text-[10px] rounded transition cursor-pointer"
-                                >
-                                  Pratonton
-                                </button>
+                                {isAwal ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                                    <Clock className="h-3 w-3 text-amber-700" />
+                                    <span>Amaran Awal</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-900 border border-rose-300">
+                                    <ShieldAlert className="h-3 w-3 text-rose-700" />
+                                    <span>Tunggakan ≥ RM36</span>
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-3 text-center">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <button
+                                    onClick={() => {
+                                      setPrintSingleMember(m);
+                                      setActiveTab('pratonton');
+                                    }}
+                                    className="px-2 py-1 bg-slate-100 hover:bg-rose-100 text-slate-700 hover:text-rose-800 font-bold text-[10px] rounded transition cursor-pointer"
+                                    title="Papar dan cetak surat untuk ahli ini"
+                                  >
+                                    Pratonton
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleSendWhatsApp(item)}
+                                    disabled={!m.tel}
+                                    className={`px-2 py-1 font-bold text-[10px] rounded transition cursor-pointer flex items-center gap-1 ${
+                                      m.tel
+                                        ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                        : 'bg-slate-50 text-slate-300 cursor-not-allowed border border-slate-200'
+                                    }`}
+                                    title={m.tel ? 'Hantar notis rasmi terus melalui WhatsApp' : 'Tiada rekod nombor telefon'}
+                                  >
+                                    <MessageSquare className="h-3 w-3 text-emerald-600" />
+                                    <span>WA</span>
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );
@@ -476,7 +781,7 @@ export default function SuratPeringatanModal({
             </div>
           )}
 
-          {/* Tab 2: SUNTING KANDUNGAN SURAT (BENDHARI) */}
+          {/* TAB 2: SUNTING KANDUNGAN SURAT */}
           {activeTab === 'sunting' && (
             <div className="p-5 flex-1 overflow-y-auto space-y-5">
               
@@ -484,14 +789,47 @@ export default function SuratPeringatanModal({
               {saveNotification && (
                 <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-xl flex items-center gap-2 animate-fade-in">
                   <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                  <span>Kandungan dan tetapan surat peringatan telah berjaya disimpan.</span>
+                  <span>Kandungan dan tetapan templat surat telah berjaya disimpan ke pangkalan data.</span>
                 </div>
               )}
 
-              <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-xl text-xs text-amber-900 flex items-start gap-2.5">
-                <Edit3 className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              {/* Template Switcher Buttons */}
+              <div className="bg-slate-100 p-1.5 rounded-xl flex gap-1 border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setSelectedTemplateToEdit('semasa')}
+                  className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+                    selectedTemplateToEdit === 'semasa'
+                      ? 'bg-rose-700 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                  }`}
+                >
+                  <ShieldAlert className="h-4 w-4" />
+                  <span>Templat 1: Surat Tunggakan Semasa (≥ RM36)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedTemplateToEdit('amaran_awal')}
+                  className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+                    selectedTemplateToEdit === 'amaran_awal'
+                      ? 'bg-amber-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                  }`}
+                >
+                  <Clock className="h-4 w-4" />
+                  <span>Templat 2: Surat Amaran Awal (Bulan Seterusnya ≥ RM36)</span>
+                </button>
+              </div>
+
+              <div className={`border p-3.5 rounded-xl text-xs flex items-start gap-2.5 ${
+                selectedTemplateToEdit === 'amaran_awal'
+                  ? 'bg-amber-50 border-amber-200 text-amber-900'
+                  : 'bg-rose-50 border-rose-200 text-rose-900'
+              }`}>
+                <Edit3 className="h-4 w-4 shrink-0 mt-0.5" />
                 <div className="leading-relaxed">
-                  <strong>Penyuntingan Makluman Bendahari:</strong> Anda boleh mengubah teks kandungan surat, maklumat akaun bank, nombor telefon, dan peringatan di bawah. Semua maklumat dinamik ahli (Nama, No Ahli, Alamat, dan Baki Tunggakan) akan disuntik secara automatik ke dalam surat masing-masing.
+                  <strong>Penyuntingan Templat {selectedTemplateToEdit === 'amaran_awal' ? 'Surat Amaran Awal' : 'Surat Peringatan Semasa'}:</strong> Anda sedang menyunting perkataan rasmi, maklumat rujukan, akaun bank, dan arahan Bendahari untuk kategori ini. Maklumat pencarum (Nama, No Ahli, Tunggakan Semasa, Anggaran Bulan Hadapan) akan diisi secara automatik.
                 </div>
               </div>
 
@@ -505,11 +843,11 @@ export default function SuratPeringatanModal({
                   </label>
                   <input
                     type="text"
-                    value={letterConfig.rujukanPrefix}
-                    onChange={(e) => setLetterConfig({ ...letterConfig, rujukanPrefix: e.target.value })}
+                    value={currentEditingConfig.rujukanPrefix}
+                    onChange={(e) => setCurrentEditingConfig({ ...currentEditingConfig, rujukanPrefix: e.target.value })}
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono font-bold focus:bg-white focus:outline-none focus:border-rose-500"
                   />
-                  <span className="text-[10px] text-slate-400">Contoh: PKKGB/BND/PERINGATAN/2026/001</span>
+                  <span className="text-[10px] text-slate-400">Contoh: PKKGB/BND/AMARAN-AWAL/2026/001</span>
                 </div>
 
                 <div className="space-y-1">
@@ -518,8 +856,8 @@ export default function SuratPeringatanModal({
                   </label>
                   <input
                     type="text"
-                    value={letterConfig.tarikhSurat}
-                    onChange={(e) => setLetterConfig({ ...letterConfig, tarikhSurat: e.target.value })}
+                    value={currentEditingConfig.tarikhSurat}
+                    onChange={(e) => setCurrentEditingConfig({ ...currentEditingConfig, tarikhSurat: e.target.value })}
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold focus:bg-white focus:outline-none focus:border-rose-500"
                   />
                 </div>
@@ -531,8 +869,8 @@ export default function SuratPeringatanModal({
                   </label>
                   <input
                     type="text"
-                    value={letterConfig.tajukSurat}
-                    onChange={(e) => setLetterConfig({ ...letterConfig, tajukSurat: e.target.value })}
+                    value={currentEditingConfig.tajukSurat}
+                    onChange={(e) => setCurrentEditingConfig({ ...currentEditingConfig, tajukSurat: e.target.value })}
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold focus:bg-white focus:outline-none focus:border-rose-500"
                   />
                 </div>
@@ -544,8 +882,8 @@ export default function SuratPeringatanModal({
                   </label>
                   <textarea
                     rows={3}
-                    value={letterConfig.pembukaan}
-                    onChange={(e) => setLetterConfig({ ...letterConfig, pembukaan: e.target.value })}
+                    value={currentEditingConfig.pembukaan}
+                    onChange={(e) => setCurrentEditingConfig({ ...currentEditingConfig, pembukaan: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:bg-white focus:outline-none focus:border-rose-500 leading-relaxed"
                   />
                 </div>
@@ -557,8 +895,8 @@ export default function SuratPeringatanModal({
                   </label>
                   <textarea
                     rows={3}
-                    value={letterConfig.arahanBayaran}
-                    onChange={(e) => setLetterConfig({ ...letterConfig, arahanBayaran: e.target.value })}
+                    value={currentEditingConfig.arahanBayaran}
+                    onChange={(e) => setCurrentEditingConfig({ ...currentEditingConfig, arahanBayaran: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:bg-white focus:outline-none focus:border-rose-500 leading-relaxed"
                   />
                 </div>
@@ -570,8 +908,8 @@ export default function SuratPeringatanModal({
                   </label>
                   <input
                     type="text"
-                    value={letterConfig.namaBank}
-                    onChange={(e) => setLetterConfig({ ...letterConfig, namaBank: e.target.value })}
+                    value={currentEditingConfig.namaBank}
+                    onChange={(e) => setCurrentEditingConfig({ ...currentEditingConfig, namaBank: e.target.value })}
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold focus:bg-white focus:outline-none focus:border-rose-500"
                   />
                 </div>
@@ -582,8 +920,8 @@ export default function SuratPeringatanModal({
                   </label>
                   <input
                     type="text"
-                    value={letterConfig.noAkaunBank}
-                    onChange={(e) => setLetterConfig({ ...letterConfig, noAkaunBank: e.target.value })}
+                    value={currentEditingConfig.noAkaunBank}
+                    onChange={(e) => setCurrentEditingConfig({ ...currentEditingConfig, noAkaunBank: e.target.value })}
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono font-bold focus:bg-white focus:outline-none focus:border-rose-500"
                   />
                 </div>
@@ -594,8 +932,8 @@ export default function SuratPeringatanModal({
                   </label>
                   <input
                     type="text"
-                    value={letterConfig.namaPemegangAkaun}
-                    onChange={(e) => setLetterConfig({ ...letterConfig, namaPemegangAkaun: e.target.value })}
+                    value={currentEditingConfig.namaPemegangAkaun}
+                    onChange={(e) => setCurrentEditingConfig({ ...currentEditingConfig, namaPemegangAkaun: e.target.value })}
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold focus:bg-white focus:outline-none focus:border-rose-500"
                   />
                 </div>
@@ -606,8 +944,8 @@ export default function SuratPeringatanModal({
                   </label>
                   <input
                     type="text"
-                    value={letterConfig.tempohHari}
-                    onChange={(e) => setLetterConfig({ ...letterConfig, tempohHari: e.target.value })}
+                    value={currentEditingConfig.tempohHari}
+                    onChange={(e) => setCurrentEditingConfig({ ...currentEditingConfig, tempohHari: e.target.value })}
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold focus:bg-white focus:outline-none focus:border-rose-500"
                   />
                 </div>
@@ -620,12 +958,12 @@ export default function SuratPeringatanModal({
                   </label>
                   <textarea
                     rows={3}
-                    value={letterConfig.maklumanResitOnline}
-                    onChange={(e) => setLetterConfig({ ...letterConfig, maklumanResitOnline: e.target.value })}
+                    value={currentEditingConfig.maklumanResitOnline}
+                    onChange={(e) => setCurrentEditingConfig({ ...currentEditingConfig, maklumanResitOnline: e.target.value })}
                     className="w-full p-2.5 bg-emerald-50/40 border border-emerald-300 rounded-lg text-xs font-medium focus:bg-white focus:outline-none focus:border-emerald-600 leading-relaxed text-slate-800"
                   />
                   <span className="text-[10px] text-slate-500">
-                    Sertakan nombor telefon WhatsApp Bendahari (017-9161615) dan maklumat butiran wajib yang perlu disertakan oleh ahli (1. Nama Ahli, 2. No. Ahli).
+                    Sertakan nombor telefon WhatsApp Bendahari (017-9161615) dan maklumat butiran wajib seperti Nama Ahli &amp; No. Ahli.
                   </span>
                 </div>
 
@@ -635,8 +973,8 @@ export default function SuratPeringatanModal({
                   </label>
                   <input
                     type="text"
-                    value={letterConfig.maklumanTunai}
-                    onChange={(e) => setLetterConfig({ ...letterConfig, maklumanTunai: e.target.value })}
+                    value={currentEditingConfig.maklumanTunai}
+                    onChange={(e) => setCurrentEditingConfig({ ...currentEditingConfig, maklumanTunai: e.target.value })}
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:bg-white focus:outline-none focus:border-rose-500"
                   />
                 </div>
@@ -648,8 +986,8 @@ export default function SuratPeringatanModal({
                   </label>
                   <textarea
                     rows={2}
-                    value={letterConfig.peringatanKeahlian}
-                    onChange={(e) => setLetterConfig({ ...letterConfig, peringatanKeahlian: e.target.value })}
+                    value={currentEditingConfig.peringatanKeahlian}
+                    onChange={(e) => setCurrentEditingConfig({ ...currentEditingConfig, peringatanKeahlian: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:bg-white focus:outline-none focus:border-rose-500 leading-relaxed"
                   />
                 </div>
@@ -661,8 +999,8 @@ export default function SuratPeringatanModal({
                   </label>
                   <input
                     type="text"
-                    value={letterConfig.namaBendahari}
-                    onChange={(e) => setLetterConfig({ ...letterConfig, namaBendahari: e.target.value })}
+                    value={currentEditingConfig.namaBendahari}
+                    onChange={(e) => setCurrentEditingConfig({ ...currentEditingConfig, namaBendahari: e.target.value })}
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold focus:bg-white focus:outline-none focus:border-rose-500 uppercase"
                   />
                 </div>
@@ -673,8 +1011,8 @@ export default function SuratPeringatanModal({
                   </label>
                   <input
                     type="text"
-                    value={letterConfig.telBendahari}
-                    onChange={(e) => setLetterConfig({ ...letterConfig, telBendahari: e.target.value })}
+                    value={currentEditingConfig.telBendahari}
+                    onChange={(e) => setCurrentEditingConfig({ ...currentEditingConfig, telBendahari: e.target.value })}
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono font-bold focus:bg-white focus:outline-none focus:border-rose-500"
                   />
                 </div>
@@ -686,8 +1024,8 @@ export default function SuratPeringatanModal({
                   </label>
                   <input
                     type="text"
-                    value={letterConfig.notaJanaanKomputer}
-                    onChange={(e) => setLetterConfig({ ...letterConfig, notaJanaanKomputer: e.target.value })}
+                    value={currentEditingConfig.notaJanaanKomputer}
+                    onChange={(e) => setCurrentEditingConfig({ ...currentEditingConfig, notaJanaanKomputer: e.target.value })}
                     className="w-full p-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 focus:bg-white focus:outline-none focus:border-rose-500 italic"
                   />
                 </div>
@@ -701,7 +1039,7 @@ export default function SuratPeringatanModal({
                   className="px-3.5 py-2 bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
-                  <span>Set Semula Templat Asal</span>
+                  <span>Set Semula Templat {selectedTemplateToEdit === 'amaran_awal' ? 'Amaran Awal' : 'Peringatan Semasa'}</span>
                 </button>
 
                 <div className="flex items-center gap-2">
@@ -726,14 +1064,14 @@ export default function SuratPeringatanModal({
             </div>
           )}
 
-          {/* Tab 3: PRATONTON & CETAK SURAT */}
+          {/* TAB 3: PRATONTON & CETAK SURAT */}
           {activeTab === 'pratonton' && (
             <div className="p-5 flex-1 overflow-y-auto space-y-4 flex flex-col">
               
               {/* Controls ribbon */}
               <div className="bg-slate-100 border border-slate-200 p-3 rounded-xl flex flex-wrap items-center justify-between gap-3 shrink-0">
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-bold text-slate-700">Pilih Ahli Untuk Ditonton:</span>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="text-xs font-bold text-slate-700">Pilih Ahli Ditonton:</span>
                   <select
                     value={previewMemberIndex}
                     onChange={(e) => setPreviewMemberIndex(Number(e.target.value))}
@@ -741,16 +1079,55 @@ export default function SuratPeringatanModal({
                   >
                     {recipientsToPrint.map((item, idx) => (
                       <option key={item.member.noAhli} value={idx}>
-                        {item.member.noAhli} - {item.member.nama} (RM {item.actualDues})
+                        {item.member.noAhli} - {item.member.nama} ({item.category === 'amaran_awal' ? 'Amaran Awal: RM' : 'Tunggakan: RM'} {item.actualDues})
                       </option>
                     ))}
                   </select>
+
+                  {/* Template Format Selector in Preview */}
+                  <div className="flex items-center gap-1 bg-white border border-slate-300 rounded-lg p-0.5 text-xs">
+                    <span className="text-[11px] font-bold text-slate-500 px-1.5">Format Surat:</span>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewFormatMode('auto')}
+                      className={`px-2 py-1 rounded text-[11px] font-bold transition cursor-pointer ${
+                        previewFormatMode === 'auto'
+                          ? 'bg-slate-900 text-white'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                      title="Gunakan format automatik mengikut kategori ahli (Amaran Awal atau Semasa)"
+                    >
+                      Automatik
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewFormatMode('amaran_awal')}
+                      className={`px-2 py-1 rounded text-[11px] font-bold transition cursor-pointer ${
+                        previewFormatMode === 'amaran_awal'
+                          ? 'bg-amber-600 text-white'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Amaran Awal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewFormatMode('semasa')}
+                      className={`px-2 py-1 rounded text-[11px] font-bold transition cursor-pointer ${
+                        previewFormatMode === 'semasa'
+                          ? 'bg-rose-600 text-white'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Peringatan Semasa
+                    </button>
+                  </div>
                 </div>
 
-                {/* Font Size Adjustment */}
+                {/* Font Size Adjustment (Standard Font 12) */}
                 <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs shadow-2xs">
                   <Type className="h-3.5 w-3.5 text-slate-500" />
-                  <span className="font-bold text-slate-700">Saiz Tulisan Surat:</span>
+                  <span className="font-bold text-slate-700">Saiz Tulisan:</span>
                   <button
                     type="button"
                     onClick={() => setFontSizePt((prev) => Math.max(10, prev - 1))}
@@ -772,7 +1149,7 @@ export default function SuratPeringatanModal({
                   </button>
                   {fontSizePt === 12 && (
                     <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded ml-1">
-                      Font 12
+                      Piawai (Font 12)
                     </span>
                   )}
                 </div>
@@ -787,8 +1164,24 @@ export default function SuratPeringatanModal({
                     </button>
                   )}
 
+                  {currentPreviewRecipient && (
+                    <button
+                      onClick={() => handleSendWhatsApp(currentPreviewRecipient)}
+                      disabled={!currentPreviewRecipient.member.tel}
+                      className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-2xs ${
+                        currentPreviewRecipient.member.tel
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                          : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                      }`}
+                      title={currentPreviewRecipient.member.tel ? 'Kirim notis ini terus ke WhatsApp ahli' : 'Tiada no telefon'}
+                    >
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      <span>Kirim WhatsApp</span>
+                    </button>
+                  )}
+
                   <button
-                    onClick={() => triggerPrintBatch(currentPreviewRecipient.member)}
+                    onClick={() => triggerPrintBatch(currentPreviewRecipient?.member)}
                     className="px-3.5 py-1.5 bg-white border border-slate-300 text-slate-800 hover:bg-slate-50 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
                   >
                     <Printer className="h-3.5 w-3.5 text-slate-600" />
@@ -816,43 +1209,42 @@ export default function SuratPeringatanModal({
                     {/* Official Letterhead */}
                     <div className="border-b-2 border-double border-slate-900 pb-3 text-center space-y-1">
                       <div className="flex items-center justify-center gap-3 mb-1">
-                        {/* Masjid Dome Emblem */}
                         <div className="w-10 h-10 rounded-full bg-emerald-700 flex items-center justify-center text-white font-black text-sm shrink-0">
-                          🕌
+                          PKK
                         </div>
                         <div>
                           <h1
                             style={{ fontSize: `${fontSizePt + 2}pt` }}
-                            className="font-black tracking-wide text-slate-950 uppercase leading-snug"
+                            className="font-black tracking-tight text-slate-950 uppercase"
                           >
-                            PERTUBUHAN KHAIRAT KEMATIAN DAN KEBAJIKAN KAMPUNG GONG BADAK
+                            PERTUBUHAN KEBAJIKAN KHAIRAT KEMATIAN
                           </h1>
-                          <p
-                            style={{ fontSize: `${fontSizePt - 1.5}pt` }}
-                            className="text-slate-700 font-semibold uppercase tracking-wider"
+                          <h2
+                            style={{ fontSize: `${fontSizePt}pt` }}
+                            className="font-bold text-slate-800 uppercase tracking-widest"
                           >
-                            Kuala Nerus, 21300 Terengganu Darul Iman
-                          </p>
+                            KAMPUNG GONG BADAK, KUALA NERUS, TERENGGANU
+                          </h2>
                         </div>
                       </div>
                       <p
-                        style={{ fontSize: `${fontSizePt - 2.5}pt` }}
-                        className="text-slate-500 italic font-mono"
+                        style={{ fontSize: `${fontSizePt - 2}pt` }}
+                        className="text-slate-600"
                       >
-                        Pendaftaran Pertubuhan (ROS): PPM-024-11-10112024 &bull; E-mel: khairatkematiantpgb@gmail.com
+                        Pendaftaran Pertubuhan (PPM) &bull; Masjid Kampung Gong Badak, 21300 Kuala Nerus, Terengganu
                       </p>
                     </div>
 
-                    {/* Meta: Ref & Date */}
+                    {/* Reference & Date */}
                     <div
                       style={{ fontSize: `${fontSizePt}pt` }}
-                      className="flex justify-between items-start font-medium text-slate-800 pt-1"
+                      className="flex justify-between items-center text-slate-700 pt-1"
                     >
                       <div>
-                        Ruj. Kami: <strong className="font-mono font-bold">{letterConfig.rujukanPrefix}/{currentPreviewRecipient.member.noAhli}</strong>
+                        Ruj. Kami: <strong className="font-mono font-bold">{activePreviewConfig.rujukanPrefix}/{currentPreviewRecipient.member.noAhli}</strong>
                       </div>
                       <div className="text-right">
-                        Tarikh: <strong>{letterConfig.tarikhSurat}</strong>
+                        Tarikh: <strong>{activePreviewConfig.tarikhSurat}</strong>
                       </div>
                     </div>
 
@@ -892,7 +1284,7 @@ export default function SuratPeringatanModal({
                       style={{ fontSize: `${fontSizePt + 0.5}pt` }}
                       className="font-black text-slate-950 uppercase underline leading-snug pt-0.5"
                     >
-                      {letterConfig.tajukSurat}
+                      {activePreviewConfig.tajukSurat}
                     </div>
 
                     {/* Paragraph 1 */}
@@ -900,16 +1292,20 @@ export default function SuratPeringatanModal({
                       style={{ fontSize: `${fontSizePt}pt` }}
                       className="text-justify text-slate-900 leading-relaxed"
                     >
-                      {letterConfig.pembukaan}
+                      {activePreviewConfig.pembukaan}
                     </div>
 
                     {/* Box: Arrears Summary */}
-                    <div className="bg-slate-50 border-2 border-slate-800 rounded-lg p-3.5 space-y-2">
+                    <div className={`border-2 rounded-lg p-3.5 space-y-2 ${
+                      currentPreviewRecipient.category === 'amaran_awal'
+                        ? 'bg-amber-50/40 border-amber-800'
+                        : 'bg-slate-50 border-slate-800'
+                    }`}>
                       <div
                         style={{ fontSize: `${fontSizePt - 1}pt` }}
                         className="font-black uppercase text-slate-900 tracking-wider border-b border-slate-300 pb-1 flex justify-between items-center"
                       >
-                        <span>BUTIRAN TUNGGAKAN YURAN KHAIRAT:</span>
+                        <span>PENYATA BUTIRAN TUNGGAKAN YURAN:</span>
                         <span className="font-mono font-bold text-slate-600">ID: {currentPreviewRecipient.member.noAhli}</span>
                       </div>
                       <div
@@ -926,16 +1322,46 @@ export default function SuratPeringatanModal({
                         <div className="font-bold text-rose-800">{currentPreviewRecipient.arrearsPeriod}</div>
 
                         <div
-                          style={{ fontSize: `${fontSizePt + 1}pt` }}
-                          className="text-slate-900 font-black pt-1 border-t border-slate-200"
+                          style={{ fontSize: `${fontSizePt + 0.5}pt` }}
+                          className="text-slate-900 font-bold pt-1 border-t border-slate-200"
                         >
-                          JUMLAH TUNGGAKAN:
+                          Jumlah Tunggakan Semasa:
                         </div>
                         <div
-                          style={{ fontSize: `${fontSizePt + 2}pt` }}
+                          style={{ fontSize: `${fontSizePt + 1.5}pt` }}
                           className="font-black text-rose-700 font-mono pt-1 border-t border-slate-200"
                         >
                           RM {currentPreviewRecipient.actualDues}.00
+                        </div>
+
+                        {/* Next Month Projected Arrears */}
+                        <div
+                          style={{ fontSize: `${fontSizePt + 0.5}pt` }}
+                          className="text-slate-900 font-bold pt-1 border-t border-slate-200"
+                        >
+                          Anggaran Tunggakan Bulan Seterusnya (+RM{kadarYuran}):
+                        </div>
+                        <div
+                          style={{ fontSize: `${fontSizePt + 1.5}pt` }}
+                          className="font-black text-rose-800 font-mono pt-1 border-t border-slate-200"
+                        >
+                          RM {currentPreviewRecipient.nextMonthDues}.00
+                          <span className="text-[10px] font-sans font-bold text-amber-800 block">
+                            (Bakal Melebihi / Mencecah Had RM36)
+                          </span>
+                        </div>
+
+                        <div className="text-slate-600 pt-1 border-t border-slate-200">Jenis Notis Surat:</div>
+                        <div className="font-bold text-slate-900 pt-1 border-t border-slate-200">
+                          {currentPreviewRecipient.category === 'amaran_awal' ? (
+                            <span className="text-amber-800 uppercase font-black">
+                              Surat Amaran Awal (Sebelum Penggantungan Keahlian)
+                            </span>
+                          ) : (
+                            <span className="text-rose-800 uppercase font-black">
+                              Surat Peringatan Semasa (Tunggakan ≥ RM36)
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -945,30 +1371,32 @@ export default function SuratPeringatanModal({
                       style={{ fontSize: `${fontSizePt}pt` }}
                       className="text-justify text-slate-900 leading-relaxed"
                     >
-                      {letterConfig.arahanBayaran} Bayaran hendaklah diselesaikan dalam tempoh <strong>{letterConfig.tempohHari}</strong> melalui saluran rasmi pertubuhan berikut:
+                      {activePreviewConfig.arahanBayaran} Bayaran hendaklah diselesaikan dalam tempoh <strong>{activePreviewConfig.tempohHari}</strong> melalui saluran rasmi pertubuhan berikut:
                     </div>
 
-                    {/* Banking Details Box */}
-                    <div className="bg-rose-50/50 border border-rose-200 rounded-lg p-3.5 space-y-2.5 font-sans">
+                    {/* Bank Info Box */}
+                    <div className="bg-slate-100 border border-slate-300 rounded-lg p-3 space-y-1.5 text-slate-900">
                       <div
                         style={{ fontSize: `${fontSizePt}pt` }}
-                        className="font-bold text-rose-950 flex items-center gap-1.5"
+                        className="font-black text-slate-950 flex items-center gap-2 uppercase tracking-wide border-b border-slate-300 pb-1"
                       >
-                        <Building2 className="h-4 w-4 text-rose-700" />
-                        <span>Saluran Pindahan Bank (Online / CDM / Kaunter):</span>
+                        <Building2 className="h-4 w-4 text-slate-700" />
+                        <span>Saluran Pembayaran Rasmi Pertubuhan</span>
                       </div>
                       <div
                         style={{ fontSize: `${fontSizePt}pt` }}
-                        className="pl-5 space-y-0.5"
+                        className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1"
                       >
-                        <div>Nama Bank: <strong>{letterConfig.namaBank}</strong></div>
-                        <div>Nombor Akaun: <strong className="font-mono">{letterConfig.noAkaunBank}</strong></div>
-                        <div>Nama Akaun: <strong>{letterConfig.namaPemegangAkaun}</strong></div>
+                        <div>Nama Bank: <strong>{activePreviewConfig.namaBank}</strong></div>
+                        <div>Nama Akaun: <strong>{activePreviewConfig.namaPemegangAkaun}</strong></div>
+                        <div className="sm:col-span-2">
+                          Nombor Akaun: <strong className="font-mono text-slate-950 font-black text-base">{activePreviewConfig.noAkaunBank}</strong>
+                        </div>
                       </div>
 
-                      {/* WhatsApp Online Receipt Notice */}
-                      {letterConfig.maklumanResitOnline && (
-                        <div className="bg-white border border-emerald-300 rounded-lg p-3 text-slate-800 space-y-1.5 shadow-2xs">
+                      {/* Online Receipt Instructions (WhatsApp Bendahari) */}
+                      {activePreviewConfig.maklumanResitOnline && (
+                        <div className="bg-white border border-emerald-300 rounded-lg p-3 text-slate-800 space-y-1.5 shadow-2xs mt-2">
                           <div
                             style={{ fontSize: `${fontSizePt - 1}pt` }}
                             className="font-bold text-emerald-900 flex items-center gap-1.5 uppercase tracking-wide"
@@ -980,35 +1408,39 @@ export default function SuratPeringatanModal({
                             style={{ fontSize: `${fontSizePt}pt` }}
                             className="text-slate-800 whitespace-pre-line leading-relaxed pl-5 font-medium"
                           >
-                            {letterConfig.maklumanResitOnline}
+                            {activePreviewConfig.maklumanResitOnline}
                           </div>
                           <div
                             style={{ fontSize: `${fontSizePt - 1.5}pt` }}
-                            className="text-emerald-700 font-mono pl-5 pt-0.5 border-t border-emerald-100"
+                            className="text-slate-500 font-mono pl-5 pt-1 border-t border-slate-100"
                           >
-                            (Rujukan Contoh Mesej: <strong>{currentPreviewRecipient.member.nama}</strong> &bull; No. Ahli: <strong>{currentPreviewRecipient.member.noAhli}</strong>)
+                            (Sertakan: Nama Ahli: <strong>{currentPreviewRecipient.member.nama}</strong> | No. Ahli: <strong>{currentPreviewRecipient.member.noAhli}</strong>)
                           </div>
                         </div>
                       )}
 
                       <div
                         style={{ fontSize: `${fontSizePt - 0.5}pt` }}
-                        className="text-slate-700 pt-1 border-t border-rose-200/60 italic"
+                        className="text-slate-600 pt-1.5 border-t border-slate-200 italic"
                       >
-                        {letterConfig.maklumanTunai}
+                        {activePreviewConfig.maklumanTunai}
                       </div>
                     </div>
 
-                    {/* Paragraph 3: Warning */}
+                    {/* Paragraph 3: Constitution Warning */}
                     <div
                       style={{ fontSize: `${fontSizePt}pt` }}
-                      className="text-justify text-slate-800 leading-relaxed bg-amber-50/60 border border-amber-200/80 p-2.5 rounded-lg"
+                      className={`text-justify leading-relaxed p-3 rounded-lg border ${
+                        currentPreviewRecipient.category === 'amaran_awal'
+                          ? 'bg-amber-50/70 border-amber-300 text-amber-950'
+                          : 'bg-rose-50/70 border-rose-300 text-rose-950'
+                      }`}
                     >
-                      {letterConfig.peringatanKeahlian}
+                      {activePreviewConfig.peringatanKeahlian}
                     </div>
 
                     {/* Closing & Sign-off */}
-                    <div className="pt-2 space-y-4">
+                    <div className="pt-2 space-y-3">
                       <div
                         style={{ fontSize: `${fontSizePt}pt` }}
                         className="space-y-1"
@@ -1019,7 +1451,7 @@ export default function SuratPeringatanModal({
                         </div>
                       </div>
 
-                      {/* Issuer details from Bendahari */}
+                      {/* Issuer Details */}
                       <div
                         style={{ fontSize: `${fontSizePt}pt` }}
                         className="space-y-0.5"
@@ -1027,32 +1459,32 @@ export default function SuratPeringatanModal({
                         <div>Saya yang menjalankan amanah,</div>
                         <div
                           style={{ fontSize: `${fontSizePt + 1.5}pt` }}
-                          className="pt-3 font-black uppercase text-slate-950 tracking-wider"
+                          className="pt-4 font-black uppercase text-slate-950 tracking-wider"
                         >
-                          {letterConfig.namaBendahari}
+                          {activePreviewConfig.namaBendahari}
                         </div>
                         <div
                           style={{ fontSize: `${fontSizePt + 0.5}pt` }}
                           className="font-bold text-slate-800 uppercase"
                         >
-                          {letterConfig.jawatanPengeluar}
+                          {activePreviewConfig.jawatanPengeluar}
                         </div>
                         <div className="text-slate-600">
                           Pertubuhan Kebajikan Khairat Kematian Kampung Gong Badak
                         </div>
-                        <div className="font-mono text-slate-700 flex items-center gap-1 pt-0.5">
-                          <Phone className="h-3 w-3 text-slate-500" />
-                          <span>H/P: {letterConfig.telBendahari}</span>
+                        <div className="font-mono text-slate-700 flex items-center gap-1.5 pt-0.5">
+                          <Phone className="h-3.5 w-3.5 text-slate-500" />
+                          <span>H/P: {activePreviewConfig.telBendahari}</span>
                         </div>
                       </div>
 
                       {/* Computer Generated Disclaimer */}
-                      <div className="pt-2 border-t border-slate-300 text-center">
+                      <div className="pt-2 border-t border-slate-200 text-center">
                         <p
                           style={{ fontSize: `${fontSizePt - 2}pt` }}
-                          className="text-slate-600 font-mono font-semibold italic bg-slate-100 py-1.5 px-3 rounded border border-slate-200"
+                          className="text-slate-500 font-mono italic"
                         >
-                          *** {letterConfig.notaJanaanKomputer} ***
+                          *** {activePreviewConfig.notaJanaanKomputer} ***
                         </p>
                       </div>
 
@@ -1066,29 +1498,24 @@ export default function SuratPeringatanModal({
           )}
 
           {/* Footer Bar */}
-          <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
-            <div className="text-xs text-slate-500 flex items-center gap-2">
-              <span>Status:</span>
-              <span className="font-bold text-slate-800">
-                {selectedMemberIds.length} daripada {membersWithArrears36.length} ahli dipilih
-              </span>
+          <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3 text-xs shrink-0">
+            <div className="text-slate-500 font-medium">
+              Jumlah penerima terpilih: <strong className="text-slate-800">{recipientsToPrint.length} ahli</strong> ({countAmaranAwal} Amaran Awal, {countSemasa} Semasa)
             </div>
-
             <div className="flex items-center gap-2">
               <button
                 onClick={onClose}
-                className="px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 rounded-xl text-xs font-bold transition cursor-pointer"
+                className="px-4 py-2 bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 rounded-xl font-bold transition cursor-pointer"
               >
                 Tutup
               </button>
-
               <button
-                disabled={selectedMemberIds.length === 0}
                 onClick={() => triggerPrintBatch()}
-                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black transition cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
+                disabled={recipientsToPrint.length === 0}
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black transition cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
               >
                 <Printer className="h-4 w-4" />
-                <span>Cetak / Simpan PDF ({recipientsToPrint.length} Surat)</span>
+                <span>Cetak Semua ({recipientsToPrint.length})</span>
               </button>
             </div>
           </div>
@@ -1096,154 +1523,95 @@ export default function SuratPeringatanModal({
         </div>
       </div>
 
-      {/* 2. PRINTABLE OUTLET PORTAL (Used when user clicks Cetak / Simpan PDF) */}
+      {/* 2. PRINT PORTAL (FOR REAL A4 BATCH PRINTING) */}
       {isPrintingPortal && createPortal(
-        <div id="surat-peringatan-print-outlet" className="fixed inset-0 bg-white z-[99999] overflow-y-auto p-6 font-sans text-slate-900 print:p-0 print:m-0 print:overflow-visible print:relative print:inset-auto">
-          
-          <style>{`
-            @page {
-              size: portrait;
-              margin: 12mm 15mm 12mm 15mm;
-            }
-            @media print {
-              body {
-                background: white !important;
-                color: black !important;
-              }
-              .surat-page-item {
-                page-break-after: always !important;
-                break-after: page !important;
-                height: auto !important;
-                min-height: 100vh !important;
-                display: flex !important;
-                flex-direction: column !important;
-                justify-content: space-between !important;
-                padding-bottom: 20px !important;
-              }
-              .surat-page-item:last-child {
-                page-break-after: avoid !important;
-                break-after: avoid !important;
-              }
-              .print-hide {
-                display: none !important;
-              }
-            }
-          `}</style>
-
-          {/* Ribbon Controls (Hidden during print) */}
-          <div className="mb-6 p-4 bg-amber-50 border border-amber-300 rounded-xl flex flex-wrap items-center justify-between gap-4 max-w-4xl mx-auto print:hidden shadow-md">
-            <div className="flex items-center gap-3">
-              <Mail className="h-5 w-5 text-rose-600 shrink-0" />
-              <div>
-                <h3 className="text-xs font-black text-amber-950 uppercase tracking-wide">
-                  Pratonton Cetakan Surat Peringatan ({recipientsToPrint.length} Surat)
-                </h3>
-                <p className="text-[11px] text-amber-800">
-                  Surat rasmi janaan komputer sedia dicetak atau disimpan sebagai fail PDF.
-                </p>
-              </div>
-            </div>
-
-            {/* Font Size Adjustment */}
-            <div className="flex items-center gap-1.5 bg-white border border-amber-300 rounded-lg px-2.5 py-1 text-xs shadow-2xs">
-              <Type className="h-3.5 w-3.5 text-amber-800" />
-              <span className="font-bold text-amber-950">Saiz Tulisan Surat:</span>
-              <button
-                type="button"
-                onClick={() => setFontSizePt((prev) => Math.max(10, prev - 1))}
-                className="w-6 h-6 rounded bg-amber-100 hover:bg-amber-200 text-amber-950 font-black flex items-center justify-center cursor-pointer transition"
-                title="Kecilkan Saiz Tulisan"
-              >
-                -
-              </button>
-              <span className="font-mono font-black text-rose-700 px-1 text-xs min-w-[34px] text-center">
-                {fontSizePt} pt
+        <div className="fixed inset-0 z-99999 bg-white text-black p-0 overflow-y-auto">
+          {/* Top Bar for Print Screen */}
+          <div className="p-4 bg-slate-900 text-white flex items-center justify-between print:hidden sticky top-0 z-50 shadow-md">
+            <div className="flex items-center gap-2">
+              <Printer className="h-5 w-5 text-rose-400" />
+              <span className="font-bold text-sm">
+                Sedia Untuk Cetak: {recipientsToPrint.length} Salinan Surat Peringatan / Amaran Awal (Piawai Font 12)
               </span>
-              <button
-                type="button"
-                onClick={() => setFontSizePt((prev) => Math.min(15, prev + 1))}
-                className="w-6 h-6 rounded bg-amber-100 hover:bg-amber-200 text-amber-950 font-black flex items-center justify-center cursor-pointer transition"
-                title="Besarkan Saiz Tulisan"
-              >
-                +
-              </button>
-              {fontSizePt === 12 && (
-                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded ml-1">
-                  Font 12
-                </span>
-              )}
             </div>
-
             <div className="flex items-center gap-2">
               <button
-                onClick={() => {
-                  try {
-                    window.print();
-                  } catch (e) {
-                    console.error('Print trigger failed', e);
-                  }
-                }}
-                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+                onClick={() => window.print()}
+                className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-sm"
               >
                 <Printer className="h-4 w-4" />
-                <span>Cetak Sekarang / Simpan PDF</span>
+                <span>Buka Dialog Cetakan (Ctrl + P)</span>
               </button>
               <button
                 onClick={() => setIsPrintingPortal(false)}
-                className="px-4 py-2 bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 rounded-lg text-xs font-bold transition cursor-pointer"
+                className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-lg transition cursor-pointer"
               >
-                Tutup Pratonton
+                Kembali
               </button>
             </div>
           </div>
 
-          {/* Multiple Printable Pages */}
-          <div className="max-w-3xl mx-auto space-y-12 print:space-y-0">
-            {recipientsToPrint.map((item, index) => {
+          {/* Individual Print Letters with CSS Page Break */}
+          <div className="space-y-8 print:space-y-0">
+            {recipientsToPrint.map((item, idx) => {
               const m = item.member;
+              const cfg = getLetterConfigForRecipient(item);
+
               return (
                 <div
                   key={m.noAhli}
-                  className="surat-page-item bg-white p-8 sm:p-12 border border-slate-200 shadow-lg rounded-sm print:border-none print:shadow-none print:p-0 space-y-4 font-sans leading-relaxed select-text"
-                  style={{ fontSize: `${fontSizePt}pt`, lineHeight: 1.5 }}
+                  className="bg-white text-slate-900 p-8 sm:p-12 mx-auto max-w-3xl space-y-4 print:p-0 print:m-0 print:max-w-none print:w-full select-text"
+                  style={{
+                    fontSize: `${fontSizePt}pt`,
+                    lineHeight: 1.5,
+                    pageBreakAfter: idx === recipientsToPrint.length - 1 ? 'auto' : 'always',
+                    breakAfter: idx === recipientsToPrint.length - 1 ? 'auto' : 'page'
+                  }}
                 >
                   
-                  {/* Official Header */}
+                  {/* Official Letterhead */}
                   <div className="border-b-2 border-double border-slate-900 pb-3 text-center space-y-1">
-                    <h1
-                      style={{ fontSize: `${fontSizePt + 2}pt` }}
-                      className="font-black tracking-wide text-slate-950 uppercase leading-snug"
-                    >
-                      PERTUBUHAN KHAIRAT KEMATIAN DAN KEBAJIKAN KAMPUNG GONG BADAK
-                    </h1>
+                    <div className="flex items-center justify-center gap-3 mb-1">
+                      <div className="w-10 h-10 rounded-full bg-emerald-700 flex items-center justify-center text-white font-black text-sm shrink-0">
+                        PKK
+                      </div>
+                      <div>
+                        <h1
+                          style={{ fontSize: `${fontSizePt + 2}pt` }}
+                          className="font-black tracking-tight text-slate-950 uppercase"
+                        >
+                          PERTUBUHAN KEBAJIKAN KHAIRAT KEMATIAN
+                        </h1>
+                        <h2
+                          style={{ fontSize: `${fontSizePt}pt` }}
+                          className="font-bold text-slate-800 uppercase tracking-widest"
+                        >
+                          KAMPUNG GONG BADAK, KUALA NERUS, TERENGGANU
+                        </h2>
+                      </div>
+                    </div>
                     <p
-                      style={{ fontSize: `${fontSizePt - 1.5}pt` }}
-                      className="text-slate-700 font-semibold uppercase tracking-wider"
+                      style={{ fontSize: `${fontSizePt - 2}pt` }}
+                      className="text-slate-600"
                     >
-                      Kuala Nerus, 21300 Terengganu Darul Iman
-                    </p>
-                    <p
-                      style={{ fontSize: `${fontSizePt - 2.5}pt` }}
-                      className="text-slate-500 italic font-mono"
-                    >
-                      Pendaftaran Pertubuhan (ROS): PPM-024-11-10112024 &bull; E-mel: khairatkematiantpgb@gmail.com
+                      Pendaftaran Pertubuhan (PPM) &bull; Masjid Kampung Gong Badak, 21300 Kuala Nerus, Terengganu
                     </p>
                   </div>
 
-                  {/* Ref & Date */}
+                  {/* Reference & Date */}
                   <div
                     style={{ fontSize: `${fontSizePt}pt` }}
-                    className="flex justify-between items-start font-medium text-slate-800 pt-1"
+                    className="flex justify-between items-center text-slate-700 pt-1"
                   >
                     <div>
-                      Ruj. Kami: <strong className="font-mono font-bold">{letterConfig.rujukanPrefix}/{m.noAhli}</strong>
+                      Ruj. Kami: <strong className="font-mono font-bold">{cfg.rujukanPrefix}/{m.noAhli}</strong>
                     </div>
                     <div className="text-right">
-                      Tarikh: <strong>{letterConfig.tarikhSurat}</strong>
+                      Tarikh: <strong>{cfg.tarikhSurat}</strong>
                     </div>
                   </div>
 
-                  {/* Recipient Box */}
+                  {/* Recipient Address */}
                   <div
                     style={{ fontSize: `${fontSizePt}pt` }}
                     className="space-y-0.5 pt-1"
@@ -1275,9 +1643,9 @@ export default function SuratPeringatanModal({
                   {/* Subject */}
                   <div
                     style={{ fontSize: `${fontSizePt + 0.5}pt` }}
-                    className="font-black text-slate-950 uppercase underline leading-snug"
+                    className="font-black text-slate-950 uppercase underline leading-snug pt-0.5"
                   >
-                    {letterConfig.tajukSurat}
+                    {cfg.tajukSurat}
                   </div>
 
                   {/* Paragraph 1 */}
@@ -1285,17 +1653,21 @@ export default function SuratPeringatanModal({
                     style={{ fontSize: `${fontSizePt}pt` }}
                     className="text-justify text-slate-900 leading-relaxed"
                   >
-                    {letterConfig.pembukaan}
+                    {cfg.pembukaan}
                   </div>
 
-                  {/* Arrears Summary Box */}
-                  <div className="bg-slate-50 border-2 border-slate-900 rounded-md p-3.5 space-y-2">
+                  {/* Box: Arrears Summary */}
+                  <div className={`border-2 rounded-lg p-3.5 space-y-2 ${
+                    item.category === 'amaran_awal'
+                      ? 'bg-amber-50/40 border-amber-800'
+                      : 'bg-slate-50 border-slate-800'
+                  }`}>
                     <div
                       style={{ fontSize: `${fontSizePt - 1}pt` }}
                       className="font-black uppercase text-slate-900 tracking-wider border-b border-slate-300 pb-1 flex justify-between items-center"
                     >
-                      <span>PENYATA TUNGGAKAN YURAN KHAIRAT:</span>
-                      <span className="font-mono font-bold text-slate-700">NO. AHLI: {m.noAhli}</span>
+                      <span>PENYATA BUTIRAN TUNGGAKAN YURAN:</span>
+                      <span className="font-mono font-bold text-slate-600">ID: {m.noAhli}</span>
                     </div>
                     <div
                       style={{ fontSize: `${fontSizePt}pt` }}
@@ -1304,23 +1676,52 @@ export default function SuratPeringatanModal({
                       <div className="text-slate-600">Nama Pencarum:</div>
                       <div className="font-bold text-slate-900 uppercase">{m.nama}</div>
 
-                      <div className="text-slate-600">Status Bayaran Terakhir:</div>
+                      <div className="text-slate-600">Status Pembayaran Terakhir:</div>
                       <div className="font-bold text-slate-900 font-mono">Lunas Sehingga {item.latestPaid}</div>
 
                       <div className="text-slate-600">Tempoh / Bulan Tertunggak:</div>
                       <div className="font-bold text-rose-800">{item.arrearsPeriod}</div>
 
                       <div
-                        style={{ fontSize: `${fontSizePt + 1}pt` }}
-                        className="text-slate-900 font-black pt-1 border-t border-slate-300"
+                        style={{ fontSize: `${fontSizePt + 0.5}pt` }}
+                        className="text-slate-900 font-bold pt-1 border-t border-slate-200"
                       >
-                        JUMLAH TUNGGAKAN PERLU DIJELASKAN:
+                        Jumlah Tunggakan Semasa:
                       </div>
                       <div
-                        style={{ fontSize: `${fontSizePt + 2}pt` }}
-                        className="font-black text-rose-800 font-mono pt-1 border-t border-slate-300"
+                        style={{ fontSize: `${fontSizePt + 1.5}pt` }}
+                        className="font-black text-rose-700 font-mono pt-1 border-t border-slate-200"
                       >
                         RM {item.actualDues}.00
+                      </div>
+
+                      <div
+                        style={{ fontSize: `${fontSizePt + 0.5}pt` }}
+                        className="text-slate-900 font-bold pt-1 border-t border-slate-200"
+                      >
+                        Anggaran Tunggakan Bulan Seterusnya (+RM{kadarYuran}):
+                      </div>
+                      <div
+                        style={{ fontSize: `${fontSizePt + 1.5}pt` }}
+                        className="font-black text-rose-800 font-mono pt-1 border-t border-slate-200"
+                      >
+                        RM {item.nextMonthDues}.00
+                        <span className="text-[10px] font-sans font-bold text-amber-800 block">
+                          (Bakal Melebihi / Mencecah Had RM36)
+                        </span>
+                      </div>
+
+                      <div className="text-slate-600 pt-1 border-t border-slate-200">Jenis Notis Surat:</div>
+                      <div className="font-bold text-slate-900 pt-1 border-t border-slate-200">
+                        {item.category === 'amaran_awal' ? (
+                          <span className="text-amber-800 uppercase font-black">
+                            Surat Amaran Awal (Sebelum Penggantungan Keahlian)
+                          </span>
+                        ) : (
+                          <span className="text-rose-800 uppercase font-black">
+                            Surat Peringatan Semasa (Tunggakan ≥ RM36)
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1330,30 +1731,32 @@ export default function SuratPeringatanModal({
                     style={{ fontSize: `${fontSizePt}pt` }}
                     className="text-justify text-slate-900 leading-relaxed"
                   >
-                    {letterConfig.arahanBayaran} Bayaran hendaklah dibuat dalam tempoh <strong>{letterConfig.tempohHari}</strong> melalui saluran rasmi pertubuhan berikut:
+                    {cfg.arahanBayaran} Bayaran hendaklah diselesaikan dalam tempoh <strong>{cfg.tempohHari}</strong> melalui saluran rasmi pertubuhan berikut:
                   </div>
 
-                  {/* Banking Details Box */}
-                  <div className="bg-slate-50 border border-slate-300 rounded-md p-3 space-y-2 font-sans">
+                  {/* Bank Info Box */}
+                  <div className="bg-slate-100 border border-slate-300 rounded-lg p-3 space-y-1.5 text-slate-900">
                     <div
                       style={{ fontSize: `${fontSizePt}pt` }}
-                      className="font-bold text-slate-950 flex items-center gap-1.5"
+                      className="font-black text-slate-950 flex items-center gap-2 uppercase tracking-wide border-b border-slate-300 pb-1"
                     >
                       <Building2 className="h-4 w-4 text-slate-700" />
-                      <span>Saluran Pindahan Akaun Bank Pertubuhan:</span>
+                      <span>Saluran Pembayaran Rasmi Pertubuhan</span>
                     </div>
                     <div
                       style={{ fontSize: `${fontSizePt}pt` }}
-                      className="pl-5 space-y-0.5"
+                      className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1"
                     >
-                      <div>Nama Bank: <strong>{letterConfig.namaBank}</strong></div>
-                      <div>Nombor Akaun: <strong className="font-mono">{letterConfig.noAkaunBank}</strong></div>
-                      <div>Nama Akaun: <strong>{letterConfig.namaPemegangAkaun}</strong></div>
+                      <div>Nama Bank: <strong>{cfg.namaBank}</strong></div>
+                      <div>Nama Akaun: <strong>{cfg.namaPemegangAkaun}</strong></div>
+                      <div className="sm:col-span-2">
+                        Nombor Akaun: <strong className="font-mono text-slate-950 font-black text-base">{cfg.noAkaunBank}</strong>
+                      </div>
                     </div>
 
                     {/* WhatsApp Online Receipt Notice for Print */}
-                    {letterConfig.maklumanResitOnline && (
-                      <div className="bg-white border border-slate-400 rounded p-2 text-slate-900 space-y-1">
+                    {cfg.maklumanResitOnline && (
+                      <div className="bg-white border border-slate-400 rounded p-2 text-slate-900 space-y-1 mt-2">
                         <div
                           style={{ fontSize: `${fontSizePt - 1}pt` }}
                           className="font-bold text-slate-950 uppercase tracking-wide"
@@ -1364,7 +1767,7 @@ export default function SuratPeringatanModal({
                           style={{ fontSize: `${fontSizePt}pt` }}
                           className="whitespace-pre-line leading-relaxed pl-2 font-medium"
                         >
-                          {letterConfig.maklumanResitOnline}
+                          {cfg.maklumanResitOnline}
                         </div>
                         <div
                           style={{ fontSize: `${fontSizePt - 1.5}pt` }}
@@ -1379,16 +1782,20 @@ export default function SuratPeringatanModal({
                       style={{ fontSize: `${fontSizePt - 0.5}pt` }}
                       className="text-slate-700 pt-1 border-t border-slate-200 italic"
                     >
-                      {letterConfig.maklumanTunai}
+                      {cfg.maklumanTunai}
                     </div>
                   </div>
 
                   {/* Paragraph 3: Warning */}
                   <div
                     style={{ fontSize: `${fontSizePt}pt` }}
-                    className="text-justify text-slate-800 leading-relaxed bg-amber-50 border border-amber-200 p-2.5 rounded-md"
+                    className={`text-justify leading-relaxed p-2.5 rounded-md border ${
+                      item.category === 'amaran_awal'
+                        ? 'bg-amber-50 border-amber-300 text-amber-950'
+                        : 'bg-rose-50 border-rose-300 text-rose-950'
+                    }`}
                   >
-                    {letterConfig.peringatanKeahlian}
+                    {cfg.peringatanKeahlian}
                   </div>
 
                   {/* Closing & Sign-off */}
@@ -1413,20 +1820,20 @@ export default function SuratPeringatanModal({
                         style={{ fontSize: `${fontSizePt + 1.5}pt` }}
                         className="pt-3 font-black uppercase text-slate-950 tracking-wider"
                       >
-                        {letterConfig.namaBendahari}
+                        {cfg.namaBendahari}
                       </div>
                       <div
                         style={{ fontSize: `${fontSizePt + 0.5}pt` }}
                         className="font-bold text-slate-800 uppercase"
                       >
-                        {letterConfig.jawatanPengeluar}
+                        {cfg.jawatanPengeluar}
                       </div>
                       <div className="text-slate-600">
                         Pertubuhan Kebajikan Khairat Kematian Kampung Gong Badak
                       </div>
                       <div className="font-mono text-slate-700 flex items-center gap-1 pt-0.5">
                         <Phone className="h-3 w-3 text-slate-500" />
-                        <span>H/P: {letterConfig.telBendahari}</span>
+                        <span>H/P: {cfg.telBendahari}</span>
                       </div>
                     </div>
 
@@ -1436,7 +1843,7 @@ export default function SuratPeringatanModal({
                         style={{ fontSize: `${fontSizePt - 2}pt` }}
                         className="text-slate-600 font-mono font-semibold italic bg-slate-100 py-1.5 px-3 rounded border border-slate-200"
                       >
-                        *** {letterConfig.notaJanaanKomputer} ***
+                        *** {cfg.notaJanaanKomputer} ***
                       </p>
                     </div>
 
