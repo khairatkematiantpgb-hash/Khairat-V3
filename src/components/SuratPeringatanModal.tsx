@@ -23,7 +23,8 @@ import {
   Search,
   CheckCircle2,
   FileCheck,
-  MessageSquare
+  MessageSquare,
+  Type
 } from 'lucide-react';
 
 interface SuratPeringatanModalProps {
@@ -185,6 +186,9 @@ export default function SuratPeringatanModal({
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>(() => {
     return membersWithArrears36.map((item) => item.member.noAhli);
   });
+
+  // Font size state (Standard Font 12 for official warning letters)
+  const [fontSizePt, setFontSizePt] = useState<number>(12);
 
   // Filtered members in modal search
   const filteredModalMembers = useMemo(() => {
@@ -743,6 +747,36 @@ export default function SuratPeringatanModal({
                   </select>
                 </div>
 
+                {/* Font Size Adjustment */}
+                <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs shadow-2xs">
+                  <Type className="h-3.5 w-3.5 text-slate-500" />
+                  <span className="font-bold text-slate-700">Saiz Tulisan Surat:</span>
+                  <button
+                    type="button"
+                    onClick={() => setFontSizePt((prev) => Math.max(10, prev - 1))}
+                    className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 text-slate-800 font-black flex items-center justify-center cursor-pointer transition"
+                    title="Kecilkan Saiz Tulisan"
+                  >
+                    -
+                  </button>
+                  <span className="font-mono font-black text-rose-700 px-1 text-xs min-w-[34px] text-center">
+                    {fontSizePt} pt
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setFontSizePt((prev) => Math.min(15, prev + 1))}
+                    className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 text-slate-800 font-black flex items-center justify-center cursor-pointer transition"
+                    title="Besarkan Saiz Tulisan"
+                  >
+                    +
+                  </button>
+                  {fontSizePt === 12 && (
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded ml-1">
+                      Font 12
+                    </span>
+                  )}
+                </div>
+
                 <div className="flex items-center gap-2">
                   {printSingleMember && (
                     <button
@@ -774,31 +808,46 @@ export default function SuratPeringatanModal({
               {/* Single Letter Layout Preview (A4 Paper emulation) */}
               {currentPreviewRecipient && (
                 <div className="bg-slate-200/60 p-4 sm:p-8 rounded-2xl flex justify-center overflow-x-auto">
-                  <div className="bg-white text-slate-900 p-8 sm:p-12 shadow-xl border border-slate-300 rounded-sm w-full max-w-3xl space-y-6 text-xs sm:text-[13px] leading-relaxed font-sans select-text">
+                  <div
+                    className="bg-white text-slate-900 p-8 sm:p-11 shadow-xl border border-slate-300 rounded-sm w-full max-w-3xl space-y-4 font-sans select-text"
+                    style={{ fontSize: `${fontSizePt}pt`, lineHeight: 1.5 }}
+                  >
                     
                     {/* Official Letterhead */}
-                    <div className="border-b-2 border-double border-slate-900 pb-4 text-center space-y-1">
+                    <div className="border-b-2 border-double border-slate-900 pb-3 text-center space-y-1">
                       <div className="flex items-center justify-center gap-3 mb-1">
                         {/* Masjid Dome Emblem */}
-                        <div className="w-10 h-10 rounded-full bg-emerald-700 flex items-center justify-center text-white font-black text-sm">
+                        <div className="w-10 h-10 rounded-full bg-emerald-700 flex items-center justify-center text-white font-black text-sm shrink-0">
                           🕌
                         </div>
                         <div>
-                          <h1 className="text-sm sm:text-base font-black tracking-wide text-slate-950 uppercase leading-snug">
+                          <h1
+                            style={{ fontSize: `${fontSizePt + 2}pt` }}
+                            className="font-black tracking-wide text-slate-950 uppercase leading-snug"
+                          >
                             PERTUBUHAN KHAIRAT KEMATIAN DAN KEBAJIKAN KAMPUNG GONG BADAK
                           </h1>
-                          <p className="text-[10px] text-slate-700 font-semibold uppercase tracking-wider">
+                          <p
+                            style={{ fontSize: `${fontSizePt - 1.5}pt` }}
+                            className="text-slate-700 font-semibold uppercase tracking-wider"
+                          >
                             Kuala Nerus, 21300 Terengganu Darul Iman
                           </p>
                         </div>
                       </div>
-                      <p className="text-[9px] text-slate-500 italic font-mono">
+                      <p
+                        style={{ fontSize: `${fontSizePt - 2.5}pt` }}
+                        className="text-slate-500 italic font-mono"
+                      >
                         Pendaftaran Pertubuhan (ROS): PPM-024-11-10112024 &bull; E-mel: khairatkematiantpgb@gmail.com
                       </p>
                     </div>
 
                     {/* Meta: Ref & Date */}
-                    <div className="flex justify-between items-start text-xs font-medium text-slate-800 pt-1">
+                    <div
+                      style={{ fontSize: `${fontSizePt}pt` }}
+                      className="flex justify-between items-start font-medium text-slate-800 pt-1"
+                    >
                       <div>
                         Ruj. Kami: <strong className="font-mono font-bold">{letterConfig.rujukanPrefix}/{currentPreviewRecipient.member.noAhli}</strong>
                       </div>
@@ -808,9 +857,15 @@ export default function SuratPeringatanModal({
                     </div>
 
                     {/* Recipient Address */}
-                    <div className="space-y-0.5 pt-2 text-xs">
+                    <div
+                      style={{ fontSize: `${fontSizePt}pt` }}
+                      className="space-y-0.5 pt-1"
+                    >
                       <div>Kepada:</div>
-                      <div className="font-black text-slate-950 uppercase text-sm">
+                      <div
+                        style={{ fontSize: `${fontSizePt + 1.5}pt` }}
+                        className="font-black text-slate-950 uppercase tracking-wide"
+                      >
                         {currentPreviewRecipient.member.nama}
                       </div>
                       <div className="font-mono text-slate-700">
@@ -825,27 +880,42 @@ export default function SuratPeringatanModal({
                     </div>
 
                     {/* Salutation */}
-                    <div className="pt-2 font-semibold">
+                    <div
+                      style={{ fontSize: `${fontSizePt}pt` }}
+                      className="pt-1 font-semibold"
+                    >
                       Tuan / Puan,
                     </div>
 
                     {/* Subject */}
-                    <div className="font-black text-slate-950 uppercase text-xs sm:text-[13px] underline leading-snug pt-1">
+                    <div
+                      style={{ fontSize: `${fontSizePt + 0.5}pt` }}
+                      className="font-black text-slate-950 uppercase underline leading-snug pt-0.5"
+                    >
                       {letterConfig.tajukSurat}
                     </div>
 
                     {/* Paragraph 1 */}
-                    <div className="text-justify text-slate-900 leading-relaxed pt-1">
+                    <div
+                      style={{ fontSize: `${fontSizePt}pt` }}
+                      className="text-justify text-slate-900 leading-relaxed"
+                    >
                       {letterConfig.pembukaan}
                     </div>
 
                     {/* Box: Arrears Summary */}
-                    <div className="bg-slate-50 border-2 border-slate-800 rounded-lg p-4 space-y-2">
-                      <div className="text-[11px] font-black uppercase text-slate-900 tracking-wider border-b border-slate-300 pb-1 flex justify-between items-center">
+                    <div className="bg-slate-50 border-2 border-slate-800 rounded-lg p-3.5 space-y-2">
+                      <div
+                        style={{ fontSize: `${fontSizePt - 1}pt` }}
+                        className="font-black uppercase text-slate-900 tracking-wider border-b border-slate-300 pb-1 flex justify-between items-center"
+                      >
                         <span>BUTIRAN TUNGGAKAN YURAN KHAIRAT:</span>
                         <span className="font-mono font-bold text-slate-600">ID: {currentPreviewRecipient.member.noAhli}</span>
                       </div>
-                      <div className="grid grid-cols-2 gap-y-1.5 text-xs">
+                      <div
+                        style={{ fontSize: `${fontSizePt}pt` }}
+                        className="grid grid-cols-2 gap-y-1.5"
+                      >
                         <div className="text-slate-600">Nama Pencarum:</div>
                         <div className="font-bold text-slate-900 uppercase">{currentPreviewRecipient.member.nama}</div>
 
@@ -855,88 +925,133 @@ export default function SuratPeringatanModal({
                         <div className="text-slate-600">Tempoh / Bulan Tertunggak:</div>
                         <div className="font-bold text-rose-800">{currentPreviewRecipient.arrearsPeriod}</div>
 
-                        <div className="text-slate-900 font-black text-xs sm:text-sm pt-1 border-t border-slate-200">
+                        <div
+                          style={{ fontSize: `${fontSizePt + 1}pt` }}
+                          className="text-slate-900 font-black pt-1 border-t border-slate-200"
+                        >
                           JUMLAH TUNGGAKAN:
                         </div>
-                        <div className="font-black text-rose-700 text-sm sm:text-base font-mono pt-1 border-t border-slate-200">
+                        <div
+                          style={{ fontSize: `${fontSizePt + 2}pt` }}
+                          className="font-black text-rose-700 font-mono pt-1 border-t border-slate-200"
+                        >
                           RM {currentPreviewRecipient.actualDues}.00
                         </div>
                       </div>
                     </div>
 
                     {/* Paragraph 2: Instructions */}
-                    <div className="text-justify text-slate-900 leading-relaxed">
+                    <div
+                      style={{ fontSize: `${fontSizePt}pt` }}
+                      className="text-justify text-slate-900 leading-relaxed"
+                    >
                       {letterConfig.arahanBayaran} Bayaran hendaklah diselesaikan dalam tempoh <strong>{letterConfig.tempohHari}</strong> melalui saluran rasmi pertubuhan berikut:
                     </div>
 
                     {/* Banking Details Box */}
-                    <div className="bg-rose-50/50 border border-rose-200 rounded-lg p-3.5 text-xs space-y-2.5 font-sans">
-                      <div className="font-bold text-rose-950 flex items-center gap-1.5">
+                    <div className="bg-rose-50/50 border border-rose-200 rounded-lg p-3.5 space-y-2.5 font-sans">
+                      <div
+                        style={{ fontSize: `${fontSizePt}pt` }}
+                        className="font-bold text-rose-950 flex items-center gap-1.5"
+                      >
                         <Building2 className="h-4 w-4 text-rose-700" />
                         <span>Saluran Pindahan Bank (Online / CDM / Kaunter):</span>
                       </div>
-                      <div className="pl-5 space-y-0.5 text-[11px]">
+                      <div
+                        style={{ fontSize: `${fontSizePt}pt` }}
+                        className="pl-5 space-y-0.5"
+                      >
                         <div>Nama Bank: <strong>{letterConfig.namaBank}</strong></div>
-                        <div>Nombor Akaun: <strong className="font-mono text-xs">{letterConfig.noAkaunBank}</strong></div>
+                        <div>Nombor Akaun: <strong className="font-mono">{letterConfig.noAkaunBank}</strong></div>
                         <div>Nama Akaun: <strong>{letterConfig.namaPemegangAkaun}</strong></div>
                       </div>
 
                       {/* WhatsApp Online Receipt Notice */}
                       {letterConfig.maklumanResitOnline && (
-                        <div className="bg-white border border-emerald-300 rounded-lg p-3 text-[11px] text-slate-800 space-y-1.5 shadow-2xs">
-                          <div className="font-bold text-emerald-900 flex items-center gap-1.5 uppercase text-[10.5px] tracking-wide">
+                        <div className="bg-white border border-emerald-300 rounded-lg p-3 text-slate-800 space-y-1.5 shadow-2xs">
+                          <div
+                            style={{ fontSize: `${fontSizePt - 1}pt` }}
+                            className="font-bold text-emerald-900 flex items-center gap-1.5 uppercase tracking-wide"
+                          >
                             <MessageSquare className="h-3.5 w-3.5 text-emerald-600" />
                             <span>Penghantaran Bukti / Resit Bayaran Atas Talian (Transfer):</span>
                           </div>
-                          <div className="text-slate-800 whitespace-pre-line leading-relaxed pl-5 font-medium">
+                          <div
+                            style={{ fontSize: `${fontSizePt}pt` }}
+                            className="text-slate-800 whitespace-pre-line leading-relaxed pl-5 font-medium"
+                          >
                             {letterConfig.maklumanResitOnline}
                           </div>
-                          <div className="text-[10px] text-emerald-700 font-mono pl-5 pt-0.5 border-t border-emerald-100">
+                          <div
+                            style={{ fontSize: `${fontSizePt - 1.5}pt` }}
+                            className="text-emerald-700 font-mono pl-5 pt-0.5 border-t border-emerald-100"
+                          >
                             (Rujukan Contoh Mesej: <strong>{currentPreviewRecipient.member.nama}</strong> &bull; No. Ahli: <strong>{currentPreviewRecipient.member.noAhli}</strong>)
                           </div>
                         </div>
                       )}
 
-                      <div className="text-[11px] text-slate-700 pt-1 border-t border-rose-200/60 italic">
+                      <div
+                        style={{ fontSize: `${fontSizePt - 0.5}pt` }}
+                        className="text-slate-700 pt-1 border-t border-rose-200/60 italic"
+                      >
                         {letterConfig.maklumanTunai}
                       </div>
                     </div>
 
                     {/* Paragraph 3: Warning */}
-                    <div className="text-justify text-slate-800 text-[11px] leading-relaxed bg-amber-50/60 border border-amber-200/80 p-2.5 rounded-lg">
+                    <div
+                      style={{ fontSize: `${fontSizePt}pt` }}
+                      className="text-justify text-slate-800 leading-relaxed bg-amber-50/60 border border-amber-200/80 p-2.5 rounded-lg"
+                    >
                       {letterConfig.peringatanKeahlian}
                     </div>
 
                     {/* Closing & Sign-off */}
-                    <div className="pt-4 space-y-6">
-                      <div className="space-y-1">
+                    <div className="pt-2 space-y-4">
+                      <div
+                        style={{ fontSize: `${fontSizePt}pt` }}
+                        className="space-y-1"
+                      >
                         <div>Sekian, terima kasih.</div>
-                        <div className="font-bold text-slate-950 tracking-wide mt-2">
+                        <div className="font-bold text-slate-950 tracking-wide mt-1">
                           &quot;BERKHIDMAT UNTUK KARIAH&quot;
                         </div>
                       </div>
 
                       {/* Issuer details from Bendahari */}
-                      <div className="space-y-1">
+                      <div
+                        style={{ fontSize: `${fontSizePt}pt` }}
+                        className="space-y-0.5"
+                      >
                         <div>Saya yang menjalankan amanah,</div>
-                        <div className="pt-4 font-black uppercase text-slate-950 tracking-wider text-sm">
+                        <div
+                          style={{ fontSize: `${fontSizePt + 1.5}pt` }}
+                          className="pt-3 font-black uppercase text-slate-950 tracking-wider"
+                        >
                           {letterConfig.namaBendahari}
                         </div>
-                        <div className="text-xs font-bold text-slate-800 uppercase">
+                        <div
+                          style={{ fontSize: `${fontSizePt + 0.5}pt` }}
+                          className="font-bold text-slate-800 uppercase"
+                        >
                           {letterConfig.jawatanPengeluar}
                         </div>
-                        <div className="text-xs text-slate-600">
+                        <div className="text-slate-600">
                           Pertubuhan Kebajikan Khairat Kematian Kampung Gong Badak
                         </div>
-                        <div className="text-xs font-mono text-slate-700 flex items-center gap-1 pt-0.5">
+                        <div className="font-mono text-slate-700 flex items-center gap-1 pt-0.5">
                           <Phone className="h-3 w-3 text-slate-500" />
                           <span>H/P: {letterConfig.telBendahari}</span>
                         </div>
                       </div>
 
                       {/* Computer Generated Disclaimer */}
-                      <div className="pt-4 border-t border-slate-300 text-center">
-                        <p className="text-[10px] text-slate-600 font-mono font-semibold italic bg-slate-100 py-1.5 px-3 rounded border border-slate-200">
+                      <div className="pt-2 border-t border-slate-300 text-center">
+                        <p
+                          style={{ fontSize: `${fontSizePt - 2}pt` }}
+                          className="text-slate-600 font-mono font-semibold italic bg-slate-100 py-1.5 px-3 rounded border border-slate-200"
+                        >
                           *** {letterConfig.notaJanaanKomputer} ***
                         </p>
                       </div>
@@ -1016,7 +1131,7 @@ export default function SuratPeringatanModal({
           `}</style>
 
           {/* Ribbon Controls (Hidden during print) */}
-          <div className="mb-6 p-4 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between gap-4 max-w-4xl mx-auto print:hidden shadow-md">
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-300 rounded-xl flex flex-wrap items-center justify-between gap-4 max-w-4xl mx-auto print:hidden shadow-md">
             <div className="flex items-center gap-3">
               <Mail className="h-5 w-5 text-rose-600 shrink-0" />
               <div>
@@ -1027,6 +1142,36 @@ export default function SuratPeringatanModal({
                   Surat rasmi janaan komputer sedia dicetak atau disimpan sebagai fail PDF.
                 </p>
               </div>
+            </div>
+
+            {/* Font Size Adjustment */}
+            <div className="flex items-center gap-1.5 bg-white border border-amber-300 rounded-lg px-2.5 py-1 text-xs shadow-2xs">
+              <Type className="h-3.5 w-3.5 text-amber-800" />
+              <span className="font-bold text-amber-950">Saiz Tulisan Surat:</span>
+              <button
+                type="button"
+                onClick={() => setFontSizePt((prev) => Math.max(10, prev - 1))}
+                className="w-6 h-6 rounded bg-amber-100 hover:bg-amber-200 text-amber-950 font-black flex items-center justify-center cursor-pointer transition"
+                title="Kecilkan Saiz Tulisan"
+              >
+                -
+              </button>
+              <span className="font-mono font-black text-rose-700 px-1 text-xs min-w-[34px] text-center">
+                {fontSizePt} pt
+              </span>
+              <button
+                type="button"
+                onClick={() => setFontSizePt((prev) => Math.min(15, prev + 1))}
+                className="w-6 h-6 rounded bg-amber-100 hover:bg-amber-200 text-amber-950 font-black flex items-center justify-center cursor-pointer transition"
+                title="Besarkan Saiz Tulisan"
+              >
+                +
+              </button>
+              {fontSizePt === 12 && (
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded ml-1">
+                  Font 12
+                </span>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -1059,24 +1204,37 @@ export default function SuratPeringatanModal({
               return (
                 <div
                   key={m.noAhli}
-                  className="surat-page-item bg-white p-8 sm:p-12 border border-slate-200 shadow-lg rounded-sm print:border-none print:shadow-none print:p-0 space-y-6 text-[13px] leading-relaxed select-text"
+                  className="surat-page-item bg-white p-8 sm:p-12 border border-slate-200 shadow-lg rounded-sm print:border-none print:shadow-none print:p-0 space-y-4 font-sans leading-relaxed select-text"
+                  style={{ fontSize: `${fontSizePt}pt`, lineHeight: 1.5 }}
                 >
                   
                   {/* Official Header */}
                   <div className="border-b-2 border-double border-slate-900 pb-3 text-center space-y-1">
-                    <h1 className="text-sm sm:text-base font-black tracking-wide text-slate-950 uppercase leading-snug">
+                    <h1
+                      style={{ fontSize: `${fontSizePt + 2}pt` }}
+                      className="font-black tracking-wide text-slate-950 uppercase leading-snug"
+                    >
                       PERTUBUHAN KHAIRAT KEMATIAN DAN KEBAJIKAN KAMPUNG GONG BADAK
                     </h1>
-                    <p className="text-[11px] text-slate-700 font-semibold uppercase tracking-wider">
+                    <p
+                      style={{ fontSize: `${fontSizePt - 1.5}pt` }}
+                      className="text-slate-700 font-semibold uppercase tracking-wider"
+                    >
                       Kuala Nerus, 21300 Terengganu Darul Iman
                     </p>
-                    <p className="text-[10px] text-slate-500 italic font-mono">
+                    <p
+                      style={{ fontSize: `${fontSizePt - 2.5}pt` }}
+                      className="text-slate-500 italic font-mono"
+                    >
                       Pendaftaran Pertubuhan (ROS): PPM-024-11-10112024 &bull; E-mel: khairatkematiantpgb@gmail.com
                     </p>
                   </div>
 
                   {/* Ref & Date */}
-                  <div className="flex justify-between items-start text-xs font-medium text-slate-800 pt-1">
+                  <div
+                    style={{ fontSize: `${fontSizePt}pt` }}
+                    className="flex justify-between items-start font-medium text-slate-800 pt-1"
+                  >
                     <div>
                       Ruj. Kami: <strong className="font-mono font-bold">{letterConfig.rujukanPrefix}/{m.noAhli}</strong>
                     </div>
@@ -1086,9 +1244,15 @@ export default function SuratPeringatanModal({
                   </div>
 
                   {/* Recipient Box */}
-                  <div className="space-y-0.5 pt-1 text-xs">
+                  <div
+                    style={{ fontSize: `${fontSizePt}pt` }}
+                    className="space-y-0.5 pt-1"
+                  >
                     <div>Kepada:</div>
-                    <div className="font-black text-slate-950 uppercase text-sm">
+                    <div
+                      style={{ fontSize: `${fontSizePt + 1.5}pt` }}
+                      className="font-black text-slate-950 uppercase tracking-wide"
+                    >
                       {m.nama}
                     </div>
                     <div className="font-mono text-slate-700">
@@ -1101,27 +1265,42 @@ export default function SuratPeringatanModal({
                   </div>
 
                   {/* Salutation */}
-                  <div className="pt-2 font-semibold">
+                  <div
+                    style={{ fontSize: `${fontSizePt}pt` }}
+                    className="pt-1 font-semibold"
+                  >
                     Tuan / Puan,
                   </div>
 
                   {/* Subject */}
-                  <div className="font-black text-slate-950 uppercase text-xs sm:text-[13px] underline leading-snug">
+                  <div
+                    style={{ fontSize: `${fontSizePt + 0.5}pt` }}
+                    className="font-black text-slate-950 uppercase underline leading-snug"
+                  >
                     {letterConfig.tajukSurat}
                   </div>
 
                   {/* Paragraph 1 */}
-                  <div className="text-justify text-slate-900 leading-relaxed">
+                  <div
+                    style={{ fontSize: `${fontSizePt}pt` }}
+                    className="text-justify text-slate-900 leading-relaxed"
+                  >
                     {letterConfig.pembukaan}
                   </div>
 
                   {/* Arrears Summary Box */}
                   <div className="bg-slate-50 border-2 border-slate-900 rounded-md p-3.5 space-y-2">
-                    <div className="text-[10px] font-black uppercase text-slate-900 tracking-wider border-b border-slate-300 pb-1 flex justify-between items-center">
+                    <div
+                      style={{ fontSize: `${fontSizePt - 1}pt` }}
+                      className="font-black uppercase text-slate-900 tracking-wider border-b border-slate-300 pb-1 flex justify-between items-center"
+                    >
                       <span>PENYATA TUNGGAKAN YURAN KHAIRAT:</span>
                       <span className="font-mono font-bold text-slate-700">NO. AHLI: {m.noAhli}</span>
                     </div>
-                    <div className="grid grid-cols-2 gap-y-1.5 text-xs">
+                    <div
+                      style={{ fontSize: `${fontSizePt}pt` }}
+                      className="grid grid-cols-2 gap-y-1.5"
+                    >
                       <div className="text-slate-600">Nama Pencarum:</div>
                       <div className="font-bold text-slate-900 uppercase">{m.nama}</div>
 
@@ -1131,60 +1310,93 @@ export default function SuratPeringatanModal({
                       <div className="text-slate-600">Tempoh / Bulan Tertunggak:</div>
                       <div className="font-bold text-rose-800">{item.arrearsPeriod}</div>
 
-                      <div className="text-slate-900 font-black text-xs sm:text-sm pt-1 border-t border-slate-300">
+                      <div
+                        style={{ fontSize: `${fontSizePt + 1}pt` }}
+                        className="text-slate-900 font-black pt-1 border-t border-slate-300"
+                      >
                         JUMLAH TUNGGAKAN PERLU DIJELASKAN:
                       </div>
-                      <div className="font-black text-rose-800 text-sm sm:text-base font-mono pt-1 border-t border-slate-300">
+                      <div
+                        style={{ fontSize: `${fontSizePt + 2}pt` }}
+                        className="font-black text-rose-800 font-mono pt-1 border-t border-slate-300"
+                      >
                         RM {item.actualDues}.00
                       </div>
                     </div>
                   </div>
 
                   {/* Paragraph 2: Instructions */}
-                  <div className="text-justify text-slate-900 leading-relaxed">
+                  <div
+                    style={{ fontSize: `${fontSizePt}pt` }}
+                    className="text-justify text-slate-900 leading-relaxed"
+                  >
                     {letterConfig.arahanBayaran} Bayaran hendaklah dibuat dalam tempoh <strong>{letterConfig.tempohHari}</strong> melalui saluran rasmi pertubuhan berikut:
                   </div>
 
                   {/* Banking Details Box */}
-                  <div className="bg-slate-50 border border-slate-300 rounded-md p-3 text-xs space-y-2 font-sans">
-                    <div className="font-bold text-slate-950 flex items-center gap-1.5">
+                  <div className="bg-slate-50 border border-slate-300 rounded-md p-3 space-y-2 font-sans">
+                    <div
+                      style={{ fontSize: `${fontSizePt}pt` }}
+                      className="font-bold text-slate-950 flex items-center gap-1.5"
+                    >
                       <Building2 className="h-4 w-4 text-slate-700" />
                       <span>Saluran Pindahan Akaun Bank Pertubuhan:</span>
                     </div>
-                    <div className="pl-5 space-y-0.5 text-[11px]">
+                    <div
+                      style={{ fontSize: `${fontSizePt}pt` }}
+                      className="pl-5 space-y-0.5"
+                    >
                       <div>Nama Bank: <strong>{letterConfig.namaBank}</strong></div>
-                      <div>Nombor Akaun: <strong className="font-mono text-xs">{letterConfig.noAkaunBank}</strong></div>
+                      <div>Nombor Akaun: <strong className="font-mono">{letterConfig.noAkaunBank}</strong></div>
                       <div>Nama Akaun: <strong>{letterConfig.namaPemegangAkaun}</strong></div>
                     </div>
 
                     {/* WhatsApp Online Receipt Notice for Print */}
                     {letterConfig.maklumanResitOnline && (
-                      <div className="bg-white border border-slate-400 rounded p-2 text-[11px] text-slate-900 space-y-0.5">
-                        <div className="font-bold text-slate-950 uppercase text-[10px] tracking-wide">
+                      <div className="bg-white border border-slate-400 rounded p-2 text-slate-900 space-y-1">
+                        <div
+                          style={{ fontSize: `${fontSizePt - 1}pt` }}
+                          className="font-bold text-slate-950 uppercase tracking-wide"
+                        >
                           Penghantaran Bukti / Resit Bayaran Atas Talian (Transfer):
                         </div>
-                        <div className="whitespace-pre-line leading-relaxed pl-2 font-medium">
+                        <div
+                          style={{ fontSize: `${fontSizePt}pt` }}
+                          className="whitespace-pre-line leading-relaxed pl-2 font-medium"
+                        >
                           {letterConfig.maklumanResitOnline}
                         </div>
-                        <div className="text-[10px] text-slate-600 font-mono pl-2 pt-0.5 border-t border-slate-200 mt-1">
+                        <div
+                          style={{ fontSize: `${fontSizePt - 1.5}pt` }}
+                          className="text-slate-600 font-mono pl-2 pt-0.5 border-t border-slate-200 mt-1"
+                        >
                           (Rujukan Ahli: <strong>{m.nama}</strong> | No. Ahli: <strong>{m.noAhli}</strong>)
                         </div>
                       </div>
                     )}
 
-                    <div className="text-[11px] text-slate-700 pt-1 border-t border-slate-200 italic">
+                    <div
+                      style={{ fontSize: `${fontSizePt - 0.5}pt` }}
+                      className="text-slate-700 pt-1 border-t border-slate-200 italic"
+                    >
                       {letterConfig.maklumanTunai}
                     </div>
                   </div>
 
                   {/* Paragraph 3: Warning */}
-                  <div className="text-justify text-slate-800 text-[11px] leading-relaxed bg-amber-50 border border-amber-200 p-2.5 rounded-md">
+                  <div
+                    style={{ fontSize: `${fontSizePt}pt` }}
+                    className="text-justify text-slate-800 leading-relaxed bg-amber-50 border border-amber-200 p-2.5 rounded-md"
+                  >
                     {letterConfig.peringatanKeahlian}
                   </div>
 
                   {/* Closing & Sign-off */}
-                  <div className="pt-2 space-y-5">
-                    <div className="space-y-1">
+                  <div className="pt-2 space-y-4">
+                    <div
+                      style={{ fontSize: `${fontSizePt}pt` }}
+                      className="space-y-1"
+                    >
                       <div>Sekian, terima kasih.</div>
                       <div className="font-bold text-slate-950 tracking-wide mt-1">
                         &quot;BERKHIDMAT UNTUK KARIAH&quot;
@@ -1192,26 +1404,38 @@ export default function SuratPeringatanModal({
                     </div>
 
                     {/* Issuer details from Bendahari */}
-                    <div className="space-y-0.5">
+                    <div
+                      style={{ fontSize: `${fontSizePt}pt` }}
+                      className="space-y-0.5"
+                    >
                       <div>Saya yang menjalankan amanah,</div>
-                      <div className="pt-3 font-black uppercase text-slate-950 tracking-wider text-sm">
+                      <div
+                        style={{ fontSize: `${fontSizePt + 1.5}pt` }}
+                        className="pt-3 font-black uppercase text-slate-950 tracking-wider"
+                      >
                         {letterConfig.namaBendahari}
                       </div>
-                      <div className="text-xs font-bold text-slate-800 uppercase">
+                      <div
+                        style={{ fontSize: `${fontSizePt + 0.5}pt` }}
+                        className="font-bold text-slate-800 uppercase"
+                      >
                         {letterConfig.jawatanPengeluar}
                       </div>
-                      <div className="text-xs text-slate-600">
+                      <div className="text-slate-600">
                         Pertubuhan Kebajikan Khairat Kematian Kampung Gong Badak
                       </div>
-                      <div className="text-xs font-mono text-slate-700 flex items-center gap-1 pt-0.5">
+                      <div className="font-mono text-slate-700 flex items-center gap-1 pt-0.5">
                         <Phone className="h-3 w-3 text-slate-500" />
                         <span>H/P: {letterConfig.telBendahari}</span>
                       </div>
                     </div>
 
                     {/* Computer Generated Disclaimer */}
-                    <div className="pt-3 border-t border-slate-300 text-center">
-                      <p className="text-[10px] text-slate-600 font-mono font-semibold italic bg-slate-100 py-1.5 px-3 rounded border border-slate-200">
+                    <div className="pt-2 border-t border-slate-300 text-center">
+                      <p
+                        style={{ fontSize: `${fontSizePt - 2}pt` }}
+                        className="text-slate-600 font-mono font-semibold italic bg-slate-100 py-1.5 px-3 rounded border border-slate-200"
+                      >
                         *** {letterConfig.notaJanaanKomputer} ***
                       </p>
                     </div>
