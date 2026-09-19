@@ -18,6 +18,9 @@ interface ReportsSummaryProps {
 export default function ReportsSummary({ state, onViewProfile, currentRole }: ReportsSummaryProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isPrinting, setIsPrinting] = useState(false);
+  const [printFontSize, setPrintFontSize] = useState<number>(12); // Minima 12pt untuk kemudahan AJK warga emas
+  const [printOrientation, setPrintOrientation] = useState<'portrait' | 'landscape'>('landscape');
+  const [printRowSpacing, setPrintRowSpacing] = useState<'normal' | 'relaxed'>('normal');
   const [filterGroup, setFilterGroup] = useState<string>('all');
   const [addressFilter, setAddressFilter] = useState<string>('all');
   const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
@@ -292,6 +295,12 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
       {/* Printable Preview Overlay */}
       {isPrinting && createPortal(
         <div id="print-area-outlet" className="fixed inset-0 bg-white z-[99999] p-10 overflow-y-auto text-slate-900 font-sans print:relative print:inset-auto print:p-0 print:m-0 print:overflow-visible print:bg-white print:block print:h-auto print:w-full">
+          <style>{`
+            @page {
+              size: ${printOrientation};
+              margin: 10mm 10mm 10mm 10mm;
+            }
+          `}</style>
           
           {/* Print Controls Ribbon - Hides in print */}
           <div className="mb-8 bg-amber-50 border border-amber-200 p-5 rounded-xl print:hidden flex flex-col gap-4">
@@ -299,8 +308,8 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
               <div className="flex items-center gap-3">
                 <AlertTriangle className="h-5 w-5 text-amber-500 animate-pulse shrink-0" />
                 <div>
-                  <span className="text-xs font-bold text-amber-900 block font-sans uppercase tracking-wide">Mod Pratonton Dokumen (PDF)</span>
-                  <span className="text-[10px] text-amber-700 block mt-0.5 font-sans">Laporan sedia dicetak. Klik butang cetak di sebelah kanan untuk memilih pencetak atau simpan sebagai PDF.</span>
+                  <span className="text-xs font-bold text-amber-900 block font-sans uppercase tracking-wide">Mod Pratonton Dokumen (PDF) - Format Tulisan Jelas</span>
+                  <span className="text-[10px] text-amber-700 block mt-0.5 font-sans">Laporan sedia dicetak. Saiz tulisan lalai telah dibesarkan kepada minima 12pt untuk kemudahan ahli jawatankuasa membaca senarai dengan jelas.</span>
                 </div>
               </div>
               <div className="flex gap-2 self-stretch md:self-auto justify-end">
@@ -326,8 +335,108 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
               </div>
             </div>
 
+            {/* Print Settings Toolbar: Font Size (Min 12pt), Orientation, Row Spacing */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-3 border-t border-amber-250/70">
+              {/* 1. Saiz Tulisan (Minima 12pt untuk AJK Warga Emas) */}
+              <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs flex flex-col justify-between">
+                <label className="text-[11px] font-extrabold uppercase tracking-wide text-slate-700 mb-1.5 flex items-center justify-between">
+                  <span>Saiz Tulisan (Minima 12pt):</span>
+                  <span className="text-amber-800 font-black">
+                    {printFontSize} pt {printFontSize === 12 ? '(Minima Disyorkan)' : printFontSize >= 14 ? '(Ekstra Jelas)' : ''}
+                  </span>
+                </label>
+                <div className="grid grid-cols-4 gap-1">
+                  {[12, 13, 14, 16].map((size) => (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => setPrintFontSize(size)}
+                      className={`px-1 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer text-center ${
+                        printFontSize === size
+                          ? 'bg-amber-600 text-white shadow-xs font-black'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                      title={`Pilih saiz tulisan ${size}pt`}
+                    >
+                      {size}pt
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 2. Orientasi Kertas A4 */}
+              <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs flex flex-col justify-between">
+                <label className="text-[11px] font-extrabold uppercase tracking-wide text-slate-700 mb-1.5">
+                  Orientasi Kertas A4:
+                </label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setPrintOrientation('landscape')}
+                    className={`px-2 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer text-center ${
+                      printOrientation === 'landscape'
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    Melintang (Landscape)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPrintOrientation('portrait')}
+                    className={`px-2 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer text-center ${
+                      printOrientation === 'portrait'
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    Menegak (Portrait)
+                  </button>
+                </div>
+              </div>
+
+              {/* 3. Jarak Baris (Spacing) */}
+              <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs flex flex-col justify-between">
+                <label className="text-[11px] font-extrabold uppercase tracking-wide text-slate-700 mb-1.5">
+                  Jarak Baris (Kepadatan):
+                </label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setPrintRowSpacing('normal')}
+                    className={`px-2 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer text-center ${
+                      printRowSpacing === 'normal'
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    Standard (Selesa)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPrintRowSpacing('relaxed')}
+                    className={`px-2 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer text-center ${
+                      printRowSpacing === 'relaxed'
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    Lapang (Mudah Dibaca)
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Readability Notification for Elderly AJK */}
+            <div className="bg-amber-100/80 border border-amber-300 p-2.5 rounded-lg flex items-center gap-2 text-xs text-amber-950">
+              <span className="text-base">👓</span>
+              <span>
+                <strong>Mod Tulisan Jelas Warga Emas:</strong> Saiz tulisan dokumen telah dinaikkan kepada minima <strong>12pt</strong> (dan boleh dibesarkan sehingga <strong>16pt</strong>). Sangat mudah dibaca oleh ahli jawatankuasa walaupun berkaca mata.
+              </span>
+            </div>
+
             {/* Column Selector Configurator Section */}
-            <div className="pt-4 border-t border-amber-200/60 mt-1">
+            <div className="pt-3 border-t border-amber-200/60 mt-0.5">
               <span className="block text-[10px] font-black text-amber-905 uppercase tracking-wider mb-2">
                 ⚙️ PILIHAN KOLUM UNTUK DIKADARKAN SEBELUM DICETAK (Sembunyikan kolum tidak perlu untuk membesarkan tulisan):
               </span>
@@ -523,84 +632,126 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
 
           {/* Letter Head */}
           <div className="text-center border-b-2 border-slate-900 pb-5 mb-6 text-black">
-            <h1 className="text-xl font-black tracking-tight uppercase font-display">Pertubuhan Khairat Kematian Dan Kebajikan Kampung Gong Badak</h1>
-            <p className="text-xs text-slate-600 font-medium mt-1">21300 Kuala Nerus, Terengganu Darul Iman</p>
-            <p className="text-[10px] text-slate-400 font-mono mt-1">Sistem Pengurusan Khairat Kematian Tambahan | Hubungi: khairatkematiantpgb@gmail.com</p>
+            <h1 className="text-2xl font-black tracking-tight uppercase font-display text-slate-950">Pertubuhan Khairat Kematian Dan Kebajikan Kampung Gong Badak</h1>
+            <p className="text-sm text-slate-700 font-bold mt-1">21300 Kuala Nerus, Terengganu Darul Iman</p>
+            <p className="text-xs text-slate-600 font-mono mt-1">Sistem Pengurusan Khairat Kematian Tambahan | Hubungi: khairatkematiantpgb@gmail.com</p>
           </div>
 
           {/* Report Title */}
-          <div className="mb-6 flex justify-between items-end">
+          <div className="mb-6 flex justify-between items-end border-b border-slate-300 pb-3">
             <div>
-              <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">LAPORAN RUMUSAN REKOD & TUNGGAKAN YURAN KHAIRAT</h2>
-              <p className="text-[10px] text-slate-500 font-medium mt-1">Pangkalan data ahli kariah Kampung Gong Badak setakat {formattedDate} ({formattedTime})</p>
+              <h2 className="text-lg font-black text-slate-950 uppercase tracking-tight">LAPORAN RUMUSAN REKOD & TUNGGAKAN YURAN KHAIRAT</h2>
+              <p className="text-xs text-slate-700 font-bold mt-1">Pangkalan data ahli kariah Kampung Gong Badak setakat {formattedDate} ({formattedTime})</p>
             </div>
-            <div className="text-right text-[10px] font-mono text-slate-500">
-              Jumlah Ahli Dipamerkan: {filteredList.length} Orang
+            <div className="text-right text-xs font-mono font-bold text-slate-800">
+              Jumlah Ahli Dipamerkan: <span className="font-black text-sm text-slate-950">{filteredList.length} Orang</span>
             </div>
           </div>
 
           {/* Stats Summary Grid */}
-          <div className="grid grid-cols-3 gap-4 mb-6 border border-slate-200 bg-slate-50 p-4 rounded-xl text-xs">
+          <div className="grid grid-cols-3 gap-4 mb-6 border-2 border-slate-400 bg-slate-100/90 p-4 rounded-xl">
             <div>
-              <span className="text-slate-500 block">Jumlah Keseluruhan Ahli:</span>
-              <strong className="text-slate-900 text-sm font-extrabold">{state.members.length} Orang</strong>
+              <span className="text-slate-700 block font-bold text-xs">Jumlah Keseluruhan Ahli:</span>
+              <strong className="text-slate-950 text-base font-black">{state.members.length} Orang</strong>
             </div>
             <div>
-              <span className="text-slate-500 block">Jumlah Ahli Aktif / Pasif:</span>
-              <strong className="text-slate-900 text-sm font-extrabold">
+              <span className="text-slate-700 block font-bold text-xs">Jumlah Ahli Aktif / Pasif:</span>
+              <strong className="text-slate-950 text-base font-black">
                 {state.members.filter(m => m.status === 'Aktif').length} Aktif / {state.members.filter(m => m.status !== 'Aktif').length} Inaktif
               </strong>
             </div>
             <div>
-              <span className="text-rose-505 block text-slate-500">Jumlah Tunggakan Keseluruhan:</span>
-              <strong className="text-rose-700 text-sm font-black font-mono">RM {totalDuesSum}</strong>
+              <span className="text-rose-900 block font-bold text-xs">Jumlah Tunggakan Keseluruhan:</span>
+              <strong className="text-rose-700 text-base font-black font-mono">RM {totalDuesSum}</strong>
             </div>
           </div>
 
           {/* Printable Report Table */}
-          <table className="w-full text-left border-collapse border border-slate-350 text-[12px]">
+          <table 
+            className={`w-full text-left border-collapse border-2 border-slate-700 print-font-${printFontSize}`}
+            style={{ fontSize: `${printFontSize}pt` }}
+          >
             <thead>
-              <tr className="bg-slate-100 border-b border-slate-350 text-slate-700 font-bold uppercase">
-                {visibleColumns.noAhli && <th className="px-2.5 py-2 text-center border-r border-slate-350 w-16">No. Ahli</th>}
-                {visibleColumns.nama && <th className="px-2.5 py-2 border-r border-slate-350 w-40">Nama Ahli</th>}
-                {visibleColumns.ic && currentRole !== 'user' && <th className="px-2.5 py-2 text-center border-r border-slate-350 w-24">No. IC</th>}
-                {visibleColumns.tel && <th className="px-2.5 py-2 border-r border-slate-350 w-24 text-center">No. Telefon</th>}
-                {visibleColumns.alamat && <th className="px-2.5 py-2 border-r border-slate-350">Alamat Berdaftar</th>}
-                {visibleColumns.status && <th className="px-2.5 py-2 text-center border-r border-slate-350 w-16">Status</th>}
-                {visibleColumns.lunasSehingga && <th className="px-2.5 py-2 text-center border-r border-slate-350 w-20">Lunas Sehingga</th>}
-                {visibleColumns.tunggakan && <th className="px-2.5 py-2 text-center w-20 border-r border-slate-350">Tunggakan</th>}
-                {visibleColumns.periodTunggakan && <th className="px-2.5 py-2 border-r border-slate-350 w-36">Period Tertunggak</th>}
-                {visibleColumns.catatan && <th className="px-2.5 py-2 w-36">Catatan</th>}
+              <tr className="bg-slate-200 border-b-2 border-slate-700 text-slate-950 font-black uppercase">
+                {visibleColumns.noAhli && <th className="px-3 py-2.5 text-center border-r border-slate-600 w-16" style={{ fontSize: `${Math.max(printFontSize, 12)}pt` }}>No. Ahli</th>}
+                {visibleColumns.nama && <th className="px-3 py-2.5 border-r border-slate-600 w-44" style={{ fontSize: `${Math.max(printFontSize, 12)}pt` }}>Nama Ahli</th>}
+                {visibleColumns.ic && currentRole !== 'user' && <th className="px-3 py-2.5 text-center border-r border-slate-600 w-28" style={{ fontSize: `${Math.max(printFontSize, 12)}pt` }}>No. IC</th>}
+                {visibleColumns.tel && <th className="px-3 py-2.5 border-r border-slate-600 w-28 text-center" style={{ fontSize: `${Math.max(printFontSize, 12)}pt` }}>No. Telefon</th>}
+                {visibleColumns.alamat && <th className="px-3 py-2.5 border-r border-slate-600" style={{ fontSize: `${Math.max(printFontSize, 12)}pt` }}>Alamat Berdaftar</th>}
+                {visibleColumns.status && <th className="px-3 py-2.5 text-center border-r border-slate-600 w-20" style={{ fontSize: `${Math.max(printFontSize, 12)}pt` }}>Status</th>}
+                {visibleColumns.lunasSehingga && <th className="px-3 py-2.5 text-center border-r border-slate-600 w-24" style={{ fontSize: `${Math.max(printFontSize, 12)}pt` }}>Lunas Sehingga</th>}
+                {visibleColumns.tunggakan && <th className="px-3 py-2.5 text-center w-24 border-r border-slate-600" style={{ fontSize: `${Math.max(printFontSize, 12)}pt` }}>Tunggakan</th>}
+                {visibleColumns.periodTunggakan && <th className="px-3 py-2.5 border-r border-slate-600 w-40" style={{ fontSize: `${Math.max(printFontSize, 12)}pt` }}>Bulan Tertunggak</th>}
+                {visibleColumns.catatan && <th className="px-3 py-2.5 w-40" style={{ fontSize: `${Math.max(printFontSize, 12)}pt` }}>Catatan</th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 text-slate-800">
+            <tbody className="divide-y divide-slate-400 text-slate-950 font-normal">
               {filteredList.map((m) => {
                 const rows = state.ledger.filter(r => isSameMemberId(r.noAhli, m.noAhli));
                 const totalLebihanKredit = rows.reduce((acc, r) => acc + (r.lebihanKredit || 0), 0);
                 const dues = calculateOutstandingDues(m.noAhli, state.ledger, state.members, kadarYuran);
                 const actualDues = Math.max(0, dues - totalLebihanKredit);
                 const arrearsDetails = computeArrearsDetails(m);
+                const cellPad = printRowSpacing === 'relaxed' ? 'px-3 py-3.5' : 'px-2.5 py-2';
  
                 return (
-                  <tr key={m.noAhli} className="align-top">
-                    {visibleColumns.noAhli && <td className="px-2.5 py-2 text-center font-mono font-bold border-r border-slate-350">{m.noAhli}</td>}
-                    {visibleColumns.nama && <td className="px-2.5 py-2 font-bold text-slate-900 border-r border-slate-350">{m.nama}</td>}
-                    {visibleColumns.ic && currentRole !== 'user' && <td className="px-2.5 py-2 text-center font-mono border-r border-slate-350">{m.ic || '-'}</td>}
-                    {visibleColumns.tel && <td className="px-2.5 py-2 text-center font-mono border-r border-slate-350">{m.tel || '-'}</td>}
-                    {visibleColumns.alamat && <td className="px-2.5 py-1.5 leading-relaxed border-r border-slate-350 text-[12px]">{m.alamat || '-'}</td>}
-                    {visibleColumns.status && <td className="px-2.5 py-2 text-center border-r border-slate-350 font-bold uppercase">{m.status}</td>}
-                    {visibleColumns.lunasSehingga && <td className="px-2.5 py-2 text-center font-mono font-bold border-r border-slate-350">{getLatestPaidMonthYear(m)}</td>}
+                  <tr key={m.noAhli} className="align-top hover:bg-slate-50">
+                    {visibleColumns.noAhli && (
+                      <td className={`${cellPad} text-center font-mono font-black border-r border-slate-400 text-slate-950`}>
+                        {m.noAhli}
+                      </td>
+                    )}
+                    {visibleColumns.nama && (
+                      <td className={`${cellPad} font-black text-slate-950 border-r border-slate-400 leading-snug`}>
+                        {m.nama}
+                      </td>
+                    )}
+                    {visibleColumns.ic && currentRole !== 'user' && (
+                      <td className={`${cellPad} text-center font-mono font-bold border-r border-slate-400 text-slate-900`}>
+                        {m.ic || '-'}
+                      </td>
+                    )}
+                    {visibleColumns.tel && (
+                      <td className={`${cellPad} text-center font-mono font-bold border-r border-slate-400 text-slate-900`}>
+                        {m.tel || '-'}
+                      </td>
+                    )}
+                    {visibleColumns.alamat && (
+                      <td className={`${cellPad} font-medium leading-relaxed border-r border-slate-400 text-slate-900`}>
+                        {m.alamat || '-'}
+                      </td>
+                    )}
+                    {visibleColumns.status && (
+                      <td className={`${cellPad} text-center border-r border-slate-400 font-black uppercase text-slate-950`}>
+                        <span className={`inline-block px-1.5 py-0.5 rounded font-black ${m.status === 'Aktif' ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-200 text-slate-800'}`}>
+                          {m.status}
+                        </span>
+                      </td>
+                    )}
+                    {visibleColumns.lunasSehingga && (
+                      <td className={`${cellPad} text-center font-mono font-black border-r border-slate-400 text-slate-950`}>
+                        {getLatestPaidMonthYear(m)}
+                      </td>
+                    )}
                     {visibleColumns.tunggakan && (
-                      <td className="px-2.5 py-2 text-center font-mono font-bold text-slate-900 border-r border-slate-350">
-                        {actualDues > 0 ? `RM ${actualDues}` : 'LUNAS'}
+                      <td className={`${cellPad} text-center font-mono font-black text-slate-950 border-r border-slate-400`}>
+                        {actualDues > 0 ? (
+                          <span className="text-rose-700 font-black">RM {actualDues}</span>
+                        ) : (
+                          <span className="text-emerald-700 font-black">LUNAS</span>
+                        )}
                       </td>
                     )}
                     {visibleColumns.periodTunggakan && (
-                      <td className="px-2.5 py-2 border-r border-slate-350 max-w-xs text-[12px] text-slate-600">
+                      <td className={`${cellPad} border-r border-slate-400 leading-snug text-slate-800 font-medium`}>
                         {actualDues > 0 ? arrearsDetails : 'Tiada tunggakan yuran.'}
                       </td>
                     )}
-                    {visibleColumns.catatan && <td className="px-2.5 py-2 max-w-xs text-[12px] text-slate-600">{m.catatan || '-'}</td>}
+                    {visibleColumns.catatan && (
+                      <td className={`${cellPad} leading-snug text-slate-800 font-medium`}>
+                        {m.catatan || '-'}
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -608,21 +759,23 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
           </table>
 
           {/* Report Footer / Signature Section */}
-          <div className="mt-16 grid grid-cols-2 gap-12 text-xs">
+          <div className="mt-14 grid grid-cols-2 gap-12 text-sm page-break-inside-avoid">
             <div>
-              <p className="font-semibold text-slate-800">Disediakan Oleh,</p>
-              <div className="mt-16 border-t border-slate-400 w-48"></div>
-              <p className="text-slate-500 text-[9px] mt-1">Urusetia Khairat Kematian Kampung Gong Badak</p>
+              <p className="font-bold text-slate-950 text-sm md:text-base">Disediakan Oleh,</p>
+              <div className="mt-14 border-t-2 border-slate-700 w-56"></div>
+              <p className="text-slate-800 font-bold text-xs md:text-sm mt-1">Urusetia Khairat Kematian Kampung Gong Badak</p>
+              <p className="text-slate-600 font-mono text-[11px] md:text-xs mt-0.5">Tarikh: {formattedDate}</p>
             </div>
             <div className="text-right flex flex-col items-end">
-              <p className="font-semibold text-slate-800 text-right">Disahkan Oleh,</p>
-              <div className="mt-16 border-t border-slate-400 w-48"></div>
-              <p className="text-slate-500 text-[9px] mt-1">Pengerusi/AJK Utama Khairat Kampung Gong Badak</p>
+              <p className="font-bold text-slate-950 text-sm md:text-base text-right">Disahkan Oleh,</p>
+              <div className="mt-14 border-t-2 border-slate-700 w-56"></div>
+              <p className="text-slate-800 font-bold text-xs md:text-sm mt-1">Pengerusi / AJK Utama Khairat Gong Badak</p>
+              <p className="text-slate-600 font-mono text-[11px] md:text-xs mt-0.5">Tarikh: .......................................</p>
             </div>
           </div>
 
-          <div className="mt-12 text-center text-[9px] text-slate-400 font-mono border-t border-slate-200 pt-3 print:block hidden">
-            Laporan ini dijana komputer melalui Sistem Pengurusan Khairat Kematian Gong Badak tambahan pada {formattedDate} {formattedTime}. Cetakan rasmi.
+          <div className="mt-10 text-center text-xs text-slate-500 font-mono border-t border-slate-300 pt-3 print:block hidden">
+            Laporan ini dijana komputer melalui Sistem Pengurusan Khairat Kematian Gong Badak pada {formattedDate} {formattedTime}. Cetakan rasmi.
           </div>
 
         </div>,
