@@ -73,6 +73,7 @@ function setupSheets() {
       ["setiausaha", "HJ. SALLEH BIN HASHIM", "019-5514670", ""],
       ["pen_setiausaha", "HJ. AHMAD BIN HAMZAH", "012-4565905", ""],
       ["bendahari", "HJ. JAMALUDDIN BIN MOHAMAD", "013-4842213", ""],
+      ["pen_bendahari", "", "", ""],
       ["pemeriksa_kira1", "HJ. WAN SALLEH BIN WAN MAT", "019-9430113", ""],
       ["pemeriksa_kira2", "HJ. MOHD NORDIN BIN MAT ISMAIL", "019-9150033", ""],
       ["ajk1", "HJ. HASBULLAH BIN ABD RAHMAN", "019-9556391", ""],

@@ -31,6 +31,7 @@ interface MaklumatPertubuhanProps {
 const ROLE_LABELS: { [key: string]: string } = {
   pengerusi: 'PENGERUSI',
   bendahari: 'BENDAHARI',
+  pen_bendahari: 'PEN. BENDAHARI',
   setiausaha: 'SETIAUSAHA',
   timb_pengerusi: 'TIMB. PENGERUSI',
   pen_setiausaha: 'PEN. SETIAUSAHA',
@@ -43,7 +44,6 @@ const ROLE_LABELS: { [key: string]: string } = {
   ajk_7: 'AJK KARIYAH VII',
   ajk_8: 'AJK KARIYAH VIII',
   ajk_9: 'AJK KARIYAH IX',
-  ajk_10: 'AJK KARIYAH X',
 };
 
 export default function MaklumatPertubuhan({ state, onChangeState, currentRole }: MaklumatPertubuhanProps) {
@@ -131,7 +131,14 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
     const saved = localStorage.getItem('khairat_gong_badak_chart_roles');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (parsed.ajk_10) {
+          delete parsed.ajk_10;
+        }
+        if (!parsed.pen_bendahari) {
+          parsed.pen_bendahari = { nama: '', tel: '' };
+        }
+        return parsed;
       } catch (e) {
         console.error('Failed to parse chart roles', e);
       }
@@ -140,6 +147,7 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
     return {
       pengerusi: { nama: "LAKSAMANA DATO' PAHLAWAN HJ. SULAIMAN BIN MOHAMAD (B)", tel: '013-5871409' },
       bendahari: { nama: "HJ. JAMALUDDIN BIN MOHAMAD", tel: '013-4842213' },
+      pen_bendahari: { nama: '', tel: '' },
       setiausaha: { nama: "HJ. SALLEH BIN HASHIM", tel: '019-5514670' },
       timb_pengerusi: { nama: "IR. HJ. ABDUL RAHIM BIN JAAFAR", tel: '019-5581192' },
       pen_setiausaha: { nama: "HJ. AHMAD BIN HAMZAH", tel: '012-4565905' },
@@ -152,7 +160,6 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
       ajk_7: { nama: "HAJI ISMAIL BIN MAMAT", tel: '013-9213456' },
       ajk_8: { nama: "HAJI MOHD NOR BIN ISA", tel: '019-9812423' },
       ajk_9: { nama: "HAJI YUSOF BIN ABDULLAH", tel: '012-9445678' },
-      ajk_10: { nama: "ENCIK MAT ALI BIN DIN", tel: '017-9123456' },
     };
   });
 
@@ -165,9 +172,25 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
 
   useEffect(() => {
     if (state.chartRoles && Object.keys(state.chartRoles).length > 0) {
-      setChartRoles(state.chartRoles);
+      const cleaned = { ...state.chartRoles };
+      let changed = false;
+      if (cleaned.ajk_10) {
+        delete cleaned.ajk_10;
+        changed = true;
+      }
+      if (!cleaned.pen_bendahari) {
+        cleaned.pen_bendahari = { nama: '', tel: '' };
+        changed = true;
+      }
+      setChartRoles(cleaned);
+      if (changed && onChangeState) {
+        onChangeState({
+          ...state,
+          chartRoles: cleaned
+        });
+      }
     }
-  }, [state.chartRoles]);
+  }, [state.chartRoles, onChangeState, state]);
 
   // Initial sync: Save default/local states to parent global state if missing on the server
   useEffect(() => {
@@ -550,6 +573,12 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
                     {/* Left: BENDAHARI */}
                     <div className="flex flex-col items-center">
                       {renderCard('bendahari')}
+                      
+                      {/* Vertical line going down from Bendahari to Pen. Bendahari */}
+                      <div className="w-1.5 h-6 bg-slate-900" />
+                      
+                      {/* PEN. BENDAHARI directly underneath BENDAHARI */}
+                      {renderCard('pen_bendahari')}
                     </div>
 
                     {/* Center: TIMB. PENGERUSI */}
@@ -574,7 +603,7 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
                   </div>
                 </div>
 
-                {/* Level 3: 10 Ahli Jawatankuasa under Timb. Pengerusi */}
+                {/* Level 3: 9 Ahli Jawatankuasa under Timb. Pengerusi */}
                 <div className="w-full border-t-4 border-slate-900 pt-6 !mt-0 relative">
                   
                   {/* Vertical connector line inside Level 3 */}
@@ -582,13 +611,13 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
                   
                   <div className="text-center mb-6 relative z-10">
                     <span className="bg-white border-2 border-slate-900 text-slate-950 font-black text-[10px] tracking-widest uppercase py-1.5 px-5 rounded-full font-mono">
-                      AHLI JAWATANKUASA (10 ORANG) - Di bawah Timbalan Pengerusi
+                      AHLI JAWATANKUASA (9 ORANG) - Di bawah Timbalan Pengerusi
                     </span>
                   </div>
 
-                  {/* Grid of 10 AJK members */}
+                  {/* Grid of 9 AJK members */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 max-w-6xl mx-auto">
-                    {Array.from({ length: 10 }).map((_, index) => {
+                    {Array.from({ length: 9 }).map((_, index) => {
                       const ajkId = `ajk_${index + 1}`;
                       return (
                         <div key={ajkId} className="flex justify-center">
@@ -1119,6 +1148,7 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
                         else if (rawLabel === 'SETIAUSAHA') formattedLabel = 'Setiausaha Kehormat';
                         else if (rawLabel === 'PEN. SETIAUSAHA') formattedLabel = 'Penolong Setiausaha';
                         else if (rawLabel === 'BENDAHARI') formattedLabel = 'Bendahari Kehormat';
+                        else if (rawLabel === 'PEN. BENDAHARI') formattedLabel = 'Penolong Bendahari';
                         else {
                           // Titlecase AJK
                           formattedLabel = rawLabel.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
