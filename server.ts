@@ -144,19 +144,65 @@ async function startServer() {
 
       console.log(`[Proxy Fetch] Fetching from Apps Script:`, targetUrl);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-      const response = await fetch(targetUrl, { signal: controller.signal });
+      // 1. Fetch with standard User-Agent header (prevents Google bot challenge)
+      let curUrl = targetUrl;
+      let finalResponse: any = null;
+
+      // Handle redirect chain manually if needed (Google Apps Script redirects to script.googleusercontent.com)
+      for (let redirectCount = 0; redirectCount < 5; redirectCount++) {
+        const response = await fetch(curUrl, {
+          signal: controller.signal,
+          redirect: 'manual',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*'
+          }
+        });
+
+        if (response.status >= 300 && response.status < 400 && response.headers.get('location')) {
+          curUrl = response.headers.get('location')!;
+          continue;
+        }
+
+        finalResponse = response;
+        break;
+      }
+
       clearTimeout(timeoutId);
 
-      if (!response.ok) {
-        return res.status(response.status).json({
+      if (!finalResponse) {
+        throw new Error('Terlalu banyak lencongan (too many redirects) dari Google Apps Script.');
+      }
+
+      if (!finalResponse.ok) {
+        // Fallback: try POST getData
+        try {
+          const postRes = await fetch(cleanUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'text/plain;charset=utf-8',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+            },
+            body: JSON.stringify({ action: 'getData' })
+          });
+          if (postRes.ok) {
+            const postText = await postRes.text();
+            const postData = JSON.parse(postText);
+            return res.json(postData);
+          }
+        } catch {
+          // ignore post fallback error
+        }
+
+        return res.status(finalResponse.status).json({
           status: 'error',
-          message: `Ralat HTTP dari Apps Script: status ${response.status}`
+          message: `Ralat HTTP dari Apps Script: status ${finalResponse.status}`
         });
       }
 
-      const responseText = await response.text();
+      const responseText = await finalResponse.text();
       let result: any = null;
       try {
         result = JSON.parse(responseText);

@@ -622,13 +622,15 @@ export function getAppsScriptGoogleCode(): string {
 
 export async function fetchFromAppsScript(url: string): Promise<{ success: boolean; data?: any; message?: string }> {
   try {
-    // 1. Try server-side proxy route first (bypasses CORS and multi-login redirect issues)
+    // 1. Try server-side proxy route first (handles redirect chains and bot bypass reliably)
     try {
       const proxyRes = await fetch(`/api/apps-script/fetch?url=${encodeURIComponent(url)}`);
       if (proxyRes.ok) {
         const result = await proxyRes.json();
         if (result && result.status === 'success') {
           return { success: true, data: result };
+        } else if (result && result.message) {
+          return { success: false, message: result.message };
         }
       }
     } catch (proxyErr) {
@@ -641,7 +643,19 @@ export async function fetchFromAppsScript(url: string): Promise<{ success: boole
     if (!response.ok) {
       throw new Error(`HTTP Error: status ${response.status}`);
     }
-    const result = await response.json();
+    const textResponse = await response.text();
+    let result: any = null;
+    try {
+      result = JSON.parse(textResponse);
+    } catch {
+      if (textResponse.includes('<!DOCTYPE') || textResponse.includes('<html')) {
+        return {
+          success: false,
+          message: 'Google memerlukan pengesahan akses. Sila pastikan tetapan Apps Script "Who has access" disetkan kepada "Anyone".'
+        };
+      }
+      return { success: false, message: 'Format data Google Sheets tidak sah.' };
+    }
     if (result.status === 'success') {
       return { success: true, data: result };
     } else {
