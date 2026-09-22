@@ -898,7 +898,26 @@ export function getArrearsDetails(
 
 export async function fetchFromAppsScript(url: string): Promise<{ members: Member[]; ledger: LedgerRow[]; kewangan?: any[] } | null> {
   try {
-    const fetchUrl = `${url}?action=getData`;
+    // 1. Try server proxy first (avoids CORS and session-cookie issues)
+    try {
+      const proxyRes = await fetch(`/api/apps-script/fetch?url=${encodeURIComponent(url)}`);
+      if (proxyRes.ok) {
+        const data = await proxyRes.json();
+        if (data && Array.isArray(data.members) && Array.isArray(data.ledger)) {
+          const { members, ledger } = mergeDuplicateMembersAndLedgers(data.members, data.ledger);
+          return {
+            members,
+            ledger,
+            kewangan: data.kewangan || []
+          };
+        }
+      }
+    } catch (proxyErr) {
+      console.warn('Proxy fetch failed, trying direct browser fetch:', proxyErr);
+    }
+
+    // 2. Direct browser fetch fallback
+    const fetchUrl = url.includes('?') ? `${url}&action=getData` : `${url}?action=getData`;
     const res = await fetch(fetchUrl);
     if (!res.ok) throw new Error('Pelayan gagal membalas.');
     const data = await res.json();
@@ -920,8 +939,44 @@ export async function fetchFromAppsScript(url: string): Promise<{ members: Membe
 export async function writeToAppsScript(
   url: string,
   payload: any
-): Promise<{ success: boolean; data?: { members: Member[]; ledger: LedgerRow[]; kewangan?: any[] }; message?: string }> {
+): Promise<{ success: boolean; data?: { members: Member[]; ledger: LedgerRow[]; kewangan?: any[]; chartRoles?: any; pekelilingList?: any[] }; message?: string }> {
   try {
+    // 1. Try server-side proxy first to completely avoid browser 302 method change and multi-login cookies
+    try {
+      const proxyRes = await fetch('/api/apps-script/write', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ url, payload })
+      });
+
+      if (proxyRes.ok) {
+        const data = await proxyRes.json();
+        if (data && data.status === 'success') {
+          let responseData = data.data;
+          if (responseData && Array.isArray(responseData.members) && Array.isArray(responseData.ledger)) {
+            const { members, ledger } = mergeDuplicateMembersAndLedgers(responseData.members, responseData.ledger);
+            responseData.members = members;
+            responseData.ledger = ledger;
+          }
+          return {
+            success: true,
+            data: responseData,
+            message: data.message || 'Penyegerakan berjaya'
+          };
+        } else if (data && data.message && !data.message.includes('Aksi GET tidak ditemui')) {
+          return {
+            success: false,
+            message: data.message
+          };
+        }
+      }
+    } catch (proxyErr) {
+      console.warn('Server proxy write failed, falling back to direct browser fetch:', proxyErr);
+    }
+
+    // 2. Direct browser fetch fallback
     const res = await fetch(url, {
       method: 'POST',
       body: JSON.stringify(payload),

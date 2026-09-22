@@ -143,9 +143,9 @@ function replyJSON(data) {
 function doGet(e) {
   setupSheets();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const action = e.parameter.action;
+  const action = (e && e.parameter && e.parameter.action) ? e.parameter.action : "getData";
   
-  if (action === "getData") {
+  if (action === "getData" || !action) {
     try {
       const sheetAhli = ss.getSheetByName("Pangkalan Data Ahli");
       const sheetLejar = ss.getSheetByName("Rekod Jadual Pembayaran (Lejar)");
@@ -297,7 +297,7 @@ function doGet(e) {
     }
   }
   
-  return replyJSON({ status: "error", message: "Aksi GET tidak ditemui." });
+  return getDirectData(ss, "Data pangkalan berjaya diambil.");
 }
 
 function doPost(e) {
@@ -622,7 +622,21 @@ export function getAppsScriptGoogleCode(): string {
 
 export async function fetchFromAppsScript(url: string): Promise<{ success: boolean; data?: any; message?: string }> {
   try {
-    const fetchUrl = `${url}?action=getData`;
+    // 1. Try server-side proxy route first (bypasses CORS and multi-login redirect issues)
+    try {
+      const proxyRes = await fetch(`/api/apps-script/fetch?url=${encodeURIComponent(url)}`);
+      if (proxyRes.ok) {
+        const result = await proxyRes.json();
+        if (result && result.status === 'success') {
+          return { success: true, data: result };
+        }
+      }
+    } catch (proxyErr) {
+      console.warn('Proxy fetch failed, falling back to direct browser fetch:', proxyErr);
+    }
+
+    // 2. Direct browser fetch fallback
+    const fetchUrl = url.includes('?') ? `${url}&action=getData` : `${url}?action=getData`;
     const response = await fetch(fetchUrl);
     if (!response.ok) {
       throw new Error(`HTTP Error: status ${response.status}`);
@@ -640,6 +654,28 @@ export async function fetchFromAppsScript(url: string): Promise<{ success: boole
 
 export async function writeToAppsScript(url: string, payload: any): Promise<{ success: boolean; data?: any; message?: string }> {
   try {
+    // 1. Try server-side proxy route first (completely avoids browser 302 method change and cookie redirects)
+    try {
+      const proxyRes = await fetch('/api/apps-script/write', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ url, payload })
+      });
+      if (proxyRes.ok) {
+        const result = await proxyRes.json();
+        if (result && result.status === 'success') {
+          return { success: true, data: result.data, message: result.message };
+        } else if (result && result.message && !result.message.includes('Aksi GET tidak ditemui')) {
+          return { success: false, message: result.message };
+        }
+      }
+    } catch (proxyErr) {
+      console.warn('Proxy write failed, falling back to direct browser fetch:', proxyErr);
+    }
+
+    // 2. Direct browser fetch fallback
     const response = await fetch(url, {
       method: 'POST',
       redirect: 'follow', // Handles Google Apps Script typical redirect mechanics

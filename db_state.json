@@ -1,0 +1,142 @@
+{
+  "members": [],
+  "ledger": [],
+  "useGoogleSheets": true,
+  "appsScriptUrl": "https://script.google.com/macros/s/AKfycbzyNGrOIKVN80Hcyb05LKTFxXCeLvzRVyF6YKKdtTYWVyyH0lCQF7otWmNfmb8rxK6r/exec",
+  "googleSheetsId": "1JLSTFs3fQ0fzZ6beESzchHbjQea0ucS4Y2gaoxRQakQ",
+  "kadarYuranSebulan": 3,
+  "adminPassword": "gongbadak123",
+  "kewangan": [],
+  "customAccountNames": {
+    "Pelaburan Bank Rakyat (33007456390002/2024/TM/ 10.11.2026)": "Pelaburan (0002/TM/10.11)",
+    "Pelaburan Bank Rakyat (33007456390003/2024/TM/ 28.04.2026)": "Pelaburan (0003/TM/28.04)",
+    "Pelaburan Bank Rakyat (33007456390004/2024/TM/ 28.01.2026)": "Pelaburan (0004/TM/ 28.01)"
+  },
+  "pekelilingList": [
+    {
+      "id": "pek-1783753944447",
+      "noRujukan": "PKKKBGB/2026/PEK/04",
+      "tarikh": "Sat Jul 11 2026 00:00:00 GMT+0800 (Singapore Standard Time)",
+      "tarikhBerkuatkuasa": "Fri Jul 10 2026 00:00:00 GMT+0800 (Singapore Standard Time)",
+      "jenis": "Hebahan",
+      "tajuk": "jawatankuasa pemungut yuran ",
+      "kandungan": "Berikut adalah senarai jawatankuasa pemungut yuran dan bayaran yang telah diberi kuasa pada mesyuarat bil.1 tahun 2026 pada 10.7.2026.\n\n1. Rumah/ Blok A : Hj. Mahmud bin Abu Bakar & Mohd Zaid bin Muda\n2. Rumah/ Blok B: Hj. Latif bin Sulong & Mohd Ridwan bin Jusoh\n3. Rumah/ Blok C: Zakaria bin Jusoh & Hj. Mamat bin Bakar\n4. Rumah/ Blok M: Mohamad Ghazali bin Ismail & Nordin bin Muda\n5. Rumah/ Blok/ Lot/ Kg Jati/ Luar : Hj. Rani bin Mat & Wan Mohd Faizal bin Wan Mamat\n\nSekiranya terdapat permasalahan boleh berhubung dengan Pengerusi, Setiausaha atau Bendahari. Sekian harap maklum.\n",
+      "penerbit": "Hj. Mohd Kamal bin Awang",
+      "jawatanPenerbit": "Pengerusi Pertubuhan",
+      "kepentingan": "Biasa"
+    },
+    {
+      "id": "pek-1",
+      "noRujukan": "PKKKBGB/2026/PEK/01",
+      "tarikh": "Thu Jan 01 2026 00:00:00 GMT+0800 (Singapore Standard Time)",
+      "tarikhBerkuatkuasa": "Thu Jan 01 2026 00:00:00 GMT+0800 (Singapore Standard Time)",
+      "jenis": "Pekeliling",
+      "tajuk": "Penetapan Caruman Kebajikan & Yuran Khairat Bulanan RM3",
+      "kandungan": "Dengan hormat takzimnya perkara di atas adalah dirujuk.\n\nAdalah dimaklumkan kepada seluruh ahli kariah Kampung Gong Badak bahawa kadar caruman kebajikan bulanan kekal sebanyak RM3.00 sebulan bagi setiap ahli berdaftar. Caruman ini adalah sangat kritikal bagi membolehkan pihak jawatankuasa menguruskan bantuan kebajikan am, khairat kematian (RM400 hingga RM700), serta saguhati kemasukan wad (RM50-RM100) secara saksama.\n\nPihak bendahari memohon kerjasama semua ketua keluarga agar melakukan semakan baki secara berkala melalui portal ini dan melunaskan tunggakan sekiranya ada sebelum tarikh akhir kutipan tahunan bagi mengelakkan status keahlian bertukar kepada \"Tidak Aktif\".\n\nKerjasama dan keperihatinan seluruh ahli kariah amatlah dihargai demi kebajikan bersama.\n\nSekian, terima kasih.\n\n\"BERIKHTIAR BERSAMA, BERBAKTI SEIKHLAS HATI\"",
+      "penerbit": "Hj. Mohd Kamal bin Awang",
+      "jawatanPenerbit": "Pengerusi Pertubuhan",
+      "kepentingan": "Penting"
+    },
+    {
+      "id": "pek-2",
+      "noRujukan": "PKKKBGB/2026/PEK/02",
+      "tarikh": "Mon Jun 15 2026 00:00:00 GMT+0800 (Singapore Standard Time)",
+      "tarikhBerkuatkuasa": "Mon Jun 15 2026 00:00:00 GMT+0800 (Singapore Standard Time)",
+      "jenis": "Hebahan",
+      "tajuk": "Hebahan Pelancaran Sistem Awan Google Sheets Terbuka",
+      "kandungan": "Merujuk kepada ketetapan Mesyuarat Agung Tahunan (AGM) Pertubuhan, dengan sukacitanya dimaklumkan bahawa sistem pangkalan data khairat kini dinaik taraf sepenuhnya dengan sistem penyegerakan dwi-hala Google Sheets.\n\nLangkah ini bertujuan meningkatkan ketelusan rekod bayaran dan membolehkan seluruh ahli kariah menyemak status terkini yuran masing-masing terus dari telefon pintar tanpa perlu merujuk kepada rekod fizikal.\n\nSemua urusan kemasukan data hanya boleh disunting oleh bendahari berdaftar (admin), manakala ahli kariah dan ajk diberikan akses carian telus bagi mengelakkan ralat teknikal.\n\nSila sebarkan pautan portal rasmi khairat-v3.vercel.app kepada semua waris kariah.\n\nSekian, terima kasih.",
+      "penerbit": "Zakaria bin Jusoh",
+      "jawatanPenerbit": "Setiausaha Kehormat",
+      "kepentingan": "Biasa"
+    },
+    {
+      "id": "pek-3",
+      "noRujukan": "PKKKBGB/2026/PEK/03",
+      "tarikh": "Sun Jun 28 2026 00:00:00 GMT+0800 (Singapore Standard Time)",
+      "tarikhBerkuatkuasa": "Sun Jul 10 2022 00:00:00 GMT+0800 (Singapore Standard Time)",
+      "jenis": "Pekeliling",
+      "tajuk": "PEKELIling ahli bil.1/2022",
+      "kandungan": "Dengan ini dimaklumkan kepada semua ahli bahawa mulai kuatkuasa pada 8 Oktober 2022 perkara-perakara berikut akan dilaksanakan. Mengikut Fasa 7 Perlembagaan Pertubuhan Khairat Kematian dan Kebajikan Kampung Gong Badak Kuala Nerus, Terengganu. (PPM-004-12021994)\n\nUntuk makluman semua pencarum aktif, berikut adalah ketetapan prosedur rasmi bagi tuntutan khairat kematian dan bantuan kebajikan wad:\n1)\tSumbangan Kematian: \n*Semua mereka hendaklah berdaftar di dalam borang ahli dan tinggal menetap bersama ahli untuk layak mendapat/ menerima sumbangan.\ni.\tAhli – RM 700\nii.\tIsteri ahli – RM 500\niii.\tAnak ahli 18 tahun ke bawah – RM 400\niv.\t;Anak angkat 18 tahun ke bawah – RM 400\nv.\tAyah tinggal bersama ahli – RM 400\nvi.\tIbu tinggal bersama ahli – RM 400\nvii.\tAyah mertua tinggal bersama ahli – RM 400\nviii.\tIbu mertua tinggal bersama ahli – RM 400\n\n2)\tSumbangan kemasukan wad hospital:\ni.\tAhli – RM 100\nii.\tIsteri – RM 50\n\n3)\tKemasukan hospital:\ni.\tBayaran kepada ahli akan dibuat mengikut bilangan hari tidak melebihi 5 hari. Akan dibayar setahun sekali.\nii.\tBayaran kepada isteri ahli kemasukan wad sekurang-kurangnya 5 hari tidak termasuk kes bersalin. Akan dibayar sekali setahun.\n\n4)\tSumbangan kesusahan berat dan sakit terlantar uzur:\ni.\tAkan dipertimbangkan dan dipututskan oleh Jawatankuasa apabila berlaku bencana seperti rebut, kebakaran atau banjir dan sakit terlantar uzur. Baharan sebanyak RM 200sekalian dengan Keputusan jawatankuasa.\n\nDikeluarkan oleh:\nAhli jawatankuasa \npertubuhan Khairat Kematian dan Kebajikan\nKampung Gong Badak, Kuala Nerus, Terengganu.\n\nZakaria bin Jusoh \nSeiatuasaha\n\nDisahkan oleh\nHaji Kamaludin bin Ismail\nPengerusi\n\n",
+      "penerbit": "Hj. Kamaludin bin Ismail",
+      "jawatanPenerbit": "Pengerusi Pertubuhan",
+      "kepentingan": "Penting"
+    }
+  ],
+  "chartRoles": {
+    "pengerusi": {
+      "nama": "Hj. Mohd Kamal bin Awang",
+      "tel": "179839410",
+      "noAhli": "369"
+    },
+    "bendahari": {
+      "nama": "Soleh bin Mohd Noor",
+      "tel": "179161615",
+      "noAhli": "474"
+    },
+    "setiausaha": {
+      "nama": "Zakaria bin Jusoh",
+      "tel": "",
+      "noAhli": "159"
+    },
+    "timb_pengerusi": {
+      "nama": "Mohamad Ghazali bin Ismail",
+      "tel": "139068445",
+      "noAhli": "380"
+    },
+    "pen_setiausaha": {
+      "nama": "Hj.Rani bin Mat",
+      "tel": "96668605",
+      "noAhli": "378"
+    },
+    "ajk_1": {
+      "nama": "HJ. LATIF BIN SULONG",
+      "tel": "019-9001234",
+      "noAhli": ""
+    },
+    "ajk_2": {
+      "nama": "Mohd Zaid bin Muda",
+      "tel": "137360631",
+      "noAhli": "451"
+    },
+    "ajk_3": {
+      "nama": "Mahmud bin Abu Bakar",
+      "tel": "193734681",
+      "noAhli": "421"
+    },
+    "ajk_4": {
+      "nama": "Hj. Mamat bin Bakar",
+      "tel": "",
+      "noAhli": "24"
+    },
+    "ajk_5": {
+      "nama": "Nordin bin Muda",
+      "tel": "",
+      "noAhli": "420"
+    },
+    "ajk_6": {
+      "nama": "Haji Kamaludin b. Ismail",
+      "tel": "",
+      "noAhli": "139"
+    },
+    "ajk_7": {
+      "nama": "Mohd Ridwan bin Jusoh @ Ibrahim",
+      "tel": "145220349",
+      "noAhli": "461"
+    },
+    "ajk_8": {
+      "nama": "Mohd Husni bin Mat Jin",
+      "tel": "139485669",
+      "noAhli": "467"
+    },
+    "ajk_9": {
+      "nama": "Wan Mohd Faizal bin Wan Mamat",
+      "tel": "199410296",
+      "noAhli": "482"
+    },
+    "ajk_10": {
+      "nama": "Azmi bin Bidin",
+      "tel": "",
+      "noAhli": "246"
+    }
+  }
+}

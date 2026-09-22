@@ -61,6 +61,102 @@ async function startServer() {
     }
   });
 
+  // Proxy Route: Write to Google Apps Script (Bypasses browser CORS, session cookies, and 302 method mutation)
+  app.post('/api/apps-script/write', async (req, res) => {
+    const { url, payload } = req.body;
+    if (!url || !payload) {
+      return res.status(400).json({ status: 'error', message: 'URL dan payload diperlukan' });
+    }
+
+    try {
+      const targetUrl = String(url).trim();
+      console.log(`[Proxy Write] Sending action '${payload.action}' to Apps Script:`, targetUrl);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+      const response = await fetch(targetUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8'
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        return res.status(response.status).json({
+          status: 'error',
+          message: `Ralat HTTP dari Apps Script: status ${response.status}`
+        });
+      }
+
+      const result = await response.json();
+      console.log(`[Proxy Write] Response status:`, result?.status, result?.message);
+
+      // If syncLocalToSheets succeeded, also mirror to local server state db_state.json for high durability
+      if (result && result.status === 'success' && payload.action === 'syncLocalToSheets') {
+        const currentState = loadServerState() || {};
+        const updatedState = {
+          ...currentState,
+          members: payload.members || currentState.members,
+          ledger: payload.ledger || currentState.ledger,
+          kewangan: payload.kewangan || currentState.kewangan,
+          chartRoles: payload.chartRoles || currentState.chartRoles,
+          pekelilingList: payload.pekelilingList || currentState.pekelilingList
+        };
+        saveServerState(updatedState);
+      }
+
+      return res.json(result);
+    } catch (err: any) {
+      console.error('[Proxy Write] Error writing to Apps Script:', err);
+      return res.status(500).json({
+        status: 'error',
+        message: err.message || 'Gagal menghantar permintaan ke Google Apps Script melalui pelayan'
+      });
+    }
+  });
+
+  // Proxy Route: Fetch from Google Apps Script
+  app.get('/api/apps-script/fetch', async (req, res) => {
+    const url = req.query.url as string;
+    if (!url) {
+      return res.status(400).json({ status: 'error', message: 'URL Apps Script diperlukan' });
+    }
+
+    try {
+      const cleanUrl = url.trim();
+      const targetUrl = cleanUrl.includes('action=')
+        ? cleanUrl
+        : (cleanUrl.includes('?') ? `${cleanUrl}&action=getData` : `${cleanUrl}?action=getData`);
+
+      console.log(`[Proxy Fetch] Fetching from Apps Script:`, targetUrl);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      const response = await fetch(targetUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        return res.status(response.status).json({
+          status: 'error',
+          message: `Ralat HTTP dari Apps Script: status ${response.status}`
+        });
+      }
+
+      const result = await response.json();
+      return res.json(result);
+    } catch (err: any) {
+      console.error('[Proxy Fetch] Error fetching from Apps Script:', err);
+      return res.status(500).json({
+        status: 'error',
+        message: err.message || 'Gagal mengambil data dari Google Apps Script melalui pelayan'
+      });
+    }
+  });
+
   // API Route: Shorten URL (Ad-free & Direct Redirect)
   app.post('/api/shorten', async (req, res) => {
     const { url } = req.body;

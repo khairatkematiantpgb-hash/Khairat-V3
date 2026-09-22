@@ -21,6 +21,17 @@ export default function PaymentGate({ state, onChangeState }: PaymentGateProps) 
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isSubmitting, setIsDeleting] = useState(false);
+  const [lastFailedState, setLastFailedState] = useState<AppState | null>(null);
+
+  const handleSaveLocallyFallback = () => {
+    if (!lastFailedState) return;
+    onChangeState(lastFailedState);
+    setSuccessMsg(`Resit ${noResit} berjaya disimpan secara tempatan! Sebanyak ${calculatedMonths} bulan sumbangan khairat telah dikreditkan.`);
+    setErrorMsg('');
+    setLastFailedState(null);
+    setNoResit('');
+    setJumlahBayaran(kadarYuran);
+  };
 
   // Auto-generate a receipt number
   const handleGenerateReceipt = () => {
@@ -91,26 +102,41 @@ export default function PaymentGate({ state, onChangeState }: PaymentGateProps) 
           action: 'syncLocalToSheets',
           members: newState.members,
           ledger: newState.ledger,
-          kewangan: state.kewangan || []
+          kewangan: state.kewangan || [],
+          chartRoles: state.chartRoles || {},
+          pekelilingList: state.pekelilingList || []
         };
 
         const result = await writeToAppsScript(state.appsScriptUrl, uploadPayload);
-        if (result.success && result.data) {
+        if (result.success) {
+          const finalMembers = (result.data && Array.isArray(result.data.members) && result.data.members.length > 0)
+            ? result.data.members
+            : newState.members;
+          const finalLedger = (result.data && Array.isArray(result.data.ledger) && result.data.ledger.length > 0)
+            ? result.data.ledger
+            : newState.ledger;
+          const finalKewangan = (result.data && Array.isArray(result.data.kewangan) && result.data.kewangan.length > 0)
+            ? result.data.kewangan
+            : (state.kewangan || []);
+
           onChangeState({
             ...state,
-            members: result.data.members,
-            ledger: result.data.ledger,
-            kewangan: result.data.kewangan || state.kewangan || []
+            members: finalMembers,
+            ledger: finalLedger,
+            kewangan: finalKewangan
           });
           setSuccessMsg(`Resit ${noResit} berjaya disimpan di Google Sheets! ${calculatedMonths} bulan sumbangan berjaya dialokasikan.`);
           
           // Clear payment inputs but leave member
           setNoResit('');
           setJumlahBayaran(kadarYuran);
+          setLastFailedState(null);
         } else {
-          setErrorMsg(`Gagal memuat naik ke Google Sheet: ${result.message}`);
+          setLastFailedState(newState);
+          setErrorMsg(`Gagal memuat naik ke Google Sheet: ${result.message || 'Sila cuba lagi'}`);
         }
       } catch (err: any) {
+        setLastFailedState(newState);
         setErrorMsg(`Gagal mensegerakkan: ${err.message || 'Ralat sambungan'}`);
       }
     } else {
@@ -284,9 +310,23 @@ export default function PaymentGate({ state, onChangeState }: PaymentGateProps) 
 
         {/* Feedback alerts */}
         {errorMsg && (
-          <div className="p-3 bg-rose-50 border border-rose-150 text-rose-800 rounded-lg font-bold text-xs flex items-center gap-2">
-            <AlertTriangle className="h-4.5 w-4.5 text-rose-600 shrink-0" />
-            <span>{errorMsg}</span>
+          <div className="p-3 bg-rose-50 border border-rose-150 text-rose-800 rounded-lg text-xs flex flex-col gap-2">
+            <div className="flex items-center gap-2 font-bold">
+              <AlertTriangle className="h-4.5 w-4.5 text-rose-600 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+            {lastFailedState && (
+              <div className="pt-2 flex items-center justify-between border-t border-rose-200">
+                <span className="text-[11px] text-rose-700">Simpan rekod ini secara tempatan terlebih dahulu?</span>
+                <button
+                  type="button"
+                  onClick={handleSaveLocallyFallback}
+                  className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded text-[10px] uppercase transition cursor-pointer"
+                >
+                  Simpan Tempatan Sahaja
+                </button>
+              </div>
+            )}
           </div>
         )}
 
