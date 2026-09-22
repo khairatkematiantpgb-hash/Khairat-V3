@@ -687,7 +687,19 @@ export async function writeToAppsScript(url: string, payload: any): Promise<{ su
     if (!response.ok) {
       throw new Error(`HTTP Error: status ${response.status}`);
     }
-    const result = await response.json();
+    const textResponse = await response.text();
+    let result: any = null;
+    try {
+      result = JSON.parse(textResponse);
+    } catch {
+      if (textResponse.includes('<!DOCTYPE') || textResponse.includes('<html')) {
+        return {
+          success: false,
+          message: 'Google meminta pengesahan log masuk. Sila pastikan tetapan Apps Script "Who has access" disetkan kepada "Anyone".'
+        };
+      }
+      return { success: false, message: 'Maklum balas tidak sah dari Google Sheets.' };
+    }
     if (result.status === 'success') {
       return { success: true, data: result.data, message: result.message };
     } else {

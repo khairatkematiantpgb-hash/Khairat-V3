@@ -73,7 +73,7 @@ async function startServer() {
       console.log(`[Proxy Write] Sending action '${payload.action}' to Apps Script:`, targetUrl);
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000);
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
 
       const response = await fetch(targetUrl, {
         method: 'POST',
@@ -92,7 +92,17 @@ async function startServer() {
         });
       }
 
-      const result = await response.json();
+      const responseText = await response.text();
+      let result: any = null;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseErr) {
+        console.warn(`[Proxy Write] Response is not valid JSON. Response starts with:`, responseText.slice(0, 150));
+        return res.status(200).json({
+          status: 'error',
+          message: `Maklum balas daripada Google Apps Script bukan dalam format JSON yang sah (${responseText.slice(0, 80)}...)`
+        });
+      }
       console.log(`[Proxy Write] Response status:`, result?.status, result?.message);
 
       // If syncLocalToSheets succeeded, also mirror to local server state db_state.json for high durability
@@ -146,7 +156,17 @@ async function startServer() {
         });
       }
 
-      const result = await response.json();
+      const responseText = await response.text();
+      let result: any = null;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseErr) {
+        console.warn(`[Proxy Fetch] Response is not valid JSON. Response starts with:`, responseText.slice(0, 150));
+        return res.status(200).json({
+          status: 'error',
+          message: `Maklum balas daripada Google Apps Script bukan dalam format JSON yang sah.`
+        });
+      }
       return res.json(result);
     } catch (err: any) {
       console.error('[Proxy Fetch] Error fetching from Apps Script:', err);
