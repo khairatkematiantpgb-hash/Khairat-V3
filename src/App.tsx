@@ -110,11 +110,22 @@ export default function App() {
     try {
       const result = await fetchFromAppsScript(state.appsScriptUrl);
       if (result.success && result.data) {
+        // Keselamatan: Jangan benarkan data kosong daripada Sheets menimpa data tempatan yang ada
+        const incomingMembers = (Array.isArray(result.data.members) && result.data.members.length > 0)
+          ? result.data.members
+          : state.members;
+        const incomingLedger = (Array.isArray(result.data.ledger) && result.data.ledger.length > 0)
+          ? result.data.ledger
+          : state.ledger;
+        const incomingKewangan = (Array.isArray(result.data.kewangan) && result.data.kewangan.length > 0)
+          ? result.data.kewangan
+          : state.kewangan;
+
         const mergedState = {
           ...state,
-          members: result.data.members || state.members,
-          ledger: result.data.ledger || state.ledger,
-          kewangan: result.data.kewangan || state.kewangan || [],
+          members: incomingMembers,
+          ledger: incomingLedger,
+          kewangan: incomingKewangan,
           googleSheetsId: result.data.spreadsheetId || state.googleSheetsId,
           chartRoles: (result.data.chartRoles && Object.keys(result.data.chartRoles).length > 0) ? result.data.chartRoles : state.chartRoles,
           pekelilingList: (result.data.pekelilingList && result.data.pekelilingList.length > 0) ? result.data.pekelilingList : state.pekelilingList
@@ -208,9 +219,17 @@ export default function App() {
             const localCount = localState?.members?.length || 0;
             const remoteCount = data.state?.members?.length || 0;
             
-            // Safety: if our local state has more records than the server state AND local state has substantial records (e.g. >15)
-            // we should PRESERVE the local state to prevent accidental local data clobbering by the server
-            if (localState && localCount > remoteCount && localCount > 15) {
+            // Safety: If server state is empty (0 members) but default or local state has data, do NOT wipe with empty data!
+            if (remoteCount === 0 && (localCount > 0 || state.members.length > 0)) {
+              console.log('Server state was empty, initializing server with local baseline');
+              const baseState = (localState && localCount > 0) ? localState : state;
+              await fetch('/api/state', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ state: baseState }),
+              });
+              setState(baseState);
+            } else if (localState && localCount > remoteCount && localCount > 15) {
               console.log('Preserving rich local state of', localCount, 'members over remote', remoteCount, 'members');
               const cachedRole = localStorage.getItem('khairat_gong_badak_role_v1') || currentRole;
               if (cachedRole === 'admin') {
