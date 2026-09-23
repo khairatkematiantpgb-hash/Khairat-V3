@@ -13,7 +13,7 @@ interface ProfileDashboardProps {
   selectedMemberId: string;
   setSelectedMemberId: (id: string) => void;
   onChangeState: (state: AppState) => void;
-  currentRole: 'admin' | 'user';
+  currentRole: 'admin' | 'user' | 'ajk' | null;
 }
 
 export default function ProfileDashboard({ state, selectedMemberId, setSelectedMemberId, onChangeState, currentRole }: ProfileDashboardProps) {
@@ -33,7 +33,7 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
   // Find targeted member based on active search query
   const foundMember = searchQuery.trim() !== ''
     ? state.members.find(
-        m => isSameMemberId(m.noAhli, searchQuery.trim()) || m.nama.toLowerCase().includes(searchQuery.trim().toLowerCase())
+        m => isSameMemberId(m.noAhli, searchQuery.trim()) || String(m.nama || '').toLowerCase().includes(searchQuery.trim().toLowerCase())
       )
     : null;
 

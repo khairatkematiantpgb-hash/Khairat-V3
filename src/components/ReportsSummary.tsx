@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { AppState } from '../types';
-import { calculateOutstandingDues, isSameMemberId, getArrearsDetails } from '../lib/database';
+import { calculateOutstandingDues, isSameMemberId, getArrearsDetails, normalizeMemberId } from '../lib/database';
 import { FileText, AlertTriangle, Eye, Search, FileSpreadsheet, Download, Printer, Mail } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import SuratPeringatanModal from './SuratPeringatanModal';
@@ -180,10 +180,10 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
       const cleanSearch = searchQuery.trim().toLowerCase();
       const isNumericSearch = /^\d+$/.test(cleanSearch);
 
-      const nameMatch = member.nama.toLowerCase().includes(cleanSearch);
-      const idMatch = member.noAhli.toLowerCase().includes(cleanSearch) || isSameMemberId(member.noAhli, cleanSearch);
-      const icMatch = member.ic && member.ic.includes(cleanSearch) && (!isNumericSearch || cleanSearch.length >= 4);
-      const addrMatch = member.alamat ? member.alamat.toLowerCase().includes(cleanSearch) : false;
+      const nameMatch = String(member.nama || '').toLowerCase().includes(cleanSearch);
+      const idMatch = String(member.noAhli || '').toLowerCase().includes(cleanSearch) || isSameMemberId(member.noAhli, cleanSearch);
+      const icMatch = Boolean(member.ic) && String(member.ic).includes(cleanSearch) && (!isNumericSearch || cleanSearch.length >= 4);
+      const addrMatch = member.alamat ? String(member.alamat).toLowerCase().includes(cleanSearch) : false;
       
       const passSearch = nameMatch || idMatch || icMatch || addrMatch;
       if (!passSearch) return false;
@@ -191,7 +191,7 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
       // 2. Group Filter
       let passGroup = true;
       if (filterGroup !== 'all') {
-        const stats = memberStats.find(s => s.noAhli === member.noAhli);
+        const stats = memberStats.find(s => isSameMemberId(s.noAhli, member.noAhli));
         if (stats) {
           if (filterGroup === 'tidak_aktif' || filterGroup === 'tiada') {
             passGroup = stats.status !== 'Aktif';
@@ -220,7 +220,7 @@ export default function ReportsSummary({ state, onViewProfile, currentRole }: Re
     })
     .sort((a, b) => {
       // Sort sequentially ascending by No. Ahli
-      return a.noAhli.localeCompare(b.noAhli, undefined, { numeric: true });
+      return normalizeMemberId(a.noAhli).localeCompare(normalizeMemberId(b.noAhli), undefined, { numeric: true });
     });
 
   // Export to Excel (CSV with UTF-8 BOM)

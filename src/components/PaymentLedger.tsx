@@ -410,13 +410,14 @@ export default function PaymentLedger({ state, onChangeState, onRefresh, syncLoa
         matchesSearch = isSameMemberId(row.noAhli, cleanSearch);
       } else {
         // Otherwise, do name substring, exact ID, or payments receipt search
+        const receiptsStr = [row.jan, row.feb, row.mac, row.apr, row.mei, row.jun, row.jul, row.ogo, row.sep, row.okt, row.nov, row.dis]
+          .map(v => String(v || ''))
+          .join(' ');
         matchesSearch =
-          row.namaAhli.toLowerCase().includes(cleanSearch) ||
-          row.noAhli.toLowerCase().includes(cleanSearch) ||
+          String(row.namaAhli || '').toLowerCase().includes(cleanSearch) ||
+          String(row.noAhli || '').toLowerCase().includes(cleanSearch) ||
           isSameMemberId(row.noAhli, cleanSearch) ||
-          (row.jan + row.feb + row.mac + row.apr + row.mei + row.jun + row.jul + row.ogo + row.sep + row.okt + row.nov + row.dis)
-            .toLowerCase()
-            .includes(cleanSearch);
+          receiptsStr.toLowerCase().includes(cleanSearch);
       }
 
       return matchesSearch;
@@ -1112,7 +1113,7 @@ export default function PaymentLedger({ state, onChangeState, onRefresh, syncLoa
             <button
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="p-1 px-1.5 text-xs text-slate-600 border border-slate-300 hover:bg-slate-105 bg-white disabled:opacity-40 rounded cursor-pointer"
+              className="p-1 px-1.5 text-xs text-slate-600 border border-slate-300 hover:bg-slate-100 bg-white disabled:opacity-40 rounded cursor-pointer"
             >
               <ChevronRight className="h-3.5 w-3.5" />
             </button>

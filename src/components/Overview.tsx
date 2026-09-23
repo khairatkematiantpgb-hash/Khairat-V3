@@ -12,7 +12,7 @@ interface OverviewProps {
   state: AppState;
   onChangeState: (state: AppState) => void;
   onNavigate: (tabId: string) => void;
-  currentRole: 'admin' | 'user';
+  currentRole: 'admin' | 'user' | 'ajk' | null;
 }
 
 export default function Overview({ state, onChangeState, onNavigate, currentRole }: OverviewProps) {
@@ -62,7 +62,7 @@ export default function Overview({ state, onChangeState, onNavigate, currentRole
   const getNextRecommendedId = () => {
     const numericIds = state.members
       .map(m => {
-        const clean = m.noAhli.replace(/\D/g, '');
+        const clean = String(m.noAhli || '').replace(/\D/g, '');
         return clean ? parseInt(clean, 10) : 0;
       })
       .filter(id => id > 0);

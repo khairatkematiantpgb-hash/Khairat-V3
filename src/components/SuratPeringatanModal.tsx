@@ -291,11 +291,11 @@ export default function SuratPeringatanModal({
     return categoryFilteredRecipients.filter((item) => {
       const m = item.member;
       return (
-        m.nama.toLowerCase().includes(q) ||
-        m.noAhli.toLowerCase().includes(q) ||
-        (m.ic && m.ic.toLowerCase().includes(q)) ||
-        (m.alamat && m.alamat.toLowerCase().includes(q)) ||
-        (m.tel && m.tel.toLowerCase().includes(q))
+        String(m.nama || '').toLowerCase().includes(q) ||
+        String(m.noAhli || '').toLowerCase().includes(q) ||
+        (Boolean(m.ic) && String(m.ic).toLowerCase().includes(q)) ||
+        (Boolean(m.alamat) && String(m.alamat).toLowerCase().includes(q)) ||
+        (Boolean(m.tel) && String(m.tel).toLowerCase().includes(q))
       );
     });
   }, [categoryFilteredRecipients, searchMemberQuery]);

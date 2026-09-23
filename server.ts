@@ -19,10 +19,77 @@ function loadServerState() {
   return null;
 }
 
+// Helper to normalize the member ID (e.g., '1' -> '001')
+function normalizeMemberId(id: any): string {
+  if (id === undefined || id === null) return '';
+  let base = id.toString().trim();
+  if (base.startsWith("'")) base = base.substring(1);
+  if (base.endsWith("'")) base = base.substring(0, base.length - 1);
+  base = base.trim();
+  if (/^\d+$/.test(base)) {
+    return base.padStart(3, '0');
+  }
+  return base;
+}
+
+// Helper to sanitize server state payload before saving
+function sanitizeServerState(rawState: any) {
+  if (!rawState || typeof rawState !== 'object') return rawState;
+
+  const members = Array.isArray(rawState.members)
+    ? rawState.members.map((m: any) => ({
+        ...m,
+        noAhli: normalizeMemberId(m?.noAhli || m?.no || m?.id || ''),
+        nama: String(m?.nama || m?.namaAhli || m?.name || '').trim(),
+        ic: String(m?.ic || m?.noKadPengenalan || m?.kadPengenalan || m?.noKp || '').trim(),
+        alamat: String(m?.alamat || m?.address || '').trim(),
+        status: (String(m?.status || m?.statusKeahlian || '').trim().toLowerCase() === 'aktif' || m?.status === 'Aktif') ? 'Aktif' : 'Tidak Aktif',
+        tel: String(m?.tel || m?.noTelefon || m?.telefon || m?.phone || '').trim(),
+        catatan: String(m?.catatan || m?.nota || m?.remarks || '').trim(),
+        tanggungan: Array.isArray(m?.tanggungan)
+          ? m.tanggungan.map((t: any) => ({
+              nama: String(t?.nama || '').trim(),
+              hubungan: String(t?.hubungan || '').trim(),
+              ic: String(t?.ic || t?.noKadPengenalan || '').trim()
+            })).filter((t: any) => t.nama.length > 0)
+          : []
+      }))
+    : [];
+
+  const ledger = Array.isArray(rawState.ledger)
+    ? rawState.ledger.map((l: any) => ({
+        ...l,
+        noAhli: normalizeMemberId(l?.noAhli || l?.no || l?.id || ''),
+        namaAhli: String(l?.namaAhli || l?.nama || '').trim(),
+        tahun: Number(l?.tahun) || new Date().getFullYear(),
+        jan: l?.jan !== undefined && l?.jan !== null ? String(l.jan).trim() : '',
+        feb: l?.feb !== undefined && l?.feb !== null ? String(l.feb).trim() : '',
+        mac: l?.mac !== undefined && l?.mac !== null ? String(l.mac).trim() : '',
+        apr: l?.apr !== undefined && l?.apr !== null ? String(l.apr).trim() : '',
+        mei: l?.mei !== undefined && l?.mei !== null ? String(l.mei).trim() : '',
+        jun: l?.jun !== undefined && l?.jun !== null ? String(l.jun).trim() : '',
+        jul: l?.jul !== undefined && l?.jul !== null ? String(l.jul).trim() : '',
+        ogo: l?.ogo !== undefined && l?.ogo !== null ? String(l.ogo).trim() : '',
+        sep: l?.sep !== undefined && l?.sep !== null ? String(l.sep).trim() : '',
+        okt: l?.okt !== undefined && l?.okt !== null ? String(l.okt).trim() : '',
+        nov: l?.nov !== undefined && l?.nov !== null ? String(l.nov).trim() : '',
+        dis: l?.dis !== undefined && l?.dis !== null ? String(l.dis).trim() : '',
+        lebihanKredit: Number(l?.lebihanKredit) || 0
+      }))
+    : [];
+
+  return {
+    ...rawState,
+    members,
+    ledger
+  };
+}
+
 // Helper to save state to server file
 function saveServerState(state: any) {
   try {
-    fs.writeFileSync(STATE_FILE_PATH, JSON.stringify(state, null, 2), 'utf-8');
+    const sanitized = sanitizeServerState(state);
+    fs.writeFileSync(STATE_FILE_PATH, JSON.stringify(sanitized, null, 2), 'utf-8');
     return true;
   } catch (error) {
     console.error('Error saving server state:', error);
@@ -144,7 +211,7 @@ async function startServer() {
 
       console.log(`[Proxy Fetch] Fetching from Apps Script:`, targetUrl);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
 
       // 1. Fetch with standard User-Agent header (prevents Google bot challenge)
       let curUrl = targetUrl;

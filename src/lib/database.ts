@@ -30,18 +30,88 @@ export function isSameMemberId(id1: string | number | undefined | null, id2: str
   return normalizeMemberId(id1) === normalizeMemberId(id2);
 }
 
+// Helper to strictly sanitize Member objects and guarantee valid strings
+export function sanitizeMember(raw: any): Member {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      noAhli: '000',
+      nama: 'x',
+      ic: 'x',
+      alamat: 'x',
+      status: 'Tidak Aktif'
+    };
+  }
+
+  const noAhli = normalizeMemberId(raw.noAhli || raw.no || raw.id || '');
+  const nama = String(raw.nama || raw.namaAhli || raw.name || '').trim();
+  const ic = String(raw.ic || raw.noKadPengenalan || raw.kadPengenalan || raw.noKp || '').trim();
+  const alamat = String(raw.alamat || raw.address || '').trim();
+  const rawStatus = String(raw.status || raw.statusKeahlian || '').trim();
+  const status = (rawStatus === 'Aktif' || rawStatus.toLowerCase() === 'aktif') ? 'Aktif' : 'Tidak Aktif';
+  const tel = String(raw.tel || raw.noTelefon || raw.telefon || raw.phone || '').trim();
+  const catatan = String(raw.catatan || raw.nota || raw.remarks || '').trim();
+
+  let tanggungan: Tanggungan[] = [];
+  if (Array.isArray(raw.tanggungan)) {
+    tanggungan = raw.tanggungan.map((t: any) => ({
+      nama: String(t?.nama || '').trim(),
+      hubungan: String(t?.hubungan || '').trim(),
+      ic: String(t?.ic || t?.noKadPengenalan || '').trim()
+    })).filter((t: any) => t.nama.length > 0);
+  }
+
+  return {
+    noAhli,
+    nama: nama || 'x',
+    ic: ic || 'x',
+    alamat: alamat || 'x',
+    status,
+    tanggungan,
+    catatan,
+    tel
+  };
+}
+
+// Helper to strictly sanitize LedgerRow objects
+export function sanitizeLedgerRow(raw: any, membersList?: Member[]): LedgerRow {
+  const noAhli = normalizeMemberId(raw?.noAhli || raw?.no || raw?.id || '');
+  let namaAhli = String(raw?.namaAhli || raw?.nama || '').trim();
+  if (!namaAhli && membersList) {
+    const m = membersList.find(mem => isSameMemberId(mem.noAhli, noAhli));
+    if (m) namaAhli = m.nama;
+  }
+  const tahun = Number(raw?.tahun) || new Date().getFullYear();
+  const sanitizeMonth = (val: any) => {
+    if (val === undefined || val === null || val === 0 || val === '0') return '';
+    return String(val).trim();
+  };
+  const lebihanKredit = Number(raw?.lebihanKredit !== undefined ? raw.lebihanKredit : (raw?.bakiTunggakan !== undefined ? raw.bakiTunggakan : 0)) || 0;
+
+  return {
+    noAhli,
+    namaAhli: namaAhli || 'x',
+    tahun,
+    jan: sanitizeMonth(raw?.jan),
+    feb: sanitizeMonth(raw?.feb),
+    mac: sanitizeMonth(raw?.mac),
+    apr: sanitizeMonth(raw?.apr),
+    mei: sanitizeMonth(raw?.mei),
+    jun: sanitizeMonth(raw?.jun),
+    jul: sanitizeMonth(raw?.jul),
+    ogo: sanitizeMonth(raw?.ogo),
+    sep: sanitizeMonth(raw?.sep),
+    okt: sanitizeMonth(raw?.okt),
+    nov: sanitizeMonth(raw?.nov),
+    dis: sanitizeMonth(raw?.dis),
+    lebihanKredit
+  };
+}
+
 // Helper to merge duplicate members and ledger rows that result from conversion of '1' and '001'
 export function mergeDuplicateMembersAndLedgers(members: Member[], ledger: LedgerRow[]): { members: Member[]; ledger: LedgerRow[] } {
-  // 1. Normalize all Member IDs first
-  const normalizedMembers = members.map(m => ({
-    ...m,
-    noAhli: normalizeMemberId(m.noAhli)
-  }));
-
-  const normalizedLedger = ledger.map(l => ({
-    ...l,
-    noAhli: normalizeMemberId(l.noAhli)
-  }));
+  // 1. Sanitize all members and ledgers first
+  const normalizedMembers = (members || []).map(sanitizeMember);
+  const normalizedLedger = (ledger || []).map(l => sanitizeLedgerRow(l, normalizedMembers));
 
   // 2. Group members by normalized noAhli
   const memberGroups: { [key: string]: Member[] } = {};
@@ -65,18 +135,20 @@ export function mergeDuplicateMembersAndLedgers(members: Member[], ledger: Ledge
 
       list.forEach(m => {
         let score = 0;
-        const nameClean = m.nama.trim().toLowerCase();
-        const icClean = m.ic.trim().toLowerCase();
-        const alamatClean = m.alamat.trim().toLowerCase();
+        const nameClean = String(m.nama || '').trim().toLowerCase();
+        const icClean = String(m.ic || '').trim().toLowerCase();
+        const alamatClean = String(m.alamat || '').trim().toLowerCase();
 
         if (nameClean && nameClean !== 'x' && nameClean !== 'test' && nameClean !== 'tiada') score += 10;
         if (icClean && icClean !== 'x' && icClean !== 'test' && icClean !== 'tiada') score += 10;
         if (alamatClean && alamatClean !== 'x' && alamatClean !== 'test' && alamatClean !== 'tiada') score += 10;
         
         if (m.status === 'Aktif') score += 5;
+        if (m.tanggungan && m.tanggungan.length > 0) score += 5;
+        if (m.tel) score += 3;
         
-        score += m.nama.length * 0.1;
-        score += m.ic.length * 0.1;
+        score += nameClean.length * 0.1;
+        score += icClean.length * 0.1;
 
         if (score > bestScore) {
           bestScore = score;
@@ -87,17 +159,23 @@ export function mergeDuplicateMembersAndLedgers(members: Member[], ledger: Ledge
       const mergedMember: Member = { ...best };
       // Gather any non-'x' details from others if the selected best had them as 'x'
       list.forEach(m => {
-        const nameClean = m.nama.trim().toLowerCase();
-        if ((mergedMember.nama.toLowerCase() === 'x' || !mergedMember.nama) && nameClean && nameClean !== 'x') {
+        const nameClean = String(m.nama || '').trim().toLowerCase();
+        if ((String(mergedMember.nama || '').toLowerCase() === 'x' || !mergedMember.nama) && nameClean && nameClean !== 'x') {
           mergedMember.nama = m.nama;
         }
-        const icClean = m.ic.trim().toLowerCase();
-        if ((mergedMember.ic.toLowerCase() === 'x' || !mergedMember.ic) && icClean && icClean !== 'x') {
+        const icClean = String(m.ic || '').trim().toLowerCase();
+        if ((String(mergedMember.ic || '').toLowerCase() === 'x' || !mergedMember.ic) && icClean && icClean !== 'x') {
           mergedMember.ic = m.ic;
         }
-        const alamatClean = m.alamat.trim().toLowerCase();
-        if ((mergedMember.alamat.toLowerCase() === 'x' || !mergedMember.alamat) && alamatClean && alamatClean !== 'x') {
+        const alamatClean = String(m.alamat || '').trim().toLowerCase();
+        if ((String(mergedMember.alamat || '').toLowerCase() === 'x' || !mergedMember.alamat) && alamatClean && alamatClean !== 'x') {
           mergedMember.alamat = m.alamat;
+        }
+        if ((!mergedMember.tanggungan || mergedMember.tanggungan.length === 0) && m.tanggungan && m.tanggungan.length > 0) {
+          mergedMember.tanggungan = m.tanggungan;
+        }
+        if (!mergedMember.tel && m.tel) {
+          mergedMember.tel = m.tel;
         }
       });
       mergedMembers.push(mergedMember);
@@ -156,6 +234,32 @@ export function mergeDuplicateMembersAndLedgers(members: Member[], ledger: Ledge
   };
 }
 
+export function sanitizeAppState(rawState: any): AppState {
+  if (!rawState || typeof rawState !== 'object') {
+    return getInitialState();
+  }
+
+  const rawMembers = Array.isArray(rawState.members) ? rawState.members : [];
+  const rawLedger = Array.isArray(rawState.ledger) ? rawState.ledger : [];
+  
+  const initialMembers = rawMembers.length > 0 ? rawMembers.map(sanitizeMember) : defaultMembers;
+  const initialLedger = rawLedger.length > 0 ? rawLedger.map((r: any) => sanitizeLedgerRow(r, initialMembers)) : defaultLedger;
+
+  const { members, ledger } = mergeDuplicateMembersAndLedgers(initialMembers, initialLedger);
+
+  return {
+    ...rawState,
+    members,
+    ledger,
+    kewangan: Array.isArray(rawState.kewangan) ? rawState.kewangan : defaultKewangan,
+    googleSheetsId: String(rawState.googleSheetsId || '1sQWxn0TVSjwUZa8KkwzZi0Uv1z7CdW3O-D8rN4kJ6zI'),
+    appsScriptUrl: String(rawState.appsScriptUrl || ''),
+    useGoogleSheets: Boolean(rawState.useGoogleSheets),
+    kadarYuranSebulan: typeof rawState.kadarYuranSebulan === 'number' ? rawState.kadarYuranSebulan : 3,
+    adminPassword: String(rawState.adminPassword || 'gongbadak123')
+  };
+}
+
 export function getInitialState(): AppState {
   let cached = localStorage.getItem(STATE_KEY);
   if (!cached) {
@@ -164,18 +268,8 @@ export function getInitialState(): AppState {
   if (cached) {
     try {
       const parsed = JSON.parse(cached);
-      if (parsed && Array.isArray(parsed.members) && Array.isArray(parsed.ledger)) {
-        const { members, ledger } = mergeDuplicateMembersAndLedgers(parsed.members, parsed.ledger);
-        return {
-          members,
-          ledger,
-          kewangan: parsed.kewangan || defaultKewangan,
-          googleSheetsId: parsed.googleSheetsId || '1sQWxn0TVSjwUZa8KkwzZi0Uv1z7CdW3O-D8rN4kJ6zI',
-          appsScriptUrl: parsed.appsScriptUrl || '',
-          useGoogleSheets: parsed.useGoogleSheets || false,
-          kadarYuranSebulan: typeof parsed.kadarYuranSebulan === 'number' ? parsed.kadarYuranSebulan : 3,
-          adminPassword: parsed.adminPassword || 'gongbadak123'
-        };
+      if (parsed && typeof parsed === 'object') {
+        return sanitizeAppState(parsed);
       }
     } catch (e) {
       console.error('Failed to parse cached state:', e);
@@ -197,13 +291,9 @@ export function getInitialState(): AppState {
 }
 
 export function saveState(state: AppState) {
-  const { members, ledger } = mergeDuplicateMembersAndLedgers(state.members, state.ledger);
-  const normalizedState = {
-    ...state,
-    members,
-    ledger
-  };
-  localStorage.setItem(STATE_KEY, JSON.stringify(normalizedState));
+  const sanitized = sanitizeAppState(state);
+  localStorage.setItem(STATE_KEY, JSON.stringify(sanitized));
+  localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(sanitized));
 }
 
 // Helper to sort the ledger strictly according to the specs
@@ -286,7 +376,7 @@ export function runDaftarAhliBaru(
   // "tidak boleh berundur atau menggunakan no ahli yang lepas"
   const numericIds = state.members
     .map(m => {
-      const clean = m.noAhli.replace(/\D/g, '');
+      const clean = String(m.noAhli || '').replace(/\D/g, '');
       return clean ? parseInt(clean, 10) : 0;
     })
     .filter(id => id > 0);

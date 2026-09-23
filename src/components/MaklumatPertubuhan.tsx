@@ -238,9 +238,9 @@ export default function MaklumatPertubuhan({ state, onChangeState, currentRole }
     }
     const q = searchQuery.toLowerCase();
     return state.members.filter(m => 
-      m.nama.toLowerCase().includes(q) || 
-      m.noAhli.toLowerCase().includes(q) ||
-      (m.ic && m.ic.includes(q))
+      String(m.nama || '').toLowerCase().includes(q) || 
+      String(m.noAhli || '').toLowerCase().includes(q) ||
+      (Boolean(m.ic) && String(m.ic).includes(q))
     );
   }, [state.members, searchQuery]);
 

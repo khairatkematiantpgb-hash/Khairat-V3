@@ -139,11 +139,11 @@ export default function PenyataKiraKira({ state, onChangeState, currentRole }: P
       const dateDiff = dateA.localeCompare(dateB);
       if (dateDiff !== 0) return dateDiff;
       // If same date, keep alphabetical order of id or treat "Baki pada" first
-      const aIsBaki = a.kenyataan.toLowerCase().startsWith('baki');
-      const bIsBaki = b.kenyataan.toLowerCase().startsWith('baki');
+      const aIsBaki = String(a.kenyataan || '').toLowerCase().startsWith('baki');
+      const bIsBaki = String(b.kenyataan || '').toLowerCase().startsWith('baki');
       if (aIsBaki && !bIsBaki) return -1;
       if (!aIsBaki && bIsBaki) return 1;
-      return a.id.localeCompare(b.id);
+      return String(a.id || '').localeCompare(String(b.id || ''));
     });
 
     const isRangeActive = filterMode === 'range' && Boolean(dateRangeStart || dateRangeEnd);

@@ -3,9 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { Component, useState, useEffect } from 'react';
 import { AppState } from './types';
 import { getDefaultAppState } from './lib/defaultData';
+import { sanitizeAppState } from './lib/database';
 import { fetchFromAppsScript } from './lib/appsScript';
 import Navbar from './components/Navbar';
 import Overview from './components/Overview';
@@ -19,7 +20,69 @@ import PenyataKiraKira from './components/PenyataKiraKira';
 import MaklumatPertubuhan from './components/MaklumatPertubuhan';
 import { ShieldAlert, LogIn, Users, HelpCircle, FileText, CheckCircle2, Lock, ArrowLeft } from 'lucide-react';
 
-export default function App() {
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  override state: ErrorBoundaryState = { hasError: false, error: null };
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  override componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('ErrorBoundary caught an error:', error, errorInfo);
+  }
+
+  handleReset = () => {
+    localStorage.removeItem('khairat_gong_badak');
+    localStorage.removeItem('khairat_gong_badak_state_v1');
+    window.location.reload();
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center p-4 font-sans">
+          <div className="max-w-md w-full bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-2xl text-center space-y-4">
+            <div className="mx-auto h-14 w-14 bg-rose-500/20 text-rose-400 rounded-full flex items-center justify-center border border-rose-500/30">
+              <ShieldAlert className="h-8 w-8" />
+            </div>
+            <h2 className="text-sm font-extrabold uppercase tracking-wide text-white">
+              Sistem Menghadapi Masalah Paparan
+            </h2>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Terdapat percanggahan format data sementara ({this.state.error?.message || 'Data format error'}). Sila klik butang di bawah untuk memuat semula sistem secara automatik.
+            </p>
+            <div className="pt-2 flex flex-col gap-2">
+              <button
+                onClick={() => window.location.reload()}
+                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition cursor-pointer"
+              >
+                Muat Semula Halaman (Refresh)
+              </button>
+              <button
+                onClick={this.handleReset}
+                className="w-full py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white text-xs font-semibold rounded-xl transition cursor-pointer"
+              >
+                Reset Cache & Muat Semula Penuh
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function MainApp() {
   // 1. App State & Role Management
   const [state, setState] = useState<AppState>(() => {
     let saved = localStorage.getItem('khairat_gong_badak');
@@ -42,17 +105,18 @@ export default function App() {
           parsed.googleSheetsId = NEW_SHEET_ID;
           upgraded = true;
         }
+        const sanitized = sanitizeAppState(parsed);
         if (upgraded) {
           console.log('Migrasi Automatik: Menetapkan Google Sheets ID & Apps Script URL terkini dalam localStorage.');
-          localStorage.setItem('khairat_gong_badak', JSON.stringify(parsed));
-          localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(parsed));
+          localStorage.setItem('khairat_gong_badak', JSON.stringify(sanitized));
+          localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(sanitized));
         }
-        return parsed;
+        return sanitized;
       } catch (e) {
         console.error('Error parsing cached state, resetting...', e);
       }
     }
-    return getDefaultAppState();
+    return sanitizeAppState(getDefaultAppState());
   });
 
   const [currentRole, setCurrentRole] = useState<'admin' | 'user' | 'ajk' | null>(() => {
@@ -64,7 +128,7 @@ export default function App() {
   const [selectedMemberId, setSelectedMemberId] = useState<string>('');
   const [syncLoading, setSyncLoading] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
-  const [isServerConnected, setIsServerConnected] = useState(false);
+  const [isServerConnected, setIsServerConnected] = useState<boolean | string>(false);
 
   // Admin authentication state
   const [showAdminPassInput, setShowAdminPassInput] = useState(false);
@@ -75,9 +139,10 @@ export default function App() {
 
   // 2. State Persister & Server Synchronization Hook
   const handleChangeState = async (newState: AppState) => {
-    setState(newState);
-    localStorage.setItem('khairat_gong_badak', JSON.stringify(newState));
-    localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(newState));
+    const sanitized = sanitizeAppState(newState);
+    setState(sanitized);
+    localStorage.setItem('khairat_gong_badak', JSON.stringify(sanitized));
+    localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(sanitized));
     
     // Safety guard: Guest ('user') devices should NEVER write or overwrite the server-side master database!
     if (currentRole === 'user' || !currentRole) {
@@ -91,7 +156,7 @@ export default function App() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ state: newState }),
+        body: JSON.stringify({ state: sanitized }),
       });
     } catch (e) {
       console.warn('Gagal menyimpan keadaan ke pelayan:', e);
@@ -121,7 +186,7 @@ export default function App() {
           ? result.data.kewangan
           : state.kewangan;
 
-        const mergedState = {
+        const mergedState = sanitizeAppState({
           ...state,
           members: incomingMembers,
           ledger: incomingLedger,
@@ -129,7 +194,7 @@ export default function App() {
           googleSheetsId: result.data.spreadsheetId || state.googleSheetsId,
           chartRoles: (result.data.chartRoles && Object.keys(result.data.chartRoles).length > 0) ? result.data.chartRoles : state.chartRoles,
           pekelilingList: (result.data.pekelilingList && result.data.pekelilingList.length > 0) ? result.data.pekelilingList : state.pekelilingList
-        };
+        });
         await handleChangeState(mergedState);
       } else {
         setSyncError(result.message || 'Gagal berkomunikasi dengan Google Sheets remote.');
@@ -222,7 +287,7 @@ export default function App() {
             // Safety: If server state is empty (0 members) but default or local state has data, do NOT wipe with empty data!
             if (remoteCount === 0 && (localCount > 0 || state.members.length > 0)) {
               console.log('Server state was empty, initializing server with local baseline');
-              const baseState = (localState && localCount > 0) ? localState : state;
+              const baseState = sanitizeAppState((localState && localCount > 0) ? localState : state);
               await fetch('/api/state', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -231,26 +296,28 @@ export default function App() {
               setState(baseState);
             } else if (localState && localCount > remoteCount && localCount > 15) {
               console.log('Preserving rich local state of', localCount, 'members over remote', remoteCount, 'members');
+              const sanitizedLocal = sanitizeAppState(localState);
               const cachedRole = localStorage.getItem('khairat_gong_badak_role_v1') || currentRole;
               if (cachedRole === 'admin') {
                 await fetch('/api/state', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ state: localState }),
+                  body: JSON.stringify({ state: sanitizedLocal }),
                 });
               }
-              setState(localState);
+              setState(sanitizedLocal);
             } else {
               // Adopt remote centered live database
-              setState(data.state);
-              localStorage.setItem('khairat_gong_badak', JSON.stringify(data.state));
-              localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(data.state));
+              const sanitizedRemote = sanitizeAppState(data.state);
+              setState(sanitizedRemote);
+              localStorage.setItem('khairat_gong_badak', JSON.stringify(sanitizedRemote));
+              localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(sanitizedRemote));
             }
           } else {
             // Server has no state file yet (first time or starting up). 
             // If we are admin or we have a richer local state, push it. Otherwise, initialize.
             const localCount = localState?.members?.length || 0;
-            const activeStateToIncept = (localState && localCount > 11) ? localState : state;
+            const activeStateToIncept = sanitizeAppState((localState && localCount > 11) ? localState : state);
             
             await fetch('/api/state', {
               method: 'POST',
@@ -760,5 +827,13 @@ export default function App() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <MainApp />
+    </ErrorBoundary>
   );
 }

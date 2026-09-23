@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { Member, AppState } from '../types';
-import { runPadamAhli, writeToAppsScript, isSameMemberId, mergeDuplicateMembersAndLedgers } from '../lib/database';
+import { runPadamAhli, writeToAppsScript, isSameMemberId, mergeDuplicateMembersAndLedgers, normalizeMemberId } from '../lib/database';
 import { Search, Trash2, Filter, AlertTriangle, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, FileSpreadsheet, FileText, PlusCircle, Check, X, Info, CheckCircle, Users, User } from 'lucide-react';
 
 interface MemberDatabaseProps {
@@ -258,18 +258,19 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
       } else {
         // If search contains letters/characters, search by name, exact ID, or IC
         matchesSearch =
-          m.nama.toLowerCase().includes(cleanSearch) ||
-          m.noAhli.toLowerCase().includes(cleanSearch) ||
+          String(m.nama || '').toLowerCase().includes(cleanSearch) ||
+          String(m.noAhli || '').toLowerCase().includes(cleanSearch) ||
           isSameMemberId(m.noAhli, cleanSearch) ||
-          (m.ic && m.ic.toLowerCase().includes(cleanSearch));
+          (Boolean(m.ic) && String(m.ic).toLowerCase().includes(cleanSearch));
       }
 
-      const matchesStatus = statusFilter === 'Semua' || m.status === statusFilter;
+      const memberStatus = m.status || 'Aktif';
+      const matchesStatus = statusFilter === 'Semua' || memberStatus === statusFilter;
       return matchesSearch && matchesStatus;
     })
     .sort((a, b) => {
       // Sort member list ascending numerically by No. Ahli
-      return a.noAhli.localeCompare(b.noAhli, undefined, { numeric: true });
+      return normalizeMemberId(a.noAhli).localeCompare(normalizeMemberId(b.noAhli), undefined, { numeric: true });
     });
 
   // Export Member list to Excel (CSV format)
@@ -845,7 +846,7 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
             <button
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="p-1 px-1.5 text-xs text-slate-600 border border-slate-300 hover:bg-slate-105 bg-white disabled:opacity-40 rounded cursor-pointer"
+              className="p-1 px-1.5 text-xs text-slate-600 border border-slate-300 hover:bg-slate-100 bg-white disabled:opacity-40 rounded cursor-pointer"
             >
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
