@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { AppState } from '../types';
 import { fetchFromAppsScript, writeToAppsScript } from '../lib/appsScript';
+import { sanitizeAppState } from '../lib/database';
 import { getAppsScriptGoogleCode } from '../lib/appsScript';
 import { Radio, ToggleLeft, ToggleRight, Check, CheckCircle, Info, Key, AlertTriangle, RefreshCw, Layers, ExternalLink, HelpCircle, FileText, CheckCircle2, Share2 } from 'lucide-react';
 
@@ -255,18 +256,47 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
     setTestLoading(true);
     setTestResult(null);
     try {
-      await onRefresh();
-      setTestResult({
-        success: true,
-        message: 'Data terbaharu berjaya ditarik turun dari Google Sheets secara bersih!'
-      });
+      const targetUrl = appsScriptUrlInput.trim() || state.appsScriptUrl || 'https://script.google.com/macros/s/AKfycbzWl9ccXM2e39h2rjYlezESn2Y-DOtQKxu3mqVZ45b64u_NtN6yeJWTGiy5eBWspo0T/exec';
+      const result = await fetchFromAppsScript(targetUrl);
+      if (result.success && result.data) {
+        const rawMembers = result.data.members || result.data.data?.members || [];
+        const rawLedger = result.data.ledger || result.data.data?.ledger || [];
+        const rawKewangan = result.data.kewangan || result.data.data?.kewangan || [];
+        
+        if (rawMembers.length === 0 && rawLedger.length === 0) {
+          throw new Error('Google Sheets membalas tetapi tiada rekod ahli atau lejar ditemui.');
+        }
+
+        const newState = sanitizeAppState({
+          ...state,
+          useGoogleSheets: true,
+          appsScriptUrl: targetUrl,
+          members: rawMembers,
+          ledger: rawLedger,
+          kewangan: rawKewangan.length > 0 ? rawKewangan : (state.kewangan || []),
+          chartRoles: (result.data.chartRoles && Object.keys(result.data.chartRoles).length > 0) ? result.data.chartRoles : state.chartRoles,
+          pekelilingList: (result.data.pekelilingList && result.data.pekelilingList.length > 0) ? result.data.pekelilingList : state.pekelilingList
+        });
+
+        await onChangeState(newState);
+        localStorage.setItem('khairat_gong_badak', JSON.stringify(newState));
+        localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(newState));
+
+        setTestResult({
+          success: true,
+          message: `Berjaya menarik data dari Google Sheets! (${rawMembers.length} rekod ahli & ${rawLedger.length} baris rekod lejar ditemui dan diselaraskan).`
+        });
+      } else {
+        throw new Error(result.message || 'Gagal menarik data dari Google Sheets.');
+      }
     } catch (err: any) {
       setTestResult({
         success: false,
         message: `Gagal menarik data: ${err.message}`
       });
+    } finally {
+      setTestLoading(false);
     }
-    setTestLoading(false);
   };
 
   const handleCopyCodeText = () => {

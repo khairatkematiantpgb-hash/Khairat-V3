@@ -92,22 +92,21 @@ function MainApp() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        const OLD_URL_ID = 'AKfycbzWl9ccXM2e39h2rjYlezESn2Y-DOtQKxu3mqVZ45b64u_NtN6yeJWTGiy5eBWspo0T';
-        const NEW_URL = 'https://script.google.com/macros/s/AKfycbzyNGrOIKVN80Hcyb05LKTFxXCeLvzRVyF6YKKdtTYWVyyH0lCQF7otWmNfmb8rxK6r/exec';
-        const NEW_SHEET_ID = '1JLSTFs3fQ0fzZ6beESzchHbjQea0ucS4Y2gaoxRQakQ';
+        const REAL_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzWl9ccXM2e39h2rjYlezESn2Y-DOtQKxu3mqVZ45b64u_NtN6yeJWTGiy5eBWspo0T/exec';
+        const REAL_SHEET_ID = '1sQWxn0TVSjwUZa8KkwzZi0Uv1z7CdW3O-D8rN4kJ6zI';
         
         let upgraded = false;
-        if (!parsed.appsScriptUrl || parsed.appsScriptUrl.includes(OLD_URL_ID) || parsed.appsScriptUrl.trim() === '') {
-          parsed.appsScriptUrl = NEW_URL;
+        if (!parsed.appsScriptUrl || parsed.appsScriptUrl.includes('AKfycbzyNGrOIKVN80Hcyb05LKTFxXCeLvzRVyF6YKKdtTYWVyyH0lCQF7otWmNfmb8rxK6r') || parsed.appsScriptUrl.trim() === '') {
+          parsed.appsScriptUrl = REAL_APPS_SCRIPT_URL;
           upgraded = true;
         }
-        if (!parsed.googleSheetsId || parsed.googleSheetsId.trim() === '' || parsed.googleSheetsId.startsWith('AKfycb')) {
-          parsed.googleSheetsId = NEW_SHEET_ID;
+        if (!parsed.googleSheetsId || parsed.googleSheetsId.includes('1JLSTFs3fQ0fzZ6beESzchHbjQea0ucS4Y2gaoxRQakQ') || parsed.googleSheetsId.trim() === '' || parsed.googleSheetsId.startsWith('AKfycb')) {
+          parsed.googleSheetsId = REAL_SHEET_ID;
           upgraded = true;
         }
         const sanitized = sanitizeAppState(parsed);
         if (upgraded) {
-          console.log('Migrasi Automatik: Menetapkan Google Sheets ID & Apps Script URL terkini dalam localStorage.');
+          console.log('Migrasi Automatik: Menetapkan Google Sheets ID & Apps Script URL asal dalam localStorage.');
           localStorage.setItem('khairat_gong_badak', JSON.stringify(sanitized));
           localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(sanitized));
         }
@@ -165,33 +164,37 @@ function MainApp() {
 
   // 3. Automated Google Sheets Synchronization Pull Trigger
   const handleRefreshFromSheets = async () => {
-    if (!state.useGoogleSheets || !state.appsScriptUrl) {
-      return;
-    }
+    const scriptUrl = state.appsScriptUrl || 'https://script.google.com/macros/s/AKfycbzWl9ccXM2e39h2rjYlezESn2Y-DOtQKxu3mqVZ45b64u_NtN6yeJWTGiy5eBWspo0T/exec';
 
     setSyncLoading(true);
     setSyncError(null);
 
     try {
-      const result = await fetchFromAppsScript(state.appsScriptUrl);
+      const result = await fetchFromAppsScript(scriptUrl);
       if (result.success && result.data) {
+        const rawMembers = result.data.members || result.data.data?.members || [];
+        const rawLedger = result.data.ledger || result.data.data?.ledger || [];
+        const rawKewangan = result.data.kewangan || result.data.data?.kewangan || [];
+
         // Keselamatan: Jangan benarkan data kosong daripada Sheets menimpa data tempatan yang ada
-        const incomingMembers = (Array.isArray(result.data.members) && result.data.members.length > 0)
-          ? result.data.members
+        const incomingMembers = (Array.isArray(rawMembers) && rawMembers.length > 0)
+          ? rawMembers
           : state.members;
-        const incomingLedger = (Array.isArray(result.data.ledger) && result.data.ledger.length > 0)
-          ? result.data.ledger
+        const incomingLedger = (Array.isArray(rawLedger) && rawLedger.length > 0)
+          ? rawLedger
           : state.ledger;
-        const incomingKewangan = (Array.isArray(result.data.kewangan) && result.data.kewangan.length > 0)
-          ? result.data.kewangan
+        const incomingKewangan = (Array.isArray(rawKewangan) && rawKewangan.length > 0)
+          ? rawKewangan
           : state.kewangan;
 
         const mergedState = sanitizeAppState({
           ...state,
+          useGoogleSheets: true,
+          appsScriptUrl: scriptUrl,
           members: incomingMembers,
           ledger: incomingLedger,
           kewangan: incomingKewangan,
-          googleSheetsId: result.data.spreadsheetId || state.googleSheetsId,
+          googleSheetsId: result.data.spreadsheetId || state.googleSheetsId || '1sQWxn0TVSjwUZa8KkwzZi0Uv1z7CdW3O-D8rN4kJ6zI',
           chartRoles: (result.data.chartRoles && Object.keys(result.data.chartRoles).length > 0) ? result.data.chartRoles : state.chartRoles,
           pekelilingList: (result.data.pekelilingList && result.data.pekelilingList.length > 0) ? result.data.pekelilingList : state.pekelilingList
         });
@@ -211,8 +214,9 @@ function MainApp() {
     const params = new URLSearchParams(window.location.search);
     const scriptUrlParam = params.get('script') || params.get('s');
     
-    // Default Apps Script URL terbaharu yang sahih dan aktif bagi Kampung Gong Badak
-    const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzyNGrOIKVN80Hcyb05LKTFxXCeLvzRVyF6YKKdtTYWVyyH0lCQF7otWmNfmb8rxK6r/exec';
+    // Default Apps Script URL asal yang mengandungi 499 ahli dan rekod lejar
+    const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzWl9ccXM2e39h2rjYlezESn2Y-DOtQKxu3mqVZ45b64u_NtN6yeJWTGiy5eBWspo0T/exec';
+    const DEFAULT_SHEET_ID = '1sQWxn0TVSjwUZa8KkwzZi0Uv1z7CdW3O-D8rN4kJ6zI';
     
     let needsUpdate = false;
     let decodedUrl = '';
@@ -226,9 +230,7 @@ function MainApp() {
       } catch (err) {
         console.error('Failed to parse URL query script URL parameter:', err);
       }
-    } else if (!state.appsScriptUrl || state.appsScriptUrl.trim() === '' || state.appsScriptUrl.includes('AKfycbzWl9ccXM2e39h2rjYlezESn2Y-DOtQKxu3mqVZ45b64u_NtN6yeJWTGiy5eBWspo0T')) {
-      // Jika pengguna melayari URL bersih (m.g. / sahaja) tanpa sebarang parametre, dan tiada pautan tersimpan,
-      // kita setkan pautan Google Sheets lalai secara automatik supaya mereka tidak mendapat ralat 404!
+    } else if (!state.appsScriptUrl || state.appsScriptUrl.trim() === '' || state.appsScriptUrl.includes('AKfycbzyNGrOIKVN80Hcyb05LKTFxXCeLvzRVyF6YKKdtTYWVyyH0lCQF7otWmNfmb8rxK6r')) {
       decodedUrl = DEFAULT_APPS_SCRIPT_URL;
       needsUpdate = true;
     }
@@ -248,7 +250,7 @@ function MainApp() {
         ...currentState,
         useGoogleSheets: true,
         appsScriptUrl: decodedUrl,
-        googleSheetsId: '1JLSTFs3fQ0fzZ6beESzchHbjQea0ucS4Y2gaoxRQakQ'
+        googleSheetsId: DEFAULT_SHEET_ID
       };
       
       setState(updatedState);
