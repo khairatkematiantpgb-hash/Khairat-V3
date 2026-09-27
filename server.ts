@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import { execSync } from 'child_process';
 import { createServer as createViteServer } from 'vite';
 
 const PORT = 3000;
@@ -365,6 +366,79 @@ async function startServer() {
     }
 
     res.status(500).json({ success: false, message: 'Gagal memproses pautan pendek secara automatik.' });
+  });
+
+  // API Route: Download Full Application Backup ZIP
+  app.get('/api/backup/download', (req, res) => {
+    try {
+      const rootDir = process.cwd();
+      const pythonScript = path.join(rootDir, 'scripts', 'backup.py');
+      const latestZip = path.join(rootDir, 'khairat_backup_lengkap.zip');
+      
+      // Execute the backup script to ensure latest state is packed
+      if (fs.existsSync(pythonScript)) {
+        try {
+          execSync(`python3 "${pythonScript}"`, { cwd: rootDir, timeout: 30000 });
+        } catch (execErr) {
+          console.warn('[Backup] Warning running python3 script:', execErr);
+        }
+      }
+      
+      if (!fs.existsSync(latestZip)) {
+        return res.status(500).json({ success: false, message: 'Fail sandaran ZIP tidak ditemui' });
+      }
+
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+      const filename = `backup_khairat_gong_badak_${timestamp}.zip`;
+
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      const fileStream = fs.createReadStream(latestZip);
+      fileStream.pipe(res);
+    } catch (err: any) {
+      console.error('[Backup Download Error]', err);
+      res.status(500).json({ success: false, message: err.message || 'Ralat memuat turun sandaran' });
+    }
+  });
+
+  // API Route: Backup Info / Status
+  app.get('/api/backup/info', (req, res) => {
+    try {
+      const rootDir = process.cwd();
+      const latestZip = path.join(rootDir, 'khairat_backup_lengkap.zip');
+      const stateFile = path.join(rootDir, 'db_state.json');
+
+      let zipStats = null;
+      if (fs.existsSync(latestZip)) {
+        const stats = fs.statSync(latestZip);
+        zipStats = {
+          size: stats.size,
+          sizeFormatted: stats.size > 1048576 ? `${(stats.size / (1024 * 1024)).toFixed(2)} MB` : `${(stats.size / 1024).toFixed(1)} KB`,
+          lastModified: stats.mtime
+        };
+      }
+
+      let memberCount = 0;
+      let ledgerCount = 0;
+      if (fs.existsSync(stateFile)) {
+        const raw = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+        memberCount = raw.members?.length || 0;
+        ledgerCount = raw.ledger?.length || 0;
+      }
+
+      res.json({
+        success: true,
+        zipStats,
+        database: {
+          memberCount,
+          ledgerCount
+        }
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
   });
 
   // Vite development middleware vs production static assets

@@ -8,7 +8,7 @@ import { AppState } from '../types';
 import { fetchFromAppsScript, writeToAppsScript } from '../lib/appsScript';
 import { sanitizeAppState } from '../lib/database';
 import { getAppsScriptGoogleCode } from '../lib/appsScript';
-import { Radio, ToggleLeft, ToggleRight, Check, CheckCircle, Info, Key, AlertTriangle, RefreshCw, Layers, ExternalLink, HelpCircle, FileText, CheckCircle2, Share2 } from 'lucide-react';
+import { Radio, ToggleLeft, ToggleRight, Check, CheckCircle, Info, Key, AlertTriangle, RefreshCw, Layers, ExternalLink, HelpCircle, FileText, CheckCircle2, Share2, Download, Archive, Terminal, FileArchive, Copy } from 'lucide-react';
 
 interface IntegrationPanelProps {
   state: AppState;
@@ -34,6 +34,76 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
   const [shortenedUrls, setShortenedUrls] = useState<Record<string, string>>({});
   const [shortenLoading, setShortenLoading] = useState(false);
   const [shortenError, setShortenError] = useState<string | null>(null);
+
+  // Full Backup State & Handlers
+  const [downloadingZip, setDownloadingZip] = useState(false);
+  const [copiedCommand, setCopiedCommand] = useState(false);
+  const [backupDownloadMsg, setBackupDownloadMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleDownloadZipBackup = async () => {
+    setDownloadingZip(true);
+    setBackupDownloadMsg(null);
+    try {
+      const res = await fetch('/api/backup/download');
+      if (!res.ok) {
+        throw new Error(`Pelayan memberi status HTTP ${res.status}`);
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+      a.download = `backup_khairat_gong_badak_${ts}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setBackupDownloadMsg({
+        type: 'success',
+        text: 'Arkib ZIP lengkap (.zip) mengandungi kod sumber penuh & pangkalan data ahli berjaya dimuat turun!'
+      });
+    } catch (err: any) {
+      console.error('Download error:', err);
+      // Fallback: download client-side db_state JSON directly
+      const stateStr = JSON.stringify(state, null, 2);
+      const blob = new Blob([stateStr], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `db_state_khairat_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setBackupDownloadMsg({
+        type: 'error',
+        text: `Pelayan sandaran ZIP tidak dapat dihubungi (${err.message}). Sistem telah memuat turun sandaran pangkalan data JSON tempatan secara automatik!`
+      });
+    } finally {
+      setDownloadingZip(false);
+    }
+  };
+
+  const handleDownloadJsonBackup = () => {
+    const stateStr = JSON.stringify(state, null, 2);
+    const blob = new Blob([stateStr], { type: 'application/json' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `db_state_khairat_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  };
+
+  const handleCopyBackupCommand = (cmd: string) => {
+    navigator.clipboard.writeText(cmd);
+    setCopiedCommand(true);
+    setTimeout(() => setCopiedCommand(false), 3000);
+  };
 
   const handleGenerateShortLink = async (longUrl: string, domainType: string) => {
     setShortenLoading(true);
@@ -893,6 +963,110 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
               >
                 Simpan Konfigurasi
               </button>
+            </div>
+          </div>
+
+          {/* Pusat Sandaran Lengkap Aplikasi (Full System Backup ZIP & Scripts) */}
+          <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white p-5 rounded-xl border border-indigo-800/60 shadow-lg space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-indigo-800/50">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-indigo-600/30 rounded-lg border border-indigo-400/30 text-indigo-300">
+                  <Archive className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-wider text-indigo-200">
+                    Pusat Sandaran Lengkap Aplikasi (Full Backup ZIP)
+                  </h3>
+                  <p className="text-[10px] text-indigo-300/80 font-sans mt-0.5">
+                    Hasilkan dan muat turun salinan lengkap keseluruhan sistem dan pangkalan data.
+                  </p>
+                </div>
+              </div>
+              <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full text-[10px] font-bold font-mono">
+                {state.members?.length || 0} Ahli • {state.ledger?.length || 0} Lejar
+              </span>
+            </div>
+
+            <p className="text-[11px] text-slate-300 leading-relaxed font-sans">
+              Salinan arkib <strong>ZIP</strong> ini mengandungi fail pangkalan data penuh (<code className="bg-indigo-950 px-1.5 py-0.5 rounded text-indigo-200 font-mono text-[10px]">db_state.json</code>), kesemua modul kod sumber sistem (<code className="bg-indigo-950 px-1.5 py-0.5 rounded text-indigo-200 font-mono text-[10px]">src/</code>), pelayan backend (<code className="bg-indigo-950 px-1.5 py-0.5 rounded text-indigo-200 font-mono text-[10px]">server.ts</code>), serta panduan pemulihan lengkap.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <button
+                type="button"
+                onClick={handleDownloadZipBackup}
+                disabled={downloadingZip}
+                className="py-3 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-extrabold text-[11px] uppercase rounded-xl tracking-wider transition border-b-2 border-indigo-900 cursor-pointer flex items-center justify-center gap-2 shadow-md hover:shadow-indigo-500/25"
+                title="Muat turun fail ZIP sandaran penuh"
+              >
+                {downloadingZip ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin text-white" />
+                    <span>Menjana Fail ZIP...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 text-indigo-200" />
+                    <span>Muat Turun Sandaran (.ZIP)</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDownloadJsonBackup}
+                className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-extrabold text-[11px] uppercase rounded-xl tracking-wider transition border-b-2 border-slate-950 cursor-pointer flex items-center justify-center gap-2 shadow-sm"
+                title="Muat turun hanya data JSON"
+              >
+                <FileArchive className="h-4 w-4 text-emerald-400" />
+                <span>Muat Turun Data Sahaja (.JSON)</span>
+              </button>
+            </div>
+
+            {backupDownloadMsg && (
+              <div className={`p-3 rounded-lg border text-xs leading-relaxed ${
+                backupDownloadMsg.type === 'success'
+                  ? 'bg-emerald-950/80 border-emerald-800 text-emerald-200'
+                  : 'bg-amber-950/80 border-amber-800 text-amber-200'
+              }`}>
+                <div className="flex gap-2 font-sans font-medium text-[11px]">
+                  {backupDownloadMsg.type === 'success' ? (
+                    <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                  )}
+                  <span>{backupDownloadMsg.text}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Skrip Terminal / CLI Information */}
+            <div className="bg-slate-950/80 border border-indigo-900/40 rounded-xl p-3.5 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest flex items-center gap-1.5 font-mono">
+                  <Terminal className="h-3.5 w-3.5 text-indigo-400" />
+                  Skrip Backup Melalui Terminal / Command Line:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleCopyBackupCommand('npm run backup')}
+                  className="px-2 py-0.5 bg-indigo-900/60 hover:bg-indigo-800 text-indigo-200 rounded text-[9px] font-mono flex items-center gap-1 transition cursor-pointer"
+                >
+                  {copiedCommand ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                  {copiedCommand ? 'Disalin!' : 'Salin Arahan'}
+                </button>
+              </div>
+
+              <div className="bg-black/60 p-2.5 rounded-lg border border-slate-800 font-mono text-[11px] text-emerald-400 space-y-1">
+                <div className="text-slate-400 text-[10px]"># Menjalankan skrip backup lengkap secara automatik:</div>
+                <div className="select-all">$ npm run backup</div>
+                <div className="text-slate-400 text-[10px] pt-1"># Atau jalankan skrip bash secara terus:</div>
+                <div className="select-all">$ bash backup.sh</div>
+              </div>
+
+              <div className="text-[10px] text-slate-400 leading-normal font-sans pt-1">
+                <strong className="text-slate-300">Cara Restore:</strong> Buka folder yang diekstrak &rarr; jalankan <code className="text-indigo-300 font-mono">npm install</code> &rarr; kemudian <code className="text-emerald-300 font-mono">npm run dev</code>. Rujuk fail <code className="text-indigo-300 font-mono">PANDUAN_PEMULIHAN.md</code> di dalam arkib untuk panduan penuh.
+              </div>
             </div>
           </div>
 
