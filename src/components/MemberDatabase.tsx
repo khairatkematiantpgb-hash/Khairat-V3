@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { Member, AppState } from '../types';
 import { runPadamAhli, writeToAppsScript, isSameMemberId, mergeDuplicateMembersAndLedgers, normalizeMemberId } from '../lib/database';
-import { Search, Trash2, Filter, AlertTriangle, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, FileSpreadsheet, FileText, PlusCircle, Check, X, Info, CheckCircle, Users, User } from 'lucide-react';
+import { Search, Trash2, Filter, AlertTriangle, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, FileSpreadsheet, FileText, PlusCircle, Check, X, Info, CheckCircle, Users, User, Phone, CreditCard, Download, Upload, ArrowRight, Sparkles } from 'lucide-react';
 
 interface MemberDatabaseProps {
   state: AppState;
@@ -29,8 +29,9 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
   const [globalDeleteConfirm, setGlobalDeleteConfirm] = useState(false);
   const [globalSecurityText, setGlobalSecurityText] = useState('');
 
-  // BULK PASTE STATES
+  // BULK PASTE & UPDATE STATES
   const [showBulkPasteModal, setShowBulkPasteModal] = useState(false);
+  const [bulkMode, setBulkMode] = useState<'ic_tel' | 'all'>('ic_tel');
   const [bulkPasteText, setBulkPasteText] = useState('');
   const [parsedRows, setParsedRows] = useState<any[]>([]);
   const [parsingError, setParsingError] = useState<string | null>(null);
@@ -49,7 +50,17 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
     setCustomAlertText(msg);
   };
 
-  const handleParseBulkText = (text: string) => {
+  // Helper to format IC number with dashes if it's 12 continuous digits (e.g. 850512115431 -> 850512-11-5431)
+  const formatIcNumber = (raw: string) => {
+    const clean = raw.trim();
+    const digitsOnly = clean.replace(/[^0-9]/g, '');
+    if (digitsOnly.length === 12 && !clean.includes('-')) {
+      return `${digitsOnly.slice(0, 6)}-${digitsOnly.slice(6, 8)}-${digitsOnly.slice(8, 12)}`;
+    }
+    return clean;
+  };
+
+  const handleParseBulkText = (text: string, currentMode = bulkMode) => {
     setBulkPasteText(text);
     if (!text.trim()) {
       setParsedRows([]);
@@ -73,7 +84,7 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
       const isHeaderRow = (cells: string[]) => {
         return cells.some(cell => {
           const val = cell.toLowerCase().trim();
-          return val.includes('ahli') || val.includes('nama') || val.includes('ic') || val.includes('alamat') || val.includes('status');
+          return val.includes('ahli') || val.includes('nama') || val.includes('ic') || val.includes('kp') || val.includes('tel') || val.includes('telefon') || val.includes('alamat') || val.includes('status');
         });
       };
 
@@ -94,7 +105,6 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
         // Clean cells
         const cleanedCells = cells.map(c => {
           let val = c.trim();
-          // Remove wrapping quotes
           if (val.startsWith('"') && val.endsWith('"')) {
             val = val.substring(1, val.length - 1).trim();
           }
@@ -102,51 +112,112 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
         });
 
         if (cleanedCells.length < 2) {
-          continue; // Skip lines that don't have enough columns (No. Ahli and Nama are required)
+          continue;
         }
 
-        const noAhliRaw = cleanedCells[0];
-        if (!noAhliRaw) continue;
-
-        let noAhli = noAhliRaw;
-        // Strip any leading or trailing single quotes (e.g. '005)
-        if (noAhli.startsWith("'")) {
-          noAhli = noAhli.substring(1);
-        }
-        if (noAhli.endsWith("'")) {
-          noAhli = noAhli.substring(0, noAhli.length - 1);
-        }
-        noAhli = noAhli.trim();
-
-        // If it's purely numeric, convert to padded 3-digit ID (e.g. 005)
+        let noAhli = cleanedCells[0].replace(/^'/, '').replace(/'$/, '').trim();
         if (/^\d+$/.test(noAhli)) {
           noAhli = noAhli.padStart(3, '0');
         }
 
-        const nama = cleanedCells[1] || 'Ahli Tanpa Nama';
-        const ic = cleanedCells[2] || '';
-        const alamat = cleanedCells[3] || '';
-        
-        let statusRaw = cleanedCells[4] || 'Aktif';
-        let status = 'Aktif';
-        if (statusRaw.toLowerCase().includes('tidak') || statusRaw.toLowerCase().includes('tangguh') || statusRaw.toLowerCase() === 'inactive') {
-          status = 'Tidak Aktif';
+        const existingMember = state.members.find(m => isSameMemberId(m.noAhli, noAhli));
+
+        if (currentMode === 'ic_tel') {
+          // MODE IC & TEL: Flexible column extraction
+          let nama = existingMember?.nama || '';
+          let ic = '';
+          let tel = '';
+
+          if (cleanedCells.length >= 4) {
+            // Format: No Ahli, Nama Ahli, No IC, No Telefon
+            nama = cleanedCells[1] || nama;
+            ic = cleanedCells[2] || '';
+            tel = cleanedCells[3] || '';
+          } else if (cleanedCells.length === 3) {
+            // Check if Col 1 is IC or Nama
+            const col1 = cleanedCells[1];
+            const col2 = cleanedCells[2];
+            const looksLikeIc = /^\d{6}-?\d{2}-?\d{4}$/.test(col1) || /^\d{10,14}$/.test(col1.replace(/-/g, ''));
+            
+            if (looksLikeIc) {
+              // Format: No Ahli, No IC, No Telefon
+              ic = col1;
+              tel = col2;
+            } else {
+              // Format: No Ahli, Nama, IC or Tel
+              nama = col1 || nama;
+              const looksLikeTel = /^(\+?60|01)\d/.test(col2.replace(/[-\s]/g, ''));
+              if (looksLikeTel) {
+                tel = col2;
+              } else {
+                ic = col2;
+              }
+            }
+          } else if (cleanedCells.length === 2) {
+            // Format: No Ahli, IC/Tel
+            const val = cleanedCells[1];
+            const looksLikeTel = /^(\+?60|01)\d/.test(val.replace(/[-\s]/g, ''));
+            if (looksLikeTel) {
+              tel = val;
+            } else {
+              ic = val;
+            }
+          }
+
+          ic = formatIcNumber(ic);
+          const currentIc = existingMember?.ic || '';
+          const currentTel = existingMember?.tel || '';
+          const isChanged = (ic && ic !== currentIc) || (tel && tel !== currentTel);
+
+          rows.push({
+            noAhli,
+            nama: existingMember?.nama || nama || 'Ahli Tidak Ditemui',
+            ic,
+            tel,
+            currentIc,
+            currentTel,
+            isChanged,
+            existsLocally: !!existingMember,
+            rawLine: line
+          });
+        } else {
+          // MODE FULL IMPORT
+          const nama = cleanedCells[1] || 'Ahli Tanpa Nama';
+          const ic = formatIcNumber(cleanedCells[2] || '');
+          let tel = existingMember?.tel || '';
+          let alamat = '';
+          let status = 'Aktif';
+          let catatan = '';
+
+          if (cleanedCells.length >= 7) {
+            tel = cleanedCells[3] || '';
+            alamat = cleanedCells[4] || '';
+            const statusRaw = cleanedCells[5] || 'Aktif';
+            if (statusRaw.toLowerCase().includes('tidak') || statusRaw.toLowerCase().includes('tangguh')) {
+              status = 'Tidak Aktif';
+            }
+            catatan = cleanedCells[6] || '';
+          } else {
+            alamat = cleanedCells[3] || '';
+            const statusRaw = cleanedCells[4] || 'Aktif';
+            if (statusRaw.toLowerCase().includes('tidak') || statusRaw.toLowerCase().includes('tangguh')) {
+              status = 'Tidak Aktif';
+            }
+            catatan = cleanedCells[5] || '';
+          }
+
+          rows.push({
+            noAhli,
+            nama,
+            ic,
+            tel,
+            alamat,
+            status,
+            catatan,
+            existsLocally: !!existingMember,
+            rawLine: line
+          });
         }
-
-        const catatan = cleanedCells[5] || '';
-
-        const existsLocally = state.members.some(m => isSameMemberId(m.noAhli, noAhli));
-
-        rows.push({
-          noAhli,
-          nama,
-          ic,
-          alamat,
-          status,
-          catatan,
-          existsLocally,
-          rawLine: line
-        });
       }
 
       setParsedRows(rows);
@@ -158,6 +229,35 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
     }
   };
 
+  // Export Member list template for Bulk IC & Tel update
+  const downloadBulkUpdateTemplate = () => {
+    const headers = ['No. Ahli', 'Nama Ahli', 'No. Kad Pengenalan (IC)', 'No. Telefon'];
+    const sorted = [...state.members].sort((a, b) =>
+      normalizeMemberId(a.noAhli).localeCompare(normalizeMemberId(b.noAhli), undefined, { numeric: true })
+    );
+
+    const rows = sorted.map(m => [
+      m.noAhli,
+      m.nama,
+      m.ic || '',
+      m.tel || ''
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+    ].join('\r\n');
+
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Templat_Kemaskini_Pukal_IC_Tel_Gong_Badak.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleSaveBulkPaste = () => {
     if (parsedRows.length === 0) {
       triggerAlert('Sila tampal data yang sah terlebih dahulu.');
@@ -167,7 +267,62 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
     setShowBulkConfirmModal(true);
   };
 
-  const executeSaveBulkPaste = () => {
+  const executeSaveBulkPaste = async () => {
+    if (bulkMode === 'ic_tel') {
+      let updatedCount = 0;
+      const updatedMembers = state.members.map(member => {
+        const updateRow = parsedRows.find(r => isSameMemberId(r.noAhli, member.noAhli));
+        if (updateRow) {
+          const newIc = updateRow.ic ? updateRow.ic.trim() : member.ic;
+          const newTel = updateRow.tel ? updateRow.tel.trim() : member.tel;
+          if (newIc !== member.ic || newTel !== member.tel) {
+            updatedCount++;
+          }
+          return {
+            ...member,
+            ic: newIc,
+            tel: newTel
+          };
+        }
+        return member;
+      });
+
+      const newState = {
+        ...state,
+        members: updatedMembers
+      };
+
+      onChangeState(newState);
+      localStorage.setItem('khairat_gong_badak', JSON.stringify(newState));
+      localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(newState));
+
+      // Sync to backend /api/state
+      fetch('/api/state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: newState })
+      }).catch(console.error);
+
+      // Sync to Google Sheets if connected
+      if (state.useGoogleSheets && state.appsScriptUrl) {
+        writeToAppsScript(state.appsScriptUrl, {
+          action: 'syncLocalToSheets',
+          members: updatedMembers,
+          ledger: state.ledger,
+          kewangan: state.kewangan || []
+        }).catch(console.error);
+      }
+
+      setBulkPasteText('');
+      setParsedRows([]);
+      setShowBulkPasteModal(false);
+      setShowBulkConfirmModal(false);
+
+      triggerAlert(`Alhamdulillah! Sebanyak ${updatedCount} rekod ahli telah berjaya dikemaskini No. Kad Pengenalan dan No. Telefon secara serentak.\n\nMaklumat alamat, tanggungan, status, dan rekod lejar yuran kekal terpelihara.`);
+      return;
+    }
+
+    // MODE FULL IMPORT
     let updatedMembers = JSON.parse(JSON.stringify(state.members)) as Member[];
     let updatedLedger = JSON.parse(JSON.stringify(state.ledger)) as any[];
     const currentYear = new Date().getFullYear();
@@ -177,19 +332,18 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
         m => isSameMemberId(m.noAhli, importRow.noAhli)
       );
 
-      const parsedMember: Member = {
-        noAhli: importRow.noAhli,
-        nama: importRow.nama,
-        ic: importRow.ic,
-        alamat: importRow.alamat,
-        status: importRow.status,
-        ...(importRow.catatan ? { catatan: importRow.catatan } : {})
-      };
-
       if (targetIndex > -1) {
-        updatedMembers[targetIndex] = parsedMember;
+        const existing = updatedMembers[targetIndex];
+        updatedMembers[targetIndex] = {
+          ...existing,
+          nama: importRow.nama,
+          ic: importRow.ic,
+          ...(importRow.tel ? { tel: importRow.tel } : {}),
+          ...(importRow.alamat ? { alamat: importRow.alamat } : {}),
+          ...(importRow.status ? { status: importRow.status } : {}),
+          ...(importRow.catatan ? { catatan: importRow.catatan } : {})
+        };
         
-        // Also update name in member's existing ledger rows if needed
         updatedLedger = updatedLedger.map(l => {
           if (isSameMemberId(l.noAhli, importRow.noAhli)) {
             return { ...l, namaAhli: importRow.nama };
@@ -197,9 +351,17 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
           return l;
         });
       } else {
+        const parsedMember: Member = {
+          noAhli: importRow.noAhli,
+          nama: importRow.nama,
+          ic: importRow.ic,
+          tel: importRow.tel || '',
+          alamat: importRow.alamat || '',
+          status: importRow.status || 'Aktif',
+          ...(importRow.catatan ? { catatan: importRow.catatan } : {})
+        };
         updatedMembers.push(parsedMember);
         
-        // Create an initial empty ledger row for this new member for current year if they don't have one!
         const hasLedger = updatedLedger.some(l => isSameMemberId(l.noAhli, importRow.noAhli));
         if (!hasLedger) {
           updatedLedger.push({
@@ -214,7 +376,6 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
       }
     });
 
-    // Sort updated ledger rows safely
     updatedLedger.sort((a, b) => {
       const idCompare = a.noAhli.toString().localeCompare(b.noAhli.toString(), undefined, { numeric: true });
       if (idCompare !== 0) return idCompare;
@@ -231,6 +392,13 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
 
     onChangeState(newState);
     localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(newState));
+
+    // Sync to backend /api/state
+    fetch('/api/state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: newState })
+    }).catch(console.error);
 
     const totalImported = parsedRows.length;
     setBulkPasteText('');
@@ -592,18 +760,39 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
           </div>
           <div className="flex items-center gap-2">
             {currentRole === 'admin' && (
-              <button
-                onClick={() => {
-                  setShowBulkPasteModal(true);
-                  setBulkPasteText('');
-                  setParsedRows([]);
-                  setParsingError(null);
-                }}
-                className="px-2.5 py-1 bg-indigo-700 hover:bg-indigo-800 text-white rounded text-[10px] font-bold flex items-center gap-1.5 transition-all shadow-xxs cursor-pointer uppercase font-sans"
-              >
-                <FileSpreadsheet className="h-3.5 w-3.5" />
-                Tampal Pukal (Excel)
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBulkMode('ic_tel');
+                    setShowBulkPasteModal(true);
+                    setBulkPasteText('');
+                    setParsedRows([]);
+                    setParsingError(null);
+                  }}
+                  className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-[10px] font-bold flex items-center gap-1.5 transition-all shadow-xxs cursor-pointer uppercase font-sans border-b border-emerald-900"
+                  title="Kemaskini No. Kad Pengenalan & No. Telefon ahli secara pukal dari Excel"
+                >
+                  <Phone className="h-3.5 w-3.5 text-emerald-300" />
+                  <span>Kemaskini Pukal (IC & Tel)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBulkMode('all');
+                    setShowBulkPasteModal(true);
+                    setBulkPasteText('');
+                    setParsedRows([]);
+                    setParsingError(null);
+                  }}
+                  className="px-2.5 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded text-[10px] font-bold flex items-center gap-1.5 transition-all shadow-xxs cursor-pointer uppercase font-sans border-b border-indigo-900"
+                  title="Daftar atau import maklumat ahli secara pukal dari Excel"
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5 text-indigo-300" />
+                  <span>Daftar Pukal (Excel)</span>
+                </button>
+              </>
             )}
             <button
               onClick={onRefresh}
@@ -965,17 +1154,31 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
         </div>
       )}
 
-      {/* MEMBER BULK PASTE DIALOG OVERLAY */}
+      {/* MEMBER BULK PASTE & UPDATE DIALOG OVERLAY */}
       {showBulkPasteModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in overflow-y-auto">
-          <div className="bg-white rounded border border-slate-200 shadow-xl max-w-4xl w-full flex flex-col overflow-hidden text-left my-8">
-            <div className="bg-indigo-900 text-white p-4 flex justify-between items-center bg-[#1e1b4b]">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-4xl w-full flex flex-col overflow-hidden text-left my-6 font-sans">
+            {/* Modal Header */}
+            <div className="bg-[#1e1b4b] text-white p-4 flex justify-between items-center bg-indigo-950 border-b border-indigo-900">
               <div>
-                <h3 className="text-sm font-black uppercase tracking-wider flex items-center gap-1.5 font-sans">
-                  <FileSpreadsheet className="h-4 w-4 text-white" />
-                  Sistem Import & Tampal Ahli Pukal (Copy-Paste Excel)
+                <h3 className="text-sm font-black uppercase tracking-wider flex items-center gap-2 font-sans">
+                  {bulkMode === 'ic_tel' ? (
+                    <>
+                      <Phone className="h-4 w-4 text-emerald-400" />
+                      <span>Kemaskini Pukal No. Kad Pengenalan & No. Telefon</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileSpreadsheet className="h-4 w-4 text-indigo-300" />
+                      <span>Sistem Import & Pendaftaran Ahli Pukal (Excel)</span>
+                    </>
+                  )}
                 </h3>
-                <p className="text-[10px] text-indigo-200 mt-0.5">Sesuai untuk memasukkan ratusan rekod maklumat ahli secara serentak mengikut susunan kolum.</p>
+                <p className="text-[10.5px] text-indigo-200/90 mt-0.5 font-sans">
+                  {bulkMode === 'ic_tel' 
+                    ? 'Kemaskini nombor IC dan nombor telefon bagi ahli sedia ada secara serentak. Alamat, tanggungan, status, dan rekod lejar yuran sedia ada KEKAL SELAMAT tanpa sebarang gangguan.'
+                    : 'Sesuai untuk memasukkan ratusan rekod pendaftaran ahli baharu mengikut susunan kolum lengkap dari Excel.'}
+                </p>
               </div>
               <button 
                 onClick={() => {
@@ -983,178 +1186,385 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
                   setBulkPasteText('');
                   setParsedRows([]);
                 }} 
-                className="text-indigo-300 hover:text-white cursor-pointer p-1"
+                className="text-indigo-300 hover:text-white cursor-pointer p-1.5 rounded-lg hover:bg-white/10 transition"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto font-sans">
-              
-              {/* Petunjuk format */}
-              <div className="bg-indigo-50/60 border border-indigo-100 p-3.5 rounded text-xs text-indigo-950 space-y-2">
-                <h4 className="font-bold flex items-center gap-1.5 uppercase text-[11px] text-indigo-900 leading-none">
-                  <Info className="h-4 w-4" /> Arahan Penggunaan Penting:
-                </h4>
-                <p className="text-[11px] leading-relaxed">
-                  1. Sila buka Microsoft Excel atau Google Sheets yang mengandungi rekod maklumat ahli lama anda.
-                  <br />
-                  2. Susun kolum fail Excel/Sheets anda <strong>Tepat Mengikut Urutan 5 atau 6 Kolum Ahli</strong> seperti di bawah.
-                  <br />
-                  3. Highlight baris data ahli anda, salin (<kbd className="bg-indigo-200 px-1 py-0.2 rounded font-bold font-mono text-[10px]">Ctrl + C</kbd>), dan tampalkan (<kbd className="bg-indigo-200 px-1 py-0.2 rounded font-bold font-mono text-[10px]">Ctrl + V</kbd>) ke dalam zon teks di bawah.
-                </p>
+            {/* Mode Switching Tabs */}
+            <div className="flex border-b border-slate-200 bg-slate-100/90 px-4 pt-2.5 gap-2 font-sans">
+              <button
+                type="button"
+                onClick={() => {
+                  setBulkMode('ic_tel');
+                  if (bulkPasteText) handleParseBulkText(bulkPasteText, 'ic_tel');
+                }}
+                className={`px-4 py-2 text-xs font-bold rounded-t-lg transition flex items-center gap-1.5 cursor-pointer ${
+                  bulkMode === 'ic_tel'
+                    ? 'bg-white text-emerald-800 border-t-2 border-x border-slate-200 border-t-emerald-600 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                }`}
+              >
+                <Phone className="h-3.5 w-3.5 text-emerald-600" />
+                <span>1. Kemaskini IC & No. Telefon Sahaja (Disyorkan)</span>
+                <span className="bg-emerald-100 text-emerald-800 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase">Pantas</span>
+              </button>
 
-                {/* Grid Visual Format */}
-                <div className="pt-2">
-                  <span className="block text-[10px] font-bold text-indigo-805 uppercase tracking-wider mb-1">Turutan Kolum Excel Yang Diperlukan (Kiri ke Kanan):</span>
-                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-1 bg-white p-2 rounded border border-indigo-150 text-center font-mono text-[9px] font-bold overflow-x-auto select-all">
-                    <span className="bg-slate-100 p-1 text-slate-800 border border-slate-200 rounded truncate">1. No. Ahli</span>
-                    <span className="bg-slate-100 p-1 text-slate-800 border border-slate-200 rounded truncate">2. Nama Ahli</span>
-                    <span className="bg-slate-100 p-1 text-slate-800 border border-slate-200 rounded truncate">3. No. IC</span>
-                    <span className="bg-slate-100 p-1 text-slate-800 border border-slate-200 rounded truncate">4. Alamat Kediaman</span>
-                    <span className="bg-slate-100 p-1 text-slate-800 border border-slate-200 rounded truncate">5. Status ('Aktif' / 'Tidak Aktif')</span>
-                    <span className="bg-slate-100 p-1 text-slate-500 border border-slate-200 rounded truncate">6. Catatan (Opsional)</span>
-                  </div>
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mt-2.5 gap-2">
-                    <span className="text-[10px] text-indigo-700 font-semibold leading-relaxed">* No. Ahli dan Nama Ahli mestilah wajib diisi. Contoh No Ahli: 001.</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const sampleData = `001\tMuhamad Firdaus Bin Ramli\t850512-11-5431\tNo 12A, Jalan Gong Pak Damat, Gong Badak, Terengganu\tAktif\tAnak sulung\n002\tSiti Aminah Binti Yusof\t901201-11-5226\tLot 155, Kampung Gong Badak, Terengganu\tTidak Aktif\tBerpindah`;
-                        handleParseBulkText(sampleData);
-                      }}
-                      className="text-[10px] bg-white border border-indigo-250 px-2 py-1 rounded text-indigo-805 font-bold hover:bg-indigo-50 cursor-pointer transition-colors whitespace-nowrap"
-                    >
-                      Muat Contoh Data Tampalan (Try Demo)
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setBulkMode('all');
+                  if (bulkPasteText) handleParseBulkText(bulkPasteText, 'all');
+                }}
+                className={`px-4 py-2 text-xs font-bold rounded-t-lg transition flex items-center gap-1.5 cursor-pointer ${
+                  bulkMode === 'all'
+                    ? 'bg-white text-indigo-900 border-t-2 border-x border-slate-200 border-t-indigo-600 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                }`}
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5 text-indigo-600" />
+                <span>2. Daftar Penuh / Semua Kolum</span>
+              </button>
+            </div>
 
-              {/* Textarea Tampal */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">Zon Tampalan Data (Paste Area)</label>
-                <textarea
-                  className="w-full h-32 bg-slate-50 border border-slate-300 rounded p-3 text-xs font-mono tracking-tight focus:bg-white focus:ring-1 focus:ring-indigo-500 outline-none"
-                  placeholder="Klik di sini kemudian tekan Ctrl+V untuk menampal baris data ahli terus dari Google Sheets / Excel..."
-                  value={bulkPasteText}
-                  onChange={(e) => handleParseBulkText(e.target.value)}
-                />
-              </div>
+            <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto font-sans">
+              {bulkMode === 'ic_tel' ? (
+                /* TAB 1: KEMASKINI IC & TEL */
+                <div className="space-y-4">
+                  <div className="bg-emerald-50/70 border border-emerald-200/80 p-3.5 rounded-xl text-xs text-emerald-950 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h4 className="font-bold flex items-center gap-1.5 uppercase text-[11px] text-emerald-900 leading-none">
+                        <Sparkles className="h-4 w-4 text-emerald-600" />
+                        Panduan Kemaskini Pukal IC & No. Telefon:
+                      </h4>
 
-              {parsingError && (
-                <div className="p-3 bg-rose-50 border border-rose-250 text-rose-800 rounded font-bold text-xs flex items-center gap-2">
-                  <AlertTriangle className="h-4.5 w-4.5 shrink-0" />
-                  <span>{parsingError}</span>
-                </div>
-              )}
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={downloadBulkUpdateTemplate}
+                          className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-[10px] font-black uppercase flex items-center gap-1.5 transition shadow-xs cursor-pointer font-sans"
+                          title="Muat turun templat Excel CSV dengan senarai kesemua ahli semasa"
+                        >
+                          <Download className="h-3 w-3" />
+                          <span>Muat Turun Templat Ahli Semasa (Excel CSV)</span>
+                        </button>
 
-              {/* Live Preview Panel */}
-              {parsedRows.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center pb-1 border-b border-slate-205">
-                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                      Pratinjau Data Dikesan ({parsedRows.length} baris)
-                    </h4>
-                  </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const demoText = `001\tHaji Ahmad bin Hassan\t580214-11-5433\t019-9123456\n002\tSiti Zaleha binti Ismail\t620510-11-5822\t012-9876543\n003\tMohd Khairul bin Azman\t880922-11-5091\t013-4455667`;
+                            handleParseBulkText(demoText, 'ic_tel');
+                          }}
+                          className="px-2.5 py-1 bg-white hover:bg-emerald-100/70 border border-emerald-300 text-emerald-800 rounded text-[10px] font-bold uppercase flex items-center gap-1.5 transition cursor-pointer font-sans"
+                        >
+                          <span>Muat Contoh Demo</span>
+                        </button>
+                      </div>
+                    </div>
 
-                  {/* Summary Badges */}
-                  <div className="flex flex-wrap gap-2 text-[10px] font-black uppercase">
-                    <span className="bg-indigo-50 border border-indigo-150 text-indigo-800 px-2 py-0.5 rounded">
-                      Jumlah: {parsedRows.length} baris
+                    <p className="text-[11px] leading-relaxed text-emerald-900/90 font-sans">
+                      1. Muat turun templat atau sediakan lajur dalam fail Excel/Google Sheets anda mengikut salah satu turutan di bawah.
+                      <br />
+                      2. Salin (<kbd className="bg-emerald-250/50 px-1 py-0.2 rounded font-bold font-mono text-[10px]">Ctrl + C</kbd>) baris dari Excel, dan tampal (<kbd className="bg-emerald-250/50 px-1 py-0.2 rounded font-bold font-mono text-[10px]">Ctrl + V</kbd>) ke zon teks di bawah.
+                    </p>
+
+                    {/* Format options */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10.5px]">
+                      <div className="bg-white p-2.5 rounded-lg border border-emerald-200">
+                        <span className="font-extrabold text-emerald-800 block text-[10px] uppercase mb-1">Pilihan A (4 Kolum - Paling Biasa):</span>
+                        <div className="font-mono text-[9px] bg-slate-50 p-1.5 rounded border border-slate-200 text-slate-700 flex gap-1">
+                          <span className="font-bold">1. No. Ahli</span> &rarr; 
+                          <span>2. Nama</span> &rarr; 
+                          <span className="text-emerald-700 font-bold">3. No. IC</span> &rarr; 
+                          <span className="text-emerald-700 font-bold">4. No. Tel</span>
+                        </div>
+                      </div>
+
+                      <div className="bg-white p-2.5 rounded-lg border border-emerald-200">
+                        <span className="font-extrabold text-emerald-800 block text-[10px] uppercase mb-1">Pilihan B (3 Kolum Ringkas):</span>
+                        <div className="font-mono text-[9px] bg-slate-50 p-1.5 rounded border border-slate-200 text-slate-700 flex gap-1">
+                          <span className="font-bold">1. No. Ahli</span> &rarr; 
+                          <span className="text-emerald-700 font-bold">2. No. IC</span> &rarr; 
+                          <span className="text-emerald-700 font-bold">3. No. Tel</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <span className="text-[10px] text-emerald-800 font-semibold block italic">
+                      * Sistem memadankan ahli mengikut <strong>No. Ahli</strong> secara automatik. Nombor IC 12 digit tanpa sempang (contoh: 850512115431) akan diformatkan secara automatik kepada 850512-11-5431.
                     </span>
-                    <span className="bg-amber-50 border border-amber-100 text-amber-850 px-2 py-0.5 rounded">
-                      Kemaskini sedia ada: {parsedRows.filter(r => r.existsLocally).length} baris
-                    </span>
-                    <span className="bg-sky-50 border border-sky-100 text-sky-850 px-2 py-0.5 rounded">
-                      Ahli baru: {parsedRows.filter(r => !r.existsLocally).length} baris
-                    </span>
                   </div>
 
-                  {/* Micro Table for Live Preview */}
-                  <div className="max-h-56 overflow-y-auto border border-slate-200 rounded">
-                    <table className="w-full text-left table-auto text-xs">
-                      <thead className="bg-[#f8fafc] text-[10px] font-bold text-slate-600 uppercase tracking-wider sticky top-0 border-b border-slate-200">
-                        <tr>
-                          <th className="px-3 py-2 w-20 text-center">No. Ahli</th>
-                          <th className="px-3 py-2">Nama Ahli</th>
-                          <th className="px-3 py-2 text-center w-36">No. IC</th>
-                          <th className="px-3 py-2">Alamat Kediaman</th>
-                          <th className="px-3 py-2 text-center w-24">Status</th>
-                          <th className="px-3 py-2 text-center w-24">Jenis</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-150 font-sans">
-                        {parsedRows.map((row, index) => {
-                          return (
-                            <tr
-                              key={index}
-                              className="hover:bg-slate-50 transition-colors"
-                            >
-                              <td className="px-3 py-1.5 text-center font-mono font-bold">
-                                {row.noAhli}
-                              </td>
-                              <td className="px-3 py-1.5 font-bold text-slate-800 truncate max-w-[150px]" title={row.nama}>
-                                {row.nama}
-                              </td>
-                              <td className="px-3 py-1.5 text-center font-mono">
-                                {row.ic || '-'}
-                              </td>
-                              <td className="px-3 py-1.5 text-slate-500 truncate max-w-[200px]" title={row.alamat}>
-                                {row.alamat || '-'}
-                              </td>
-                              <td className="px-3 py-1.5 text-center">
-                                <span className={`inline-flex px-1.5 py-0.2 rounded font-bold text-[9px] uppercase ${
-                                  row.status === 'Aktif' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-150 text-slate-600'
-                                }`}>
-                                  {row.status}
-                                </span>
-                              </td>
-                              <td className="px-3 py-1.5 text-center">
-                                {row.existsLocally ? (
-                                  <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-100">
-                                    Kemaskini
-                                  </span>
-                                ) : (
-                                  <span className="text-[10px] font-bold text-sky-605 bg-sky-50 px-1.5 py-0.2 rounded border border-sky-100">
-                                    Ahli Baru
-                                  </span>
-                                )}
-                              </td>
+                  {/* Textarea */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center justify-between">
+                      <span>Zon Tampalan Data (Paste Area)</span>
+                      <span className="text-[10px] text-slate-400 font-normal">Tampal dari Excel atau Google Sheets</span>
+                    </label>
+                    <textarea
+                      className="w-full h-32 bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs font-mono tracking-tight focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition"
+                      placeholder="Klik di sini kemudian tekan Ctrl+V untuk menampal baris data ahli dari Excel (Contoh: 001	850512-11-5431	019-9123456)..."
+                      value={bulkPasteText}
+                      onChange={(e) => handleParseBulkText(e.target.value, 'ic_tel')}
+                    />
+                  </div>
+
+                  {parsingError && (
+                    <div className="p-3 bg-rose-50 border border-rose-250 text-rose-800 rounded-lg font-bold text-xs flex items-center gap-2">
+                      <AlertTriangle className="h-4.5 w-4.5 shrink-0" />
+                      <span>{parsingError}</span>
+                    </div>
+                  )}
+
+                  {/* Live Preview Panel for IC & Tel */}
+                  {parsedRows.length > 0 && (
+                    <div className="space-y-2.5">
+                      <div className="flex flex-wrap justify-between items-center pb-1 border-b border-slate-200 gap-2">
+                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                          Pratinjau Kemaskini IC & Telefon ({parsedRows.length} baris dikesan)
+                        </h4>
+
+                        <div className="flex flex-wrap gap-2 text-[10px] font-black uppercase">
+                          <span className="bg-slate-100 border border-slate-200 text-slate-700 px-2 py-0.5 rounded">
+                            Jumlah: {parsedRows.length}
+                          </span>
+                          <span className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-2 py-0.5 rounded">
+                            Ahli Ditemui: {parsedRows.filter(r => r.existsLocally).length}
+                          </span>
+                          <span className="bg-amber-50 border border-amber-200 text-amber-800 px-2 py-0.5 rounded">
+                            Perubahan Dikesan: {parsedRows.filter(r => r.existsLocally && r.isChanged).length}
+                          </span>
+                          {parsedRows.filter(r => !r.existsLocally).length > 0 && (
+                            <span className="bg-rose-50 border border-rose-200 text-rose-800 px-2 py-0.5 rounded">
+                              No. Ahli Tidak Wujud: {parsedRows.filter(r => !r.existsLocally).length}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Micro Table for Live Preview */}
+                      <div className="max-h-56 overflow-y-auto border border-slate-200 rounded-lg">
+                        <table className="w-full text-left table-auto text-xs">
+                          <thead className="bg-slate-50 text-[10px] font-bold text-slate-600 uppercase tracking-wider sticky top-0 border-b border-slate-200">
+                            <tr>
+                              <th className="px-3 py-2 w-20 text-center">No. Ahli</th>
+                              <th className="px-3 py-2">Nama Ahli</th>
+                              <th className="px-3 py-2">No. IC (Semasa &rarr; Baharu)</th>
+                              <th className="px-3 py-2">No. Telefon (Semasa &rarr; Baharu)</th>
+                              <th className="px-3 py-2 text-center w-32">Status Padanan</th>
                             </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 font-sans">
+                            {parsedRows.map((row, index) => {
+                              const icChanged = row.ic && row.ic !== row.currentIc;
+                              const telChanged = row.tel && row.tel !== row.currentTel;
+
+                              return (
+                                <tr key={index} className={`hover:bg-slate-50 transition-colors ${!row.existsLocally ? 'bg-rose-50/40' : ''}`}>
+                                  <td className="px-3 py-2 text-center font-mono font-bold text-slate-900">
+                                    {row.noAhli}
+                                  </td>
+                                  <td className="px-3 py-2 font-bold text-slate-800 truncate max-w-[160px]" title={row.nama}>
+                                    {row.nama}
+                                  </td>
+                                  <td className="px-3 py-2 font-mono text-[11px]">
+                                    {row.ic ? (
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-slate-400 line-through text-[10px]">{row.currentIc || '(Tiada)'}</span>
+                                        <ArrowRight className="h-3 w-3 text-slate-400" />
+                                        <span className={`font-bold ${icChanged ? 'text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200' : 'text-slate-700'}`}>
+                                          {row.ic}
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <span className="text-slate-400 italic">Kekal: {row.currentIc || '-'}</span>
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2 font-mono text-[11px]">
+                                    {row.tel ? (
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-slate-400 line-through text-[10px]">{row.currentTel || '(Tiada)'}</span>
+                                        <ArrowRight className="h-3 w-3 text-slate-400" />
+                                        <span className={`font-bold ${telChanged ? 'text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200' : 'text-slate-700'}`}>
+                                          {row.tel}
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <span className="text-slate-400 italic">Kekal: {row.currentTel || '-'}</span>
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2 text-center">
+                                    {row.existsLocally ? (
+                                      <span className="inline-flex items-center gap-1 text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                        <Check className="h-3 w-3 text-emerald-600" />
+                                        Ditemui
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 text-[9.5px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
+                                        <X className="h-3 w-3 text-rose-600" />
+                                        Tidak Ditemui
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* TAB 2: IMPORT PENUH (ALL COLUMNS) */
+                <div className="space-y-4">
+                  <div className="bg-indigo-50/60 border border-indigo-100 p-3.5 rounded-xl text-xs text-indigo-950 space-y-2">
+                    <h4 className="font-bold flex items-center gap-1.5 uppercase text-[11px] text-indigo-900 leading-none">
+                      <Info className="h-4 w-4" /> Arahan Import Penuh Ahli:
+                    </h4>
+                    <p className="text-[11px] leading-relaxed">
+                      1. Susun kolum fail Excel/Sheets mengikut urutan kolum ahli di bawah.
+                      <br />
+                      2. Highlight baris data ahli anda, salin (<kbd className="bg-indigo-200 px-1 py-0.2 rounded font-bold font-mono text-[10px]">Ctrl + C</kbd>), dan tampalkan (<kbd className="bg-indigo-200 px-1 py-0.2 rounded font-bold font-mono text-[10px]">Ctrl + V</kbd>) ke dalam zon teks di bawah.
+                    </p>
+
+                    <div className="pt-2">
+                      <span className="block text-[10px] font-bold text-indigo-805 uppercase tracking-wider mb-1">Turutan Kolum Excel Yang Diperlukan:</span>
+                      <div className="grid grid-cols-2 sm:grid-cols-7 gap-1 bg-white p-2 rounded border border-indigo-150 text-center font-mono text-[9px] font-bold overflow-x-auto select-all">
+                        <span className="bg-slate-100 p-1 text-slate-800 border border-slate-200 rounded truncate">1. No. Ahli</span>
+                        <span className="bg-slate-100 p-1 text-slate-800 border border-slate-200 rounded truncate">2. Nama Ahli</span>
+                        <span className="bg-slate-100 p-1 text-slate-800 border border-slate-200 rounded truncate">3. No. IC</span>
+                        <span className="bg-slate-100 p-1 text-slate-800 border border-slate-200 rounded truncate">4. No. Telefon</span>
+                        <span className="bg-slate-100 p-1 text-slate-800 border border-slate-200 rounded truncate">5. Alamat</span>
+                        <span className="bg-slate-100 p-1 text-slate-800 border border-slate-200 rounded truncate">6. Status</span>
+                        <span className="bg-slate-100 p-1 text-slate-500 border border-slate-200 rounded truncate">7. Catatan</span>
+                      </div>
+                    </div>
                   </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">Zon Tampalan Data Penuh</label>
+                    <textarea
+                      className="w-full h-32 bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs font-mono tracking-tight focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                      placeholder="Klik di sini kemudian tekan Ctrl+V untuk menampal baris data ahli dari Google Sheets / Excel..."
+                      value={bulkPasteText}
+                      onChange={(e) => handleParseBulkText(e.target.value, 'all')}
+                    />
+                  </div>
+
+                  {parsingError && (
+                    <div className="p-3 bg-rose-50 border border-rose-250 text-rose-800 rounded font-bold text-xs flex items-center gap-2">
+                      <AlertTriangle className="h-4.5 w-4.5 shrink-0" />
+                      <span>{parsingError}</span>
+                    </div>
+                  )}
+
+                  {parsedRows.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center pb-1 border-b border-slate-205">
+                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                          Pratinjau Data Dikesan ({parsedRows.length} baris)
+                        </h4>
+                      </div>
+
+                      <div className="max-h-56 overflow-y-auto border border-slate-200 rounded">
+                        <table className="w-full text-left table-auto text-xs">
+                          <thead className="bg-[#f8fafc] text-[10px] font-bold text-slate-600 uppercase tracking-wider sticky top-0 border-b border-slate-200">
+                            <tr>
+                              <th className="px-3 py-2 w-20 text-center">No. Ahli</th>
+                              <th className="px-3 py-2">Nama Ahli</th>
+                              <th className="px-3 py-2 text-center w-32">No. IC</th>
+                              <th className="px-3 py-2 text-center w-28">No. Tel</th>
+                              <th className="px-3 py-2">Alamat</th>
+                              <th className="px-3 py-2 text-center w-20">Status</th>
+                              <th className="px-3 py-2 text-center w-24">Tindakan</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-150 font-sans">
+                            {parsedRows.map((row, index) => (
+                              <tr key={index} className="hover:bg-slate-50 transition-colors">
+                                <td className="px-3 py-1.5 text-center font-mono font-bold">{row.noAhli}</td>
+                                <td className="px-3 py-1.5 font-bold text-slate-800 truncate max-w-[140px]">{row.nama}</td>
+                                <td className="px-3 py-1.5 text-center font-mono">{row.ic || '-'}</td>
+                                <td className="px-3 py-1.5 text-center font-mono">{row.tel || '-'}</td>
+                                <td className="px-3 py-1.5 text-slate-500 truncate max-w-[160px]">{row.alamat || '-'}</td>
+                                <td className="px-3 py-1.5 text-center">
+                                  <span className={`inline-flex px-1.5 py-0.2 rounded font-bold text-[9px] uppercase ${row.status === 'Aktif' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-150 text-slate-600'}`}>
+                                    {row.status}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-1.5 text-center">
+                                  {row.existsLocally ? (
+                                    <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-100">
+                                      Kemaskini
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] font-bold text-sky-605 bg-sky-50 px-1.5 py-0.2 rounded border border-sky-100">
+                                      Ahli Baru
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
-              <div className="pt-4 flex justify-end gap-2.5 border-t border-slate-150">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowBulkPasteModal(false);
-                    setBulkPasteText('');
-                    setParsedRows([]);
-                  }}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-205 text-slate-700 text-xs font-bold rounded uppercase tracking-wider cursor-pointer font-sans"
-                >
-                  BATAL
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveBulkPaste}
-                  disabled={parsedRows.length === 0}
-                  className="px-5 py-2 bg-indigo-700 hover:bg-indigo-805 disabled:opacity-50 text-white text-xs font-black rounded uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-xxs font-sans"
-                >
-                  <Check className="h-4 w-4" /> Sahkan & Masukkan Rekod Pukal
-                </button>
+              {/* Modal Footer */}
+              <div className="pt-4 flex flex-wrap items-center justify-between gap-2.5 border-t border-slate-150">
+                <div className="text-[11px] text-slate-500 font-sans">
+                  {bulkMode === 'ic_tel' ? (
+                    <span>
+                      {parsedRows.filter(r => r.existsLocally).length} daripada {parsedRows.length} baris sedia untuk dikemaskini.
+                    </span>
+                  ) : (
+                    <span>
+                      {parsedRows.length} rekod sedia untuk dimasukkan/dikemas kini.
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowBulkPasteModal(false);
+                      setBulkPasteText('');
+                      setParsedRows([]);
+                    }}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg uppercase tracking-wider cursor-pointer font-sans transition"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveBulkPaste}
+                    disabled={parsedRows.length === 0 || (bulkMode === 'ic_tel' && parsedRows.filter(r => r.existsLocally).length === 0)}
+                    className={`px-5 py-2 text-white text-xs font-black rounded-lg uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-sm transition disabled:opacity-40 font-sans ${
+                      bulkMode === 'ic_tel'
+                        ? 'bg-emerald-700 hover:bg-emerald-800'
+                        : 'bg-indigo-700 hover:bg-indigo-800'
+                    }`}
+                  >
+                    <Check className="h-4 w-4" /> 
+                    <span>
+                      {bulkMode === 'ic_tel' 
+                        ? `Sahkan & Kemaskini IC & Tel (${parsedRows.filter(r => r.existsLocally).length} Ahli)` 
+                        : 'Sahkan & Masukkan Rekod Pukal'}
+                    </span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
       )}
+
       {/* Toast Notification */}
       {toastMessage && (
         <div
@@ -1208,41 +1618,73 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
       {/* BULK MEMBER IMPORT CONFIRMATION MODAL */}
       {showBulkConfirmModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-[60] animate-fade-in">
-          <div className="bg-white rounded-lg border border-slate-200 shadow-xl max-w-md w-full flex flex-col overflow-hidden text-left font-sans">
-            <div className="bg-[#1e1b4b] text-white p-4 flex justify-between items-center bg-indigo-905">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-md w-full flex flex-col overflow-hidden text-left font-sans">
+            <div className={`text-white p-4 flex justify-between items-center ${
+              bulkMode === 'ic_tel' ? 'bg-emerald-900' : 'bg-indigo-950'
+            }`}>
               <h3 className="text-xs font-black uppercase tracking-wider flex items-center gap-1.5">
-                <Users className="h-4.5 w-4.5 text-indigo-300" />
-                Sahkan Pengemaskinian Pukal
+                {bulkMode === 'ic_tel' ? (
+                  <>
+                    <Phone className="h-4.5 w-4.5 text-emerald-300" />
+                    <span>Sahkan Kemaskini IC & No. Telefon</span>
+                  </>
+                ) : (
+                  <>
+                    <Users className="h-4.5 w-4.5 text-indigo-300" />
+                    <span>Sahkan Pengemaskinian Pukal</span>
+                  </>
+                )}
               </h3>
-              <button onClick={() => setShowBulkConfirmModal(false)} className="text-slate-400 hover:text-white cursor-pointer select-none">
+              <button onClick={() => setShowBulkConfirmModal(false)} className="text-slate-300 hover:text-white cursor-pointer select-none">
                 <X className="h-4.5 w-4.5" />
               </button>
             </div>
             <div className="p-5 space-y-3">
-              <p className="text-xs font-medium text-slate-700 leading-relaxed">
-                Adakah anda pasti mahu mengimport & mengemaskini sebanyak <strong className="text-indigo-700 font-extrabold">{parsedRows.length} rekod ahli</strong> ke dalam pangkalan data ahli secara pukal?
-              </p>
-              
-              <div className="p-3 bg-indigo-50 border border-indigo-100 text-indigo-950 rounded-[6px] text-[10px] leading-relaxed flex gap-2 font-bold font-sans">
-                <Info className="h-4.5 w-4.5 text-indigo-700 shrink-0" />
-                <span>Info: Sekiranya No. Ahli sudah wujud, data ahli yang sedia ada akan dikemaskini. Rekod lejar baharu juga akan dibina bagi ahli yang baharu didaftarkan.</span>
-              </div>
+              {bulkMode === 'ic_tel' ? (
+                <>
+                  <p className="text-xs font-medium text-slate-700 leading-relaxed">
+                    Adakah anda pasti mahu mengemaskini No. Kad Pengenalan dan No. Telefon bagi <strong className="text-emerald-700 font-extrabold">{parsedRows.filter(r => r.existsLocally).length} rekod ahli</strong> yang ditemui?
+                  </p>
+                  
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-950 rounded-lg text-[10.5px] leading-relaxed flex gap-2 font-medium font-sans">
+                    <CheckCircle className="h-4.5 w-4.5 text-emerald-700 shrink-0 mt-0.5" />
+                    <span>
+                      <strong>Jaminan Keselamatan Data:</strong> Maklumat alamat kediaman, nama ahli, senarai tanggungan, status keahlian, dan buku lejar bayaran yuran TIDAK akan dipadam atau diubah.
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs font-medium text-slate-700 leading-relaxed">
+                    Adakah anda pasti mahu mengimport & mengemaskini sebanyak <strong className="text-indigo-700 font-extrabold">{parsedRows.length} rekod ahli</strong> ke dalam pangkalan data ahli secara pukal?
+                  </p>
+                  
+                  <div className="p-3 bg-indigo-50 border border-indigo-100 text-indigo-950 rounded-lg text-[10px] leading-relaxed flex gap-2 font-bold font-sans">
+                    <Info className="h-4.5 w-4.5 text-indigo-700 shrink-0" />
+                    <span>Info: Sekiranya No. Ahli sudah wujud, data ahli yang sedia ada akan dikemaskini. Rekod lejar baharu juga akan dibina bagi ahli yang baharu didaftarkan.</span>
+                  </div>
+                </>
+              )}
             </div>
             <div className="bg-slate-50 px-5 py-3 flex justify-end gap-2 border-t border-slate-150">
               <button
                 type="button"
                 onClick={() => setShowBulkConfirmModal(false)}
-                className="px-4 py-1.8 bg-slate-200 hover:bg-slate-250 text-slate-700 hover:text-slate-800 text-[10px] font-bold rounded uppercase cursor-pointer transition-colors"
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-250 text-slate-700 hover:text-slate-800 text-[10px] font-bold rounded-lg uppercase cursor-pointer transition-colors"
               >
                 Batal
               </button>
               <button
                 type="button"
                 onClick={executeSaveBulkPaste}
-                className="px-4 py-1.8 bg-indigo-700 hover:bg-indigo-805 text-white text-[10px] font-black rounded uppercase cursor-pointer flex items-center gap-1.5 transition-colors shadow-3xs"
+                className={`px-4 py-2 text-white text-[10px] font-black rounded-lg uppercase cursor-pointer flex items-center gap-1.5 transition-colors shadow-sm ${
+                  bulkMode === 'ic_tel'
+                    ? 'bg-emerald-700 hover:bg-emerald-800'
+                    : 'bg-indigo-700 hover:bg-indigo-800'
+                }`}
               >
                 <Check className="h-3.5 w-3.5" />
-                Ya, Sahkan Import
+                <span>{bulkMode === 'ic_tel' ? 'Ya, Sahkan Kemaskini IC & Tel' : 'Ya, Sahkan Import'}</span>
               </button>
             </div>
           </div>
