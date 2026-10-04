@@ -6,7 +6,7 @@
 import React, { Component, useState, useEffect } from 'react';
 import { AppState } from './types';
 import { getDefaultAppState } from './lib/defaultData';
-import { sanitizeAppState } from './lib/database';
+import { sanitizeAppState, mergeRemoteMembersWithLocal } from './lib/database';
 import { fetchFromAppsScript } from './lib/appsScript';
 import Navbar from './components/Navbar';
 import Overview from './components/Overview';
@@ -176,27 +176,37 @@ function MainApp() {
         const rawLedger = result.data.ledger || result.data.data?.ledger || [];
         const rawKewangan = result.data.kewangan || result.data.data?.kewangan || [];
 
-        // Keselamatan: Jangan benarkan data kosong daripada Sheets menimpa data tempatan yang ada
+        // Get latest local state so we don't overwrite recent local edits with a stale closure
+        let latestLocalState = state;
+        const savedStr = localStorage.getItem('khairat_gong_badak') || localStorage.getItem('khairat_gong_badak_state_v1');
+        if (savedStr) {
+          try {
+            latestLocalState = sanitizeAppState(JSON.parse(savedStr));
+          } catch {}
+        }
+
+        // Keselamatan: Jangan benarkan data kosong daripada Sheets menimpa data tempatan yang ada,
+        // dan kekalkan No. Telefon serta Tanggungan tempatan jika Google Sheets belum memulangkannya.
         const incomingMembers = (Array.isArray(rawMembers) && rawMembers.length > 0)
-          ? rawMembers
-          : state.members;
+          ? mergeRemoteMembersWithLocal(rawMembers, latestLocalState.members)
+          : latestLocalState.members;
         const incomingLedger = (Array.isArray(rawLedger) && rawLedger.length > 0)
           ? rawLedger
-          : state.ledger;
+          : latestLocalState.ledger;
         const incomingKewangan = (Array.isArray(rawKewangan) && rawKewangan.length > 0)
           ? rawKewangan
-          : state.kewangan;
+          : latestLocalState.kewangan;
 
         const mergedState = sanitizeAppState({
-          ...state,
+          ...latestLocalState,
           useGoogleSheets: true,
           appsScriptUrl: scriptUrl,
           members: incomingMembers,
           ledger: incomingLedger,
           kewangan: incomingKewangan,
-          googleSheetsId: result.data.spreadsheetId || state.googleSheetsId || '1sQWxn0TVSjwUZa8KkwzZi0Uv1z7CdW3O-D8rN4kJ6zI',
-          chartRoles: (result.data.chartRoles && Object.keys(result.data.chartRoles).length > 0) ? result.data.chartRoles : state.chartRoles,
-          pekelilingList: (result.data.pekelilingList && result.data.pekelilingList.length > 0) ? result.data.pekelilingList : state.pekelilingList
+          googleSheetsId: result.data.spreadsheetId || latestLocalState.googleSheetsId || '1sQWxn0TVSjwUZa8KkwzZi0Uv1z7CdW3O-D8rN4kJ6zI',
+          chartRoles: (result.data.chartRoles && Object.keys(result.data.chartRoles).length > 0) ? result.data.chartRoles : latestLocalState.chartRoles,
+          pekelilingList: (result.data.pekelilingList && result.data.pekelilingList.length > 0) ? result.data.pekelilingList : latestLocalState.pekelilingList
         });
         await handleChangeState(mergedState);
       } else {
@@ -309,8 +319,14 @@ function MainApp() {
               }
               setState(sanitizedLocal);
             } else {
-              // Adopt remote centered live database
-              const sanitizedRemote = sanitizeAppState(data.state);
+              // Adopt remote centered live database while preserving any local tel/tanggungan
+              const mergedMembers = localState?.members
+                ? mergeRemoteMembersWithLocal(data.state.members || [], localState.members)
+                : data.state.members;
+              const sanitizedRemote = sanitizeAppState({
+                ...data.state,
+                members: mergedMembers
+              });
               setState(sanitizedRemote);
               localStorage.setItem('khairat_gong_badak', JSON.stringify(sanitizedRemote));
               localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(sanitizedRemote));
@@ -385,15 +401,17 @@ function MainApp() {
         const result = await fetchFromAppsScript(state.appsScriptUrl!);
         if (result.success && result.data) {
           setState(prevState => {
-            const mergedState = {
+            const rawMembers = result.data.members || result.data.data?.members || prevState.members;
+            const mergedMembers = mergeRemoteMembersWithLocal(rawMembers, prevState.members);
+            const mergedState = sanitizeAppState({
               ...prevState,
-              members: result.data.members || prevState.members,
-              ledger: result.data.ledger || prevState.ledger,
-              kewangan: result.data.kewangan || prevState.kewangan || [],
+              members: mergedMembers,
+              ledger: result.data.ledger || result.data.data?.ledger || prevState.ledger,
+              kewangan: result.data.kewangan || result.data.data?.kewangan || prevState.kewangan || [],
               googleSheetsId: result.data.spreadsheetId || prevState.googleSheetsId,
               chartRoles: (result.data.chartRoles && Object.keys(result.data.chartRoles).length > 0) ? result.data.chartRoles : prevState.chartRoles,
               pekelilingList: (result.data.pekelilingList && result.data.pekelilingList.length > 0) ? result.data.pekelilingList : prevState.pekelilingList
-            };
+            });
             
             const currentString = localStorage.getItem('khairat_gong_badak');
             const newString = JSON.stringify(mergedState);

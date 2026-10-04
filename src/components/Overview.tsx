@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { AppState, Tanggungan } from '../types';
-import { runDaftarAhliBaru, calculateOutstandingDues, isSameMemberId } from '../lib/database';
+import { runDaftarAhliBaru, calculateOutstandingDues, isSameMemberId, writeToAppsScript } from '../lib/database';
 import { PlusCircle, Info, Sparkles, UserPlus, ShieldAlert, CheckCircle, Search, HelpCircle, FileText, Plus, Trash2, Users } from 'lucide-react';
 
 interface OverviewProps {
@@ -106,7 +106,22 @@ export default function Overview({ state, onChangeState, onNavigate, currentRole
       setErrorMsg(error);
     } else {
       onChangeState(newState);
-      setSuccessMsg(`Sukses! Ahli ${nama.trim()} (${noAhli}) telah berjaya didaftarkan di dalam pangkalan data.`);
+      fetch('/api/state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: newState })
+      }).catch(console.error);
+
+      if (newState.useGoogleSheets && newState.appsScriptUrl) {
+        writeToAppsScript(newState.appsScriptUrl, {
+          action: 'syncLocalToSheets',
+          members: newState.members,
+          ledger: newState.ledger,
+          kewangan: newState.kewangan || []
+        }).catch(console.error);
+      }
+
+      setSuccessMsg(`Sukses! Ahli ${nama.trim()} (${noAhli}) telah berjaya didaftarkan di dalam pangkalan data${newState.useGoogleSheets && newState.appsScriptUrl ? ' dan disegerakkan ke Google Sheets' : ''}.`);
       
       // Clear form inputs
       setNoAhli('');

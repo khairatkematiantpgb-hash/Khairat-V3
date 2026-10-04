@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { AppState, Member, Tanggungan, MONTH_KEYS, MONTH_LABELS } from '../types';
-import { calculateOutstandingDues, isSameMemberId, runKemaskiniMaklumatAhli, getArrearsDetails } from '../lib/database';
+import { calculateOutstandingDues, isSameMemberId, runKemaskiniMaklumatAhli, getArrearsDetails, writeToAppsScript, normalizePhoneNumber, normalizeIcNumber } from '../lib/database';
 import { Search, User, ShieldCheck, CheckCircle2, AlertCircle, FileText, Printer, MapPin, CreditCard, PlusCircle, Trash2, Edit2, Users, Check, X, Plus, Phone } from 'lucide-react';
 
 interface ProfileDashboardProps {
@@ -30,11 +30,28 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
     }
   }, [selectedMemberId]);
 
-  // Find targeted member based on active search query
+  // Find targeted member based on active search query (prioritize exact member ID match, then Name, IC, or Phone)
   const foundMember = searchQuery.trim() !== ''
-    ? state.members.find(
-        m => isSameMemberId(m.noAhli, searchQuery.trim()) || String(m.nama || '').toLowerCase().includes(searchQuery.trim().toLowerCase())
-      )
+    ? (() => {
+        const q = searchQuery.trim();
+        const qLower = q.toLowerCase();
+        const qDigits = q.replace(/[^0-9]/g, '');
+
+        // 1. Exact Member ID match first
+        const exactIdMatch = state.members.find(m => isSameMemberId(m.noAhli, q));
+        if (exactIdMatch) return exactIdMatch;
+
+        // 2. Match by Name, IC (with/without dashes), or Phone Number (with/without dashes)
+        return state.members.find(m => {
+          const icDigits = String(m.ic || '').replace(/[^0-9]/g, '');
+          const telDigits = String(m.tel || '').replace(/[^0-9]/g, '');
+          return (
+            String(m.nama || '').toLowerCase().includes(qLower) ||
+            (Boolean(m.ic) && (String(m.ic).toLowerCase().includes(qLower) || (qDigits.length >= 4 && icDigits.includes(qDigits)))) ||
+            (Boolean(m.tel) && (String(m.tel).toLowerCase().includes(qLower) || (qDigits.length >= 4 && telDigits.includes(qDigits))))
+          );
+        }) || null;
+      })()
     : null;
 
   // The active member we are viewing:
@@ -97,6 +114,42 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
   const [editStatus, setEditStatus] = useState('');
   const [editCatatan, setEditCatatan] = useState('');
   const [editTel, setEditTel] = useState('');
+  const [profileToast, setProfileToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const showProfileToast = (type: 'success' | 'error', text: string) => {
+    setProfileToast({ type, text });
+    setTimeout(() => setProfileToast(null), 4500);
+  };
+
+  const syncUpdatedStateEverywhere = (newState: AppState, successLabel: string) => {
+    onChangeState(newState);
+    localStorage.setItem('khairat_gong_badak', JSON.stringify(newState));
+    localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(newState));
+
+    fetch('/api/state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state: newState })
+    }).catch(console.error);
+
+    if (newState.useGoogleSheets && newState.appsScriptUrl) {
+      showProfileToast('success', `${successLabel} — Menyegerakkan ke Google Sheets...`);
+      writeToAppsScript(newState.appsScriptUrl, {
+        action: 'syncLocalToSheets',
+        members: newState.members,
+        ledger: newState.ledger,
+        kewangan: newState.kewangan || []
+      }).then(res => {
+        if (res.success) {
+          showProfileToast('success', `${successLabel} & berjaya disimpan ke Google Sheets!`);
+        } else {
+          showProfileToast('error', `Disimpan di Aplikasi, tetapi ralat Google Sheets: ${res.message}`);
+        }
+      }).catch(console.error);
+    } else {
+      showProfileToast('success', `${successLabel} berjaya disimpan!`);
+    }
+  };
 
   const openEditMemberModal = () => {
     if (!finalMember) return;
@@ -116,18 +169,18 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
     const { newState, error } = runKemaskiniMaklumatAhli(state, {
       noAhli: finalMember.noAhli,
       namaBaru: editNama,
-      icBaru: editIc,
+      icBaru: normalizeIcNumber(editIc),
       alamatBaru: editAlamat,
       statusBaru: editStatus,
       catatanBaru: editCatatan,
-      telBaru: editTel
+      telBaru: normalizePhoneNumber(editTel)
     });
 
     if (error) {
-      alert(error);
+      showProfileToast('error', error);
     } else {
-      onChangeState(newState);
       setShowEditMemberModal(false);
+      syncUpdatedStateEverywhere(newState, `Maklumat ahli ${finalMember.noAhli} dikemaskini`);
     }
   };
 
@@ -162,10 +215,11 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
       return m;
     });
 
-    onChangeState({
+    const newState = {
       ...state,
       members: updatedMembers
-    });
+    };
+    syncUpdatedStateEverywhere(newState, 'Senarai tanggungan dikemaskini');
   };
 
   const handleSaveDependent = (e: React.FormEvent) => {
@@ -175,7 +229,7 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
     const newDep: Tanggungan = {
       nama: depName.trim(),
       hubungan: depHubungan,
-      ic: depIc.trim()
+      ic: normalizeIcNumber(depIc.trim())
     };
 
     let updatedTanggungan = [...(finalMember.tanggungan || [])];
@@ -195,10 +249,11 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
       return m;
     });
 
-    onChangeState({
+    const newState = {
       ...state,
       members: updatedMembers
-    });
+    };
+    syncUpdatedStateEverywhere(newState, 'Maklumat tanggungan disimpan');
 
     setShowDepModal(false);
     setDepName('');
@@ -321,6 +376,10 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
               <div class="recipient-val" style="font-family: monospace;">${finalMember.ic}</div>
             </div>
             <div class="recipient-row">
+              <div class="recipient-label">No. Telefon</div>
+              <div class="recipient-val" style="font-family: monospace;">${finalMember.tel || '-'}</div>
+            </div>
+            <div class="recipient-row">
               <div class="recipient-label">Alamat Berdaftar</div>
               <div class="recipient-val">${finalMember.alamat}</div>
             </div>
@@ -384,11 +443,32 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
   return (
     <div className="space-y-4 font-sans" id="profile-dashboard-component">
       
+      {/* Toast Notification */}
+      {profileToast && (
+        <div
+          className={`fixed top-4 right-4 z-[70] flex items-center p-3 rounded-lg shadow-lg border max-w-sm w-full transition-all duration-300 animate-fade-in ${
+            profileToast.type === 'success'
+              ? 'bg-emerald-50 border-emerald-250 text-emerald-800'
+              : 'bg-rose-50 border-rose-250 text-rose-800'
+          }`}
+        >
+          <div className="mr-2.5 shrink-0">
+            {profileToast.type === 'success' ? (
+              <CheckCircle2 className="h-4.5 w-4.5 text-emerald-600" />
+            ) : (
+              <AlertCircle className="h-4.5 w-4.5 text-rose-600" />
+            )}
+          </div>
+          <p className="text-[11px] font-bold leading-relaxed">{profileToast.text}</p>
+          <button onClick={() => setProfileToast(null)} className="ml-auto text-slate-400 hover:text-slate-650 font-bold p-0.5 ml-2 text-sm">&times;</button>
+        </div>
+      )}
+
       {/* Search Bar / Selector Panel */}
       <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-3xs flex flex-col sm:flex-row gap-3 items-center justify-between">
         <div className="space-y-0.5 max-w-md w-full">
           <h3 className="text-xs font-bold text-slate-700 uppercase tracking-tight font-sans">Dashboard Carian & Profil Ahli</h3>
-          <p className="text-[10px] text-slate-450 font-sans">Pilih atau taip kata kunci (Nama, No. KP, atau No. Ahli) untuk melihat/mengemaskini maklumat keahlian.</p>
+          <p className="text-[10px] text-slate-450 font-sans">Pilih atau taip kata kunci (Nama, No. KP, No. Telefon, atau No. Ahli) untuk melihat/mengemaskini maklumat keahlian.</p>
         </div>
 
         {/* Input box */}
@@ -398,7 +478,7 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
           </div>
           <input
             type="text"
-            placeholder="Cari No. Ahli, Nama, atau No. IC..."
+            placeholder="Cari No. Ahli, Nama, No. IC, atau No. Telefon..."
             className="w-full pl-9 pr-3 py-1.8 bg-slate-50 border border-slate-300 text-slate-905 text-xs rounded focus:outline-hidden focus:ring-1 focus:ring-emerald-500 font-bold"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -713,7 +793,7 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
                 <label className="block text-[10px] font-bold text-slate-500 uppercase">Nombor Kad Pengenalan (IC)</label>
                 <input
                   type="text"
-                  required
+                  placeholder="Contoh: 850512-11-5431"
                   value={editIc}
                   onChange={(e) => setEditIc(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-305 rounded p-2 text-xs font-mono tracking-tight focus:bg-white focus:ring-1 focus:ring-emerald-500 outline-none"
@@ -724,7 +804,7 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
                 <label className="block text-[10px] font-bold text-slate-500 uppercase">Nombor Telefon</label>
                 <input
                   type="tel"
-                  required
+                  placeholder="Contoh: 019-9123456"
                   value={editTel}
                   onChange={(e) => setEditTel(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-305 rounded p-2 text-xs font-mono tracking-tight focus:bg-white focus:ring-1 focus:ring-emerald-500 outline-none"

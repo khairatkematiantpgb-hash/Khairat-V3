@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { prepareMembersForAppsScript, mergeRemoteMembersWithLocal, mergeDuplicateMembersAndLedgers } from './database';
+
 export const APPS_SCRIPT_CODE = `/**
  * Google Apps Script Web App - Integrasi Dwi-Hala Sistem Khairat Gong Badak
  * 
@@ -383,9 +385,14 @@ function doPost(e) {
       // 2. Tulis Senarai Ahli Baru
       const members = payload.members || [];
       if (members.length > 0) {
-        const rowsAhli = members.map(m => [
-          m.noAhli, m.nama, m.ic, m.alamat, m.status, m.catatan || "", JSON.stringify(m.tanggungan || []), m.tel || ""
-        ]);
+        const rowsAhli = members.map(m => {
+          const catatanBersih = m.cleanCatatan !== undefined
+            ? m.cleanCatatan
+            : String(m.catatan || "").replace(/(?:\\s*\\|\\s*|\\s+|^)\\[?Tel:\\s*([0-9+\\-\\s()]{7,20})\\]?(?=\\s*\\||$)/i, "").trim();
+          return [
+            m.noAhli, m.nama, m.ic, m.alamat, m.status, catatanBersih, JSON.stringify(m.tanggungan || []), m.tel || ""
+          ];
+        });
         sheetAhli.getRange(2, 1, rowsAhli.length, 8).setValues(rowsAhli);
       }
       
@@ -668,6 +675,26 @@ export async function fetchFromAppsScript(url: string): Promise<{ success: boole
 
 export async function writeToAppsScript(url: string, payload: any): Promise<{ success: boolean; data?: any; message?: string }> {
   try {
+    // Prepare payload with backward-compatible Tel encoding so both 6-column and 8-column Apps Scripts store Tel
+    const preparedPayload = {
+      ...payload,
+      ...(Array.isArray(payload?.members) ? { members: prepareMembersForAppsScript(payload.members) } : {})
+    };
+
+    const mergeResponseData = (rawData: any) => {
+      if (!rawData) return rawData;
+      const responseData = { ...rawData };
+      if (Array.isArray(responseData.members) && Array.isArray(responseData.ledger)) {
+        const mergedWithPushed = Array.isArray(payload?.members)
+          ? mergeRemoteMembersWithLocal(responseData.members, payload.members)
+          : responseData.members;
+        const { members, ledger } = mergeDuplicateMembersAndLedgers(mergedWithPushed, responseData.ledger);
+        responseData.members = members;
+        responseData.ledger = ledger;
+      }
+      return responseData;
+    };
+
     // 1. Try server-side proxy route first (completely avoids browser 302 method change and cookie redirects)
     try {
       const proxyRes = await fetch('/api/apps-script/write', {
@@ -675,12 +702,12 @@ export async function writeToAppsScript(url: string, payload: any): Promise<{ su
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ url, payload })
+        body: JSON.stringify({ url, payload: preparedPayload })
       });
       if (proxyRes.ok) {
         const result = await proxyRes.json();
         if (result && result.status === 'success') {
-          return { success: true, data: result.data, message: result.message };
+          return { success: true, data: mergeResponseData(result.data), message: result.message };
         } else if (result && result.message && !result.message.includes('Aksi GET tidak ditemui')) {
           return { success: false, message: result.message };
         }
@@ -696,7 +723,7 @@ export async function writeToAppsScript(url: string, payload: any): Promise<{ su
       headers: {
         'Content-Type': 'text/plain;charset=utf-8' // Handles easy CORS pre-flight bypass
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(preparedPayload)
     });
     if (!response.ok) {
       throw new Error(`HTTP Error: status ${response.status}`);
@@ -715,7 +742,7 @@ export async function writeToAppsScript(url: string, payload: any): Promise<{ su
       return { success: false, message: 'Maklum balas tidak sah dari Google Sheets.' };
     }
     if (result.status === 'success') {
-      return { success: true, data: result.data, message: result.message };
+      return { success: true, data: mergeResponseData(result.data), message: result.message };
     } else {
       return { success: false, message: result.message || 'Ralat memuat naik data.' };
     }

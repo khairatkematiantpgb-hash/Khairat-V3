@@ -30,6 +30,139 @@ export function isSameMemberId(id1: string | number | undefined | null, id2: str
   return normalizeMemberId(id1) === normalizeMemberId(id2);
 }
 
+// Helper to normalize phone numbers (restores leading 0 stripped by Excel and formats cleanly)
+export function normalizePhoneNumber(raw: any): string {
+  if (raw === undefined || raw === null) return '';
+  let clean = String(raw).trim();
+  if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+    clean = clean.substring(1, clean.length - 1).trim();
+  }
+  if (clean.startsWith("'")) clean = clean.substring(1).trim();
+  if (!clean || clean.toLowerCase() === 'tiada' || clean === '-' || clean.toLowerCase() === 'x') return '';
+
+  // Remove spaces and common separators to inspect digits
+  const digitsAndPlus = clean.replace(/[\s().-]/g, '');
+
+  // Handle +60 or 60 prefix (e.g., +60199123456 or 60199123456)
+  if (/^\+?601\d{7,9}$/.test(digitsAndPlus)) {
+    const localDigits = '0' + digitsAndPlus.replace(/^\+?60/, '');
+    if (localDigits.length >= 10 && localDigits.length <= 11) {
+      return `${localDigits.slice(0, 3)}-${localDigits.slice(3)}`;
+    }
+    return localDigits;
+  }
+
+  // Handle Excel stripped leading zero (e.g. 199123456 -> 019-9123456, 1110515152 -> 011-10515152)
+  if (/^1[0-9]\d{7,8}$/.test(digitsAndPlus)) {
+    const withZero = '0' + digitsAndPlus;
+    return `${withZero.slice(0, 3)}-${withZero.slice(3)}`;
+  }
+
+  // Handle standard 01X numbers without dash (e.g. 0199123456 -> 019-9123456)
+  if (/^01\d{8,9}$/.test(digitsAndPlus)) {
+    return `${digitsAndPlus.slice(0, 3)}-${digitsAndPlus.slice(3)}`;
+  }
+
+  // Handle landline 09 / 03 etc. without dash
+  if (/^0[2-9]\d{7,8}$/.test(digitsAndPlus) && !clean.includes('-')) {
+    return `${digitsAndPlus.slice(0, 2)}-${digitsAndPlus.slice(2)}`;
+  }
+
+  return clean;
+}
+
+// Helper to normalize IC numbers (restores leading zeros stripped by Excel for 2000s births and adds dashes)
+export function normalizeIcNumber(raw: any): string {
+  if (raw === undefined || raw === null) return '';
+  let clean = String(raw).trim();
+  if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+    clean = clean.substring(1, clean.length - 1).trim();
+  }
+  if (clean.startsWith("'")) clean = clean.substring(1).trim();
+  if (!clean) return '';
+
+  const digitsOnly = clean.replace(/[^0-9]/g, '');
+  // Standard 12-digit IC without dashes
+  if (digitsOnly.length === 12 && /^\d{12}$/.test(clean.replace(/[-\s]/g, ''))) {
+    return `${digitsOnly.slice(0, 6)}-${digitsOnly.slice(6, 8)}-${digitsOnly.slice(8, 12)}`;
+  }
+  // If Excel stripped 1 or 2 leading zeros from a 12-digit IC (e.g. 001017070684 -> 1017070684)
+  if ((digitsOnly.length === 10 || digitsOnly.length === 11) && /^\d+$/.test(clean)) {
+    const padded = digitsOnly.padStart(12, '0');
+    const mm = parseInt(padded.slice(2, 4), 10);
+    const dd = parseInt(padded.slice(4, 6), 10);
+    if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) {
+      return `${padded.slice(0, 6)}-${padded.slice(6, 8)}-${padded.slice(8, 12)}`;
+    }
+  }
+  return clean;
+}
+
+// Helper to extract embedded Tel from catatan (for 6-column Google Sheets backward compatibility)
+export function extractTelAndCleanCatatan(rawTel: any, rawCatatan: any): { tel: string; catatan: string } {
+  let tel = normalizePhoneNumber(rawTel);
+  let catatan = String(rawCatatan || '').trim();
+
+  // Check if catatan has embedded Tel tag like "Tel: 019-9123456" or "| Tel: 019-9123456" or "[Tel: 019-9123456]"
+  const telRegex = /(?:\s*\|\s*|\s+|^)\[?Tel:\s*([0-9+\-\s()]{7,20})\]?(?=\s*\||$)/i;
+  const match = catatan.match(telRegex);
+  if (match && match[1]) {
+    const extractedTel = normalizePhoneNumber(match[1]);
+    if (!tel && extractedTel) {
+      tel = extractedTel;
+    }
+    catatan = catatan.replace(telRegex, '').trim();
+    // Clean up any leftover leading/trailing pipe
+    catatan = catatan.replace(/^\|\s*/, '').replace(/\s*\|$/, '').trim();
+  }
+
+  return { tel, catatan };
+}
+
+// Helper to prepare member objects before sending to Google Apps Script (ensures 6-col & 8-col compatibility)
+export function prepareMembersForAppsScript(members: Member[]): any[] {
+  if (!Array.isArray(members)) return [];
+  return members.map(m => {
+    const { tel, catatan: cleanCatatan } = extractTelAndCleanCatatan(m.tel, m.catatan);
+    const ic = normalizeIcNumber(m.ic);
+    // Embed Tel into catatan as well so if the user's Google Sheet runs the older 6-column Apps Script,
+    // No. Telefon is still saved in Column F (Catatan) and read back automatically!
+    const catatanWithTel = tel
+      ? (cleanCatatan ? `${cleanCatatan} | Tel: ${tel}` : `Tel: ${tel}`)
+      : cleanCatatan;
+
+    return {
+      ...m,
+      noAhli: normalizeMemberId(m.noAhli),
+      ic: ic || m.ic || 'x',
+      tel,
+      catatan: catatanWithTel,
+      cleanCatatan
+    };
+  });
+}
+
+// Helper to merge remote members from Google Sheets with local members so tel & tanggungan are never lost
+export function mergeRemoteMembersWithLocal(remoteMembers: any[], localMembers: Member[]): Member[] {
+  const sanitizedRemote = (remoteMembers || []).map(sanitizeMember);
+  if (!Array.isArray(localMembers) || localMembers.length === 0) {
+    return sanitizedRemote;
+  }
+
+  return sanitizedRemote.map(rm => {
+    const localMatch = localMembers.find(lm => isSameMemberId(lm.noAhli, rm.noAhli));
+    if (!localMatch) return rm;
+
+    return {
+      ...rm,
+      tel: rm.tel || localMatch.tel || '',
+      tanggungan: (rm.tanggungan && rm.tanggungan.length > 0)
+        ? rm.tanggungan
+        : (localMatch.tanggungan || [])
+    };
+  });
+}
+
 // Helper to strictly sanitize Member objects and guarantee valid strings
 export function sanitizeMember(raw: any): Member {
   if (!raw || typeof raw !== 'object') {
@@ -44,12 +177,14 @@ export function sanitizeMember(raw: any): Member {
 
   const noAhli = normalizeMemberId(raw.noAhli || raw.no || raw.id || '');
   const nama = String(raw.nama || raw.namaAhli || raw.name || '').trim();
-  const ic = String(raw.ic || raw.noKadPengenalan || raw.kadPengenalan || raw.noKp || '').trim();
+  const rawIc = String(raw.ic || raw.noKadPengenalan || raw.kadPengenalan || raw.noKp || '').trim();
+  const ic = normalizeIcNumber(rawIc) || rawIc;
   const alamat = String(raw.alamat || raw.address || '').trim();
   const rawStatus = String(raw.status || raw.statusKeahlian || '').trim();
   const status = (rawStatus === 'Aktif' || rawStatus.toLowerCase() === 'aktif') ? 'Aktif' : 'Tidak Aktif';
-  const tel = String(raw.tel || raw.noTelefon || raw.telefon || raw.phone || '').trim();
-  const catatan = String(raw.catatan || raw.nota || raw.remarks || '').trim();
+  const rawTel = raw.tel || raw.noTelefon || raw.telefon || raw.phone || '';
+  const rawCatatan = raw.catatan || raw.nota || raw.remarks || '';
+  const { tel, catatan } = extractTelAndCleanCatatan(rawTel, rawCatatan);
 
   let tanggungan: Tanggungan[] = [];
   if (Array.isArray(raw.tanggungan)) {
@@ -396,12 +531,12 @@ export function runDaftarAhliBaru(
   const newMember: Member = {
     noAhli,
     nama: nama.trim(),
-    ic: ic.trim(),
+    ic: normalizeIcNumber(ic.trim()),
     alamat: alamat.trim(),
     status: status || 'Aktif',
     tanggungan: tanggungan || [],
     catatan: catatan || '',
-    tel: tel?.trim() || ''
+    tel: normalizePhoneNumber(tel?.trim() || '')
   };
 
   const currentYear = new Date().getFullYear();
@@ -595,12 +730,12 @@ export function runKemaskiniMaklumatAhli(
   const targetMember = { ...updatedMembers[memberIndex] };
 
   if (namaBaru.trim()) targetMember.nama = namaBaru.trim();
-  if (icBaru.trim()) targetMember.ic = icBaru.trim();
+  if (icBaru.trim()) targetMember.ic = normalizeIcNumber(icBaru.trim());
   if (alamatBaru.trim()) targetMember.alamat = alamatBaru.trim();
   if (statusBaru.trim()) targetMember.status = statusBaru.trim();
   if (catatanBaru !== undefined) targetMember.catatan = catatanBaru.trim();
   if (tanggunganBaru !== undefined) targetMember.tanggungan = tanggunganBaru;
-  if (telBaru !== undefined) targetMember.tel = telBaru.trim();
+  if (telBaru !== undefined) targetMember.tel = normalizePhoneNumber(telBaru.trim());
 
   updatedMembers[memberIndex] = targetMember;
 
@@ -1031,6 +1166,12 @@ export async function writeToAppsScript(
   payload: any
 ): Promise<{ success: boolean; data?: { members: Member[]; ledger: LedgerRow[]; kewangan?: any[]; chartRoles?: any; pekelilingList?: any[] }; message?: string }> {
   try {
+    // Prepare payload with backward-compatible Tel encoding so both 6-column and 8-column Apps Scripts store Tel
+    const preparedPayload = {
+      ...payload,
+      ...(Array.isArray(payload?.members) ? { members: prepareMembersForAppsScript(payload.members) } : {})
+    };
+
     // 1. Try server-side proxy first to completely avoid browser 302 method change and multi-login cookies
     try {
       const proxyRes = await fetch('/api/apps-script/write', {
@@ -1038,7 +1179,7 @@ export async function writeToAppsScript(
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ url, payload })
+        body: JSON.stringify({ url, payload: preparedPayload })
       });
 
       if (proxyRes.ok) {
@@ -1046,7 +1187,10 @@ export async function writeToAppsScript(
         if (data && data.status === 'success') {
           let responseData = data.data;
           if (responseData && Array.isArray(responseData.members) && Array.isArray(responseData.ledger)) {
-            const { members, ledger } = mergeDuplicateMembersAndLedgers(responseData.members, responseData.ledger);
+            const mergedWithPushed = Array.isArray(payload?.members)
+              ? mergeRemoteMembersWithLocal(responseData.members, payload.members)
+              : responseData.members;
+            const { members, ledger } = mergeDuplicateMembersAndLedgers(mergedWithPushed, responseData.ledger);
             responseData.members = members;
             responseData.ledger = ledger;
           }
@@ -1069,7 +1213,8 @@ export async function writeToAppsScript(
     // 2. Direct browser fetch fallback
     const res = await fetch(url, {
       method: 'POST',
-      body: JSON.stringify(payload),
+      redirect: 'follow',
+      body: JSON.stringify(preparedPayload),
       headers: {
         'Content-Type': 'text/plain;charset=utf-8', // Bypass preflight CORS constraints in Apps Script Web Apps
       },
@@ -1080,7 +1225,10 @@ export async function writeToAppsScript(
     if (data && data.status === 'success') {
       let responseData = data.data;
       if (responseData && Array.isArray(responseData.members) && Array.isArray(responseData.ledger)) {
-        const { members, ledger } = mergeDuplicateMembersAndLedgers(responseData.members, responseData.ledger);
+        const mergedWithPushed = Array.isArray(payload?.members)
+          ? mergeRemoteMembersWithLocal(responseData.members, payload.members)
+          : responseData.members;
+        const { members, ledger } = mergeDuplicateMembersAndLedgers(mergedWithPushed, responseData.ledger);
         responseData.members = members;
         responseData.ledger = ledger;
       }

@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { Member, AppState } from '../types';
-import { runPadamAhli, writeToAppsScript, isSameMemberId, mergeDuplicateMembersAndLedgers, normalizeMemberId } from '../lib/database';
+import { runPadamAhli, writeToAppsScript, isSameMemberId, mergeDuplicateMembersAndLedgers, normalizeMemberId, normalizePhoneNumber, normalizeIcNumber } from '../lib/database';
 import { Search, Trash2, Filter, AlertTriangle, AlertCircle, RefreshCw, ChevronLeft, ChevronRight, FileSpreadsheet, FileText, PlusCircle, Check, X, Info, CheckCircle, Users, User, Phone, CreditCard, Download, Upload, ArrowRight, Sparkles } from 'lucide-react';
 
 interface MemberDatabaseProps {
@@ -52,12 +52,82 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
 
   // Helper to format IC number with dashes if it's 12 continuous digits (e.g. 850512115431 -> 850512-11-5431)
   const formatIcNumber = (raw: string) => {
-    const clean = raw.trim();
-    const digitsOnly = clean.replace(/[^0-9]/g, '');
-    if (digitsOnly.length === 12 && !clean.includes('-')) {
-      return `${digitsOnly.slice(0, 6)}-${digitsOnly.slice(6, 8)}-${digitsOnly.slice(8, 12)}`;
+    return normalizeIcNumber(raw);
+  };
+
+  // Helper to format phone number (restoring leading 0 if stripped by Excel)
+  const formatPhoneNumber = (raw: string) => {
+    return normalizePhoneNumber(raw);
+  };
+
+  // Smart CSV/TSV line splitter that handles tabs, commas, and semicolons while respecting quotes
+  const splitBulkLine = (line: string): string[] => {
+    if (line.includes('\t')) {
+      return line.split('\t').map(c => {
+        let val = c.trim();
+        if (val.startsWith('"') && val.endsWith('"')) {
+          val = val.substring(1, val.length - 1).replace(/""/g, '"').trim();
+        }
+        return val;
+      });
     }
-    return clean;
+
+    const delimiter = !line.includes(',') && line.includes(';') ? ';' : ',';
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (ch === delimiter && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+
+  const isLikelyPhoneValue = (val: string): boolean => {
+    const clean = val.replace(/^'/, '').trim();
+    if (!clean) return false;
+    const digits = clean.replace(/[^0-9]/g, '');
+    if (/^(\+?60|01)\d{7,10}$/.test(digits)) return true;
+    // Excel stripped leading 0 from Malaysian mobile number (e.g. 199123456 or 1112345678)
+    if ((digits.length === 9 || digits.length === 10) && /^1[0-9]/.test(digits) && !clean.includes('-')) return true;
+    // Formatted with dash like 019-1234567 or 19-1234567
+    if (/^0?1\d-\d{6,8}$/.test(clean.replace(/\s+/g, ''))) return true;
+    return false;
+  };
+
+  const isLikelyIcValue = (val: string): boolean => {
+    const clean = val.replace(/^'/, '').trim();
+    if (!clean) return false;
+    if (/^\d{6}-\d{2}-\d{4}$/.test(clean)) return true;
+    const digits = clean.replace(/[^0-9]/g, '');
+    if (digits.length === 12 && !/^(\+?60|01)/.test(digits)) return true;
+    return false;
+  };
+
+  const handleUploadBulkFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = String(event.target?.result || '');
+      handleParseBulkText(content, bulkMode);
+    };
+    reader.readAsText(file, 'utf-8');
+    e.target.value = '';
   };
 
   const handleParseBulkText = (text: string, currentMode = bulkMode) => {
@@ -69,53 +139,61 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
     }
 
     try {
-      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l !== '');
-      if (lines.length === 0) {
+      const rawLines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(l => l.trim() !== '');
+      if (rawLines.length === 0) {
         setParsedRows([]);
         return;
       }
 
       // Check if the first line is likely a header
-      let cells0 = lines[0].split('\t');
-      if (cells0.length === 1) {
-        cells0 = lines[0].split(',');
-      }
+      const cells0 = splitBulkLine(rawLines[0]);
 
       const isHeaderRow = (cells: string[]) => {
         return cells.some(cell => {
           const val = cell.toLowerCase().trim();
-          return val.includes('ahli') || val.includes('nama') || val.includes('ic') || val.includes('kp') || val.includes('tel') || val.includes('telefon') || val.includes('alamat') || val.includes('status');
+          return val.includes('ahli') || val.includes('nama') || val.includes('ic') || val.includes('kp') || val.includes('pengenalan') || val.includes('tel') || val.includes('telefon') || val.includes('alamat') || val.includes('status');
         });
       };
 
       let startIdx = 0;
+      let headerMap: { noAhli?: number; nama?: number; ic?: number; tel?: number; alamat?: number; status?: number; catatan?: number } | null = null;
+
       if (isHeaderRow(cells0)) {
         startIdx = 1;
+        headerMap = {};
+        cells0.forEach((h, idx) => {
+          const val = h.toLowerCase().trim();
+          if (headerMap!.noAhli === undefined && (val.includes('no. ahli') || val.includes('no ahli') || val === 'ahli' || val === 'id' || val === 'no')) {
+            headerMap!.noAhli = idx;
+          } else if (headerMap!.nama === undefined && val.includes('nama')) {
+            headerMap!.nama = idx;
+          } else if (headerMap!.ic === undefined && (val.includes('ic') || val.includes('kp') || val.includes('pengenalan'))) {
+            headerMap!.ic = idx;
+          } else if (headerMap!.tel === undefined && (val.includes('tel') || val.includes('hp') || val.includes('bimbit') || val.includes('phone'))) {
+            headerMap!.tel = idx;
+          } else if (headerMap!.alamat === undefined && val.includes('alamat')) {
+            headerMap!.alamat = idx;
+          } else if (headerMap!.status === undefined && val.includes('status')) {
+            headerMap!.status = idx;
+          } else if (headerMap!.catatan === undefined && val.includes('catatan')) {
+            headerMap!.catatan = idx;
+          }
+        });
       }
 
       const rows: any[] = [];
 
-      for (let i = startIdx; i < lines.length; i++) {
-        const line = lines[i];
-        let cells = line.split('\t');
-        if (cells.length === 1) {
-          cells = line.split(',');
-        }
+      for (let i = startIdx; i < rawLines.length; i++) {
+        const line = rawLines[i];
+        const cleanedCells = splitBulkLine(line);
 
-        // Clean cells
-        const cleanedCells = cells.map(c => {
-          let val = c.trim();
-          if (val.startsWith('"') && val.endsWith('"')) {
-            val = val.substring(1, val.length - 1).trim();
-          }
-          return val;
-        });
-
-        if (cleanedCells.length < 2) {
+        if (cleanedCells.length < 2 || cleanedCells.every(c => !c)) {
           continue;
         }
 
-        let noAhli = cleanedCells[0].replace(/^'/, '').replace(/'$/, '').trim();
+        const noAhliCol = headerMap?.noAhli !== undefined ? headerMap.noAhli : 0;
+        let noAhli = (cleanedCells[noAhliCol] || '').replace(/^'/, '').replace(/'$/, '').trim();
+        if (!noAhli) continue;
         if (/^\d+$/.test(noAhli)) {
           noAhli = noAhli.padStart(3, '0');
         }
@@ -128,26 +206,37 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
           let ic = '';
           let tel = '';
 
-          if (cleanedCells.length >= 4) {
+          if (headerMap && (headerMap.ic !== undefined || headerMap.tel !== undefined)) {
+            if (headerMap.nama !== undefined && cleanedCells[headerMap.nama]) {
+              nama = cleanedCells[headerMap.nama];
+            }
+            if (headerMap.ic !== undefined && cleanedCells[headerMap.ic]) {
+              ic = cleanedCells[headerMap.ic];
+            }
+            if (headerMap.tel !== undefined && cleanedCells[headerMap.tel]) {
+              tel = cleanedCells[headerMap.tel];
+            }
+          } else if (cleanedCells.length >= 4) {
             // Format: No Ahli, Nama Ahli, No IC, No Telefon
             nama = cleanedCells[1] || nama;
             ic = cleanedCells[2] || '';
             tel = cleanedCells[3] || '';
           } else if (cleanedCells.length === 3) {
-            // Check if Col 1 is IC or Nama
+            // Check if Col 1 is IC, Tel, or Nama
             const col1 = cleanedCells[1];
             const col2 = cleanedCells[2];
-            const looksLikeIc = /^\d{6}-?\d{2}-?\d{4}$/.test(col1) || /^\d{10,14}$/.test(col1.replace(/-/g, ''));
-            
-            if (looksLikeIc) {
+            if (isLikelyIcValue(col1) || (!isLikelyPhoneValue(col1) && /^\d[\d-\s]+$/.test(col1))) {
               // Format: No Ahli, No IC, No Telefon
               ic = col1;
               tel = col2;
+            } else if (isLikelyPhoneValue(col1) && isLikelyIcValue(col2)) {
+              // Format: No Ahli, No Telefon, No IC
+              tel = col1;
+              ic = col2;
             } else {
               // Format: No Ahli, Nama, IC or Tel
               nama = col1 || nama;
-              const looksLikeTel = /^(\+?60|01)\d/.test(col2.replace(/[-\s]/g, ''));
-              if (looksLikeTel) {
+              if (isLikelyPhoneValue(col2)) {
                 tel = col2;
               } else {
                 ic = col2;
@@ -156,8 +245,7 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
           } else if (cleanedCells.length === 2) {
             // Format: No Ahli, IC/Tel
             const val = cleanedCells[1];
-            const looksLikeTel = /^(\+?60|01)\d/.test(val.replace(/[-\s]/g, ''));
-            if (looksLikeTel) {
+            if (isLikelyPhoneValue(val)) {
               tel = val;
             } else {
               ic = val;
@@ -165,9 +253,10 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
           }
 
           ic = formatIcNumber(ic);
+          tel = formatPhoneNumber(tel);
           const currentIc = existingMember?.ic || '';
           const currentTel = existingMember?.tel || '';
-          const isChanged = (ic && ic !== currentIc) || (tel && tel !== currentTel);
+          const isChanged = Boolean((ic && ic !== currentIc) || (tel && tel !== currentTel));
 
           rows.push({
             noAhli,
@@ -182,15 +271,25 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
           });
         } else {
           // MODE FULL IMPORT
-          const nama = cleanedCells[1] || 'Ahli Tanpa Nama';
-          const ic = formatIcNumber(cleanedCells[2] || '');
+          const nama = cleanedCells[headerMap?.nama ?? 1] || existingMember?.nama || 'Ahli Tanpa Nama';
+          const ic = formatIcNumber(cleanedCells[headerMap?.ic ?? 2] || '');
           let tel = existingMember?.tel || '';
           let alamat = '';
           let status = 'Aktif';
           let catatan = '';
 
-          if (cleanedCells.length >= 7) {
-            tel = cleanedCells[3] || '';
+          if (headerMap && (headerMap.tel !== undefined || headerMap.alamat !== undefined)) {
+            if (headerMap.tel !== undefined) tel = formatPhoneNumber(cleanedCells[headerMap.tel] || '');
+            if (headerMap.alamat !== undefined) alamat = cleanedCells[headerMap.alamat] || '';
+            if (headerMap.status !== undefined) {
+              const statusRaw = cleanedCells[headerMap.status] || 'Aktif';
+              if (statusRaw.toLowerCase().includes('tidak') || statusRaw.toLowerCase().includes('tangguh')) {
+                status = 'Tidak Aktif';
+              }
+            }
+            if (headerMap.catatan !== undefined) catatan = cleanedCells[headerMap.catatan] || '';
+          } else if (cleanedCells.length >= 7) {
+            tel = formatPhoneNumber(cleanedCells[3] || '');
             alamat = cleanedCells[4] || '';
             const statusRaw = cleanedCells[5] || 'Aktif';
             if (statusRaw.toLowerCase().includes('tidak') || statusRaw.toLowerCase().includes('tangguh')) {
@@ -198,12 +297,22 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
             }
             catatan = cleanedCells[6] || '';
           } else {
-            alamat = cleanedCells[3] || '';
-            const statusRaw = cleanedCells[4] || 'Aktif';
-            if (statusRaw.toLowerCase().includes('tidak') || statusRaw.toLowerCase().includes('tangguh')) {
-              status = 'Tidak Aktif';
+            // Check if column 3 is actually a phone number
+            if (isLikelyPhoneValue(cleanedCells[3] || '')) {
+              tel = formatPhoneNumber(cleanedCells[3] || '');
+              alamat = cleanedCells[4] || existingMember?.alamat || '';
+              const statusRaw = cleanedCells[5] || existingMember?.status || 'Aktif';
+              if (statusRaw.toLowerCase().includes('tidak') || statusRaw.toLowerCase().includes('tangguh')) {
+                status = 'Tidak Aktif';
+              }
+            } else {
+              alamat = cleanedCells[3] || '';
+              const statusRaw = cleanedCells[4] || 'Aktif';
+              if (statusRaw.toLowerCase().includes('tidak') || statusRaw.toLowerCase().includes('tangguh')) {
+                status = 'Tidak Aktif';
+              }
+              catatan = cleanedCells[5] || '';
             }
-            catatan = cleanedCells[5] || '';
           }
 
           rows.push({
@@ -273,9 +382,9 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
       const updatedMembers = state.members.map(member => {
         const updateRow = parsedRows.find(r => isSameMemberId(r.noAhli, member.noAhli));
         if (updateRow) {
-          const newIc = updateRow.ic ? updateRow.ic.trim() : member.ic;
-          const newTel = updateRow.tel ? updateRow.tel.trim() : member.tel;
-          if (newIc !== member.ic || newTel !== member.tel) {
+          const newIc = updateRow.ic ? formatIcNumber(updateRow.ic.trim()) : member.ic;
+          const newTel = updateRow.tel ? formatPhoneNumber(updateRow.tel.trim()) : (member.tel || '');
+          if (newIc !== member.ic || newTel !== (member.tel || '')) {
             updatedCount++;
           }
           return {
@@ -296,6 +405,11 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
       localStorage.setItem('khairat_gong_badak', JSON.stringify(newState));
       localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(newState));
 
+      setBulkPasteText('');
+      setParsedRows([]);
+      setShowBulkPasteModal(false);
+      setShowBulkConfirmModal(false);
+
       // Sync to backend /api/state
       fetch('/api/state', {
         method: 'POST',
@@ -305,20 +419,22 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
 
       // Sync to Google Sheets if connected
       if (state.useGoogleSheets && state.appsScriptUrl) {
+        showToast('success', `Menyimpan & menyegerakkan ${updatedCount} rekod ahli ke Google Sheets...`);
         writeToAppsScript(state.appsScriptUrl, {
           action: 'syncLocalToSheets',
           members: updatedMembers,
           ledger: state.ledger,
           kewangan: state.kewangan || []
+        }).then(res => {
+          if (res.success) {
+            showToast('success', `Berjaya! ${updatedCount} rekod IC & No. Telefon telah dikemaskini di Aplikasi & Google Sheets.`);
+          } else {
+            showToast('error', `Disimpan di Aplikasi, tetapi ralat Google Sheets: ${res.message}`);
+          }
         }).catch(console.error);
       }
 
-      setBulkPasteText('');
-      setParsedRows([]);
-      setShowBulkPasteModal(false);
-      setShowBulkConfirmModal(false);
-
-      triggerAlert(`Alhamdulillah! Sebanyak ${updatedCount} rekod ahli telah berjaya dikemaskini No. Kad Pengenalan dan No. Telefon secara serentak.\n\nMaklumat alamat, tanggungan, status, dan rekod lejar yuran kekal terpelihara.`);
+      triggerAlert(`Alhamdulillah! Sebanyak ${updatedCount} rekod ahli telah berjaya dikemaskini No. Kad Pengenalan dan No. Telefon secara serentak.\n\nData telah disimpan terus ke Storan Pusat${state.useGoogleSheets && state.appsScriptUrl ? ' dan disegerakkan ke Google Sheets (Pangkalan Data Ahli)' : ''}. Maklumat alamat, tanggungan, status, dan rekod lejar yuran kekal terpelihara.`);
       return;
     }
 
@@ -391,6 +507,7 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
     };
 
     onChangeState(newState);
+    localStorage.setItem('khairat_gong_badak', JSON.stringify(newState));
     localStorage.setItem('khairat_gong_badak_state_v1', JSON.stringify(newState));
 
     // Sync to backend /api/state
@@ -400,13 +517,27 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
       body: JSON.stringify({ state: newState })
     }).catch(console.error);
 
+    // Sync to Google Sheets if connected
+    if (state.useGoogleSheets && state.appsScriptUrl) {
+      writeToAppsScript(state.appsScriptUrl, {
+        action: 'syncLocalToSheets',
+        members: cleanMembers,
+        ledger: cleanLedger,
+        kewangan: state.kewangan || []
+      }).then(res => {
+        if (res.success) {
+          showToast('success', `Berjaya menyegerakkan ${totalImported} rekod ahli ke Google Sheets!`);
+        }
+      }).catch(console.error);
+    }
+
     const totalImported = parsedRows.length;
     setBulkPasteText('');
     setParsedRows([]);
     setShowBulkPasteModal(false);
     setShowBulkConfirmModal(false);
 
-    triggerAlert(`Sukses! ${totalImported} rekod pangkalan ahli telah berjaya dimasukkan/dikemas kini secara pukal.\n\nSila segerakkan (sync) perubahan ke Google Sheet jika anda mengaktifkan integrasi di tab Integrasi.`);
+    triggerAlert(`Sukses! ${totalImported} rekod pangkalan ahli telah berjaya dimasukkan/dikemas kini secara pukal dan disegerakkan ke pangkalan data.`);
   };
 
   // Filter and sort members based on search and status
@@ -418,18 +549,22 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
       }
 
       const isNumericSearch = /^\d+$/.test(cleanSearch);
-      
+      const cleanDigits = cleanSearch.replace(/[^0-9]/g, '');
+      const memberIcDigits = String(m.ic || '').replace(/[^0-9]/g, '');
+      const memberTelDigits = String(m.tel || '').replace(/[^0-9]/g, '');
+
       let matchesSearch = false;
-      if (isNumericSearch) {
-        // If search is numeric, match member ID exactly (ignoring leading zeros) 
+      if (isNumericSearch && cleanSearch.length <= 4) {
+        // If search is short numeric (1-4 digits), match member ID (ignoring leading zeros)
         matchesSearch = isSameMemberId(m.noAhli, cleanSearch);
       } else {
-        // If search contains letters/characters, search by name, exact ID, or IC
+        // Search by name, exact ID, IC (with/without dashes), or Phone Number (with/without dashes)
         matchesSearch =
           String(m.nama || '').toLowerCase().includes(cleanSearch) ||
           String(m.noAhli || '').toLowerCase().includes(cleanSearch) ||
           isSameMemberId(m.noAhli, cleanSearch) ||
-          (Boolean(m.ic) && String(m.ic).toLowerCase().includes(cleanSearch));
+          (Boolean(m.ic) && (String(m.ic).toLowerCase().includes(cleanSearch) || (cleanDigits.length >= 5 && memberIcDigits.includes(cleanDigits)))) ||
+          (Boolean(m.tel) && (String(m.tel).toLowerCase().includes(cleanSearch) || (cleanDigits.length >= 5 && memberTelDigits.includes(cleanDigits))));
       }
 
       const memberStatus = m.status || 'Aktif';
@@ -814,7 +949,7 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
             </div>
             <input
               type="text"
-              placeholder="Cari ahli berdasarkan Nama, No. Kad Pengenalan atau No. Ahli..."
+              placeholder="Cari ahli berdasarkan Nama, No. Kad Pengenalan, No. Telefon atau No. Ahli..."
               className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-300 text-slate-905 text-xs rounded focus:outline-hidden focus:ring-1 focus:ring-emerald-500 font-medium"
               value={searchTerm}
               onChange={(e) => {
@@ -1247,8 +1382,22 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
                           title="Muat turun templat Excel CSV dengan senarai kesemua ahli semasa"
                         >
                           <Download className="h-3 w-3" />
-                          <span>Muat Turun Templat Ahli Semasa (Excel CSV)</span>
+                          <span>1. Muat Turun Templat (CSV)</span>
                         </button>
+
+                        <label
+                          className="px-2.5 py-1 bg-indigo-700 hover:bg-indigo-800 text-white rounded text-[10px] font-black uppercase flex items-center gap-1.5 transition shadow-xs cursor-pointer font-sans"
+                          title="Muat naik terus fail CSV yang telah dikemaskini dalam Excel"
+                        >
+                          <Upload className="h-3 w-3" />
+                          <span>2. Muat Naik Fail CSV</span>
+                          <input
+                            type="file"
+                            accept=".csv,.txt,.tsv"
+                            onChange={handleUploadBulkFile}
+                            className="hidden"
+                          />
+                        </label>
 
                         <button
                           type="button"
@@ -1258,7 +1407,7 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
                           }}
                           className="px-2.5 py-1 bg-white hover:bg-emerald-100/70 border border-emerald-300 text-emerald-800 rounded text-[10px] font-bold uppercase flex items-center gap-1.5 transition cursor-pointer font-sans"
                         >
-                          <span>Muat Contoh Demo</span>
+                          <span>Contoh Demo</span>
                         </button>
                       </div>
                     </div>

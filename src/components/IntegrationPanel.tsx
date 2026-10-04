@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { AppState } from '../types';
 import { fetchFromAppsScript, writeToAppsScript } from '../lib/appsScript';
-import { sanitizeAppState } from '../lib/database';
+import { sanitizeAppState, mergeRemoteMembersWithLocal } from '../lib/database';
 import { getAppsScriptGoogleCode } from '../lib/appsScript';
 import { Radio, ToggleLeft, ToggleRight, Check, CheckCircle, Info, Key, AlertTriangle, RefreshCw, Layers, ExternalLink, HelpCircle, FileText, CheckCircle2, Share2, Download, Archive, Terminal, FileArchive, Copy } from 'lucide-react';
 
@@ -146,23 +146,73 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
     setCentralLoading(true);
     setCentralResult(null);
     try {
-      const res = await fetch('/api/state', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) {
-          setCentralResult({
-            success: true,
-            message: `Selesai! Pangkalan data tempatan (${state.members?.length || 0} ahli) telah disimpan secara pusat ke Server Live. Peranti tetamu lain akan disegerak secara automatik seketika lagi!`
-          });
-        } else {
-          setCentralResult({ success: false, message: `Ralat maklum balas server: ${data.message}` });
+      let serverSaved = false;
+      try {
+        const res = await fetch('/api/state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success) serverSaved = true;
         }
+      } catch (serverErr) {
+        console.warn('Server local save warning:', serverErr);
+      }
+
+      // Also push to Google Sheets if configured so both storages are always in sync!
+      let sheetsSaved = false;
+      let sheetsErrMsg = '';
+      const targetScriptUrl = appsScriptUrlInput.trim() || state.appsScriptUrl;
+      if (state.useGoogleSheets && targetScriptUrl) {
+        const payload = {
+          action: 'syncLocalToSheets',
+          members: state.members,
+          ledger: state.ledger,
+          kewangan: state.kewangan || [],
+          chartRoles: state.chartRoles || {},
+          pekelilingList: state.pekelilingList || []
+        };
+        const result = await writeToAppsScript(targetScriptUrl, payload);
+        if (result.success) {
+          sheetsSaved = true;
+          if (result.data) {
+            const mergedMembers = mergeRemoteMembersWithLocal(result.data.members || state.members, state.members);
+            onChangeState({
+              ...state,
+              members: mergedMembers,
+              ledger: result.data.ledger || state.ledger,
+              kewangan: result.data.kewangan || state.kewangan || [],
+              chartRoles: result.data.chartRoles || state.chartRoles || {},
+              pekelilingList: result.data.pekelilingList || state.pekelilingList || []
+            });
+          }
+        } else {
+          sheetsErrMsg = result.message || 'Ralat tidak diketahui';
+        }
+      }
+
+      if (serverSaved && sheetsSaved) {
+        setCentralResult({
+          success: true,
+          message: `Selesai! Pangkalan data tempatan (${state.members?.length || 0} ahli termasuk No. IC & No. Telefon) telah berjaya dimuat naik ke Server Pusat DAN Google Sheets (Pangkalan Data Ahli)!`
+        });
+      } else if (sheetsSaved) {
+        setCentralResult({
+          success: true,
+          message: `Selesai! Pangkalan data tempatan (${state.members?.length || 0} ahli termasuk No. IC & No. Telefon) telah berjaya dimuat naik ke Google Sheets (Pangkalan Data Ahli)!`
+        });
+      } else if (serverSaved) {
+        setCentralResult({
+          success: true,
+          message: `Pangkalan data tempatan (${state.members?.length || 0} ahli) telah disimpan ke Server Live.${sheetsErrMsg ? ` (Amaran Google Sheets: ${sheetsErrMsg})` : ''}`
+        });
       } else {
-        setCentralResult({ success: false, message: `Gagal HTTP dengan status kerosakan ${res.status}` });
+        setCentralResult({
+          success: false,
+          message: `Gagal memuat naik data.${sheetsErrMsg ? ` Ralat Google Sheets: ${sheetsErrMsg}` : ''}`
+        });
       }
     } catch (e: any) {
       setCentralResult({ success: false, message: `Ralat sambungan: ${e.message}` });
@@ -274,7 +324,8 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
 
   // Force Push Local State to Remote Google Sheets spreadsheet overwrite (Arah dwi-hala)
   const handleForcePushToSheets = async () => {
-    if (!state.appsScriptUrl) {
+    const targetUrl = appsScriptUrlInput.trim() || state.appsScriptUrl;
+    if (!targetUrl) {
       setTestResult({ success: false, message: 'Ralat: Sila simpan URL Web App terlebih dahulu sebelum menyegerak.' });
       return;
     }
@@ -292,19 +343,32 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
     };
 
     try {
-      const result = await writeToAppsScript(state.appsScriptUrl, payload);
-      if (result.success && result.data) {
-        onChangeState({
+      // Also persist current local state to /api/state first so server storage has the exact latest tel & ic
+      fetch('/api/state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state })
+      }).catch(() => {});
+
+      const result = await writeToAppsScript(targetUrl, payload);
+      if (result.success) {
+        const mergedMembers = result.data?.members
+          ? mergeRemoteMembersWithLocal(result.data.members, state.members)
+          : state.members;
+        const updatedState = {
           ...state,
-          members: result.data.members,
-          ledger: result.data.ledger,
-          kewangan: result.data.kewangan || state.kewangan || [],
-          chartRoles: result.data.chartRoles || state.chartRoles || {},
-          pekelilingList: result.data.pekelilingList || state.pekelilingList || []
-        });
+          appsScriptUrl: targetUrl,
+          members: mergedMembers,
+          ledger: result.data?.ledger || state.ledger,
+          kewangan: result.data?.kewangan || state.kewangan || [],
+          chartRoles: result.data?.chartRoles || state.chartRoles || {},
+          pekelilingList: result.data?.pekelilingList || state.pekelilingList || []
+        };
+        onChangeState(updatedState);
+        const withTelCount = mergedMembers.filter(m => m.tel && m.tel.trim() !== '').length;
         setTestResult({
           success: true,
-          message: `Segerak PUSH Berjaya! Pangkalan Google Sheets di atas talian telah dikemaskinikan sepenuhnya.`
+          message: `Segerak PUSH Berjaya! Pangkalan Google Sheets (Tab Pangkalan Data Ahli: ${mergedMembers.length} ahli, ${withTelCount} rekod No. Telefon) dan Server telah dikemaskinikan sepenuhnya.`
         });
       } else {
         setTestResult({
@@ -337,11 +401,13 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
           throw new Error('Google Sheets membalas tetapi tiada rekod ahli atau lejar ditemui.');
         }
 
+        const mergedMembers = mergeRemoteMembersWithLocal(rawMembers, state.members);
+
         const newState = sanitizeAppState({
           ...state,
           useGoogleSheets: true,
           appsScriptUrl: targetUrl,
-          members: rawMembers,
+          members: mergedMembers,
           ledger: rawLedger,
           kewangan: rawKewangan.length > 0 ? rawKewangan : (state.kewangan || []),
           chartRoles: (result.data.chartRoles && Object.keys(result.data.chartRoles).length > 0) ? result.data.chartRoles : state.chartRoles,
@@ -354,7 +420,7 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
 
         setTestResult({
           success: true,
-          message: `Berjaya menarik data dari Google Sheets! (${rawMembers.length} rekod ahli & ${rawLedger.length} baris rekod lejar ditemui dan diselaraskan).`
+          message: `Berjaya menarik data dari Google Sheets! (${newState.members.length} rekod ahli & ${rawLedger.length} baris rekod lejar ditemui dan diselaraskan).`
         });
       } else {
         throw new Error(result.message || 'Gagal menarik data dari Google Sheets.');
@@ -858,8 +924,25 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
                   className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-extrabold text-xs uppercase rounded-lg tracking-wider transition border-b-4 border-emerald-950 flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-emerald-700/10"
                 >
                   <RefreshCw className={`h-4 w-4 ${testLoading || syncLoading ? 'animate-spin' : ''}`} />
-                  <span>Muat Naik (Push) Data Tempatan ke Google Sheets</span>
+                  <span>{testLoading ? 'Sedang Memuat Naik Data ke Google Sheets...' : 'Muat Naik (Push) Data Tempatan ke Google Sheets'}</span>
                 </button>
+
+                {testResult && (
+                  <div className={`p-3 rounded-lg border text-xs ${
+                    testResult.success
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-850'
+                      : 'bg-rose-50 border-rose-200 text-rose-850'
+                  }`}>
+                    <div className="flex gap-2 items-start">
+                      {testResult.success ? (
+                        <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                      ) : (
+                        <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+                      )}
+                      <p className="text-[11px] font-semibold leading-relaxed font-sans">{testResult.message}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="p-3.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-[11px] flex items-start gap-2 leading-relaxed">

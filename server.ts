@@ -33,28 +33,52 @@ function normalizeMemberId(id: any): string {
   return base;
 }
 
+// Helper to extract embedded Tel from catatan
+function extractServerTelAndCatatan(rawTel: any, rawCatatan: any): { tel: string; catatan: string } {
+  let tel = String(rawTel || '').trim();
+  let catatan = String(rawCatatan || '').trim();
+
+  const telRegex = /(?:\s*\|\s*|\s+|^)\[?Tel:\s*([0-9+\-\s()]{7,20})\]?(?=\s*\||$)/i;
+  const match = catatan.match(telRegex);
+  if (match && match[1]) {
+    const extractedTel = match[1].trim();
+    if (!tel && extractedTel) {
+      tel = extractedTel;
+    }
+    catatan = catatan.replace(telRegex, '').trim();
+    catatan = catatan.replace(/^\|\s*/, '').replace(/\s*\|$/, '').trim();
+  }
+
+  return { tel, catatan };
+}
+
 // Helper to sanitize server state payload before saving
 function sanitizeServerState(rawState: any) {
   if (!rawState || typeof rawState !== 'object') return rawState;
 
   const members = Array.isArray(rawState.members)
-    ? rawState.members.map((m: any) => ({
-        ...m,
-        noAhli: normalizeMemberId(m?.noAhli || m?.no || m?.id || ''),
-        nama: String(m?.nama || m?.namaAhli || m?.name || '').trim(),
-        ic: String(m?.ic || m?.noKadPengenalan || m?.kadPengenalan || m?.noKp || '').trim(),
-        alamat: String(m?.alamat || m?.address || '').trim(),
-        status: (String(m?.status || m?.statusKeahlian || '').trim().toLowerCase() === 'aktif' || m?.status === 'Aktif') ? 'Aktif' : 'Tidak Aktif',
-        tel: String(m?.tel || m?.noTelefon || m?.telefon || m?.phone || '').trim(),
-        catatan: String(m?.catatan || m?.nota || m?.remarks || '').trim(),
-        tanggungan: Array.isArray(m?.tanggungan)
-          ? m.tanggungan.map((t: any) => ({
-              nama: String(t?.nama || '').trim(),
-              hubungan: String(t?.hubungan || '').trim(),
-              ic: String(t?.ic || t?.noKadPengenalan || '').trim()
-            })).filter((t: any) => t.nama.length > 0)
-          : []
-      }))
+    ? rawState.members.map((m: any) => {
+        const rawTel = m?.tel || m?.noTelefon || m?.telefon || m?.phone || '';
+        const rawCatatan = m?.catatan || m?.nota || m?.remarks || '';
+        const { tel, catatan } = extractServerTelAndCatatan(rawTel, rawCatatan);
+        return {
+          ...m,
+          noAhli: normalizeMemberId(m?.noAhli || m?.no || m?.id || ''),
+          nama: String(m?.nama || m?.namaAhli || m?.name || '').trim(),
+          ic: String(m?.ic || m?.noKadPengenalan || m?.kadPengenalan || m?.noKp || '').trim(),
+          alamat: String(m?.alamat || m?.address || '').trim(),
+          status: (String(m?.status || m?.statusKeahlian || '').trim().toLowerCase() === 'aktif' || m?.status === 'Aktif') ? 'Aktif' : 'Tidak Aktif',
+          tel,
+          catatan,
+          tanggungan: Array.isArray(m?.tanggungan)
+            ? m.tanggungan.map((t: any) => ({
+                nama: String(t?.nama || '').trim(),
+                hubungan: String(t?.hubungan || '').trim(),
+                ic: String(t?.ic || t?.noKadPengenalan || '').trim()
+              })).filter((t: any) => t.nama.length > 0)
+            : []
+        };
+      })
     : [];
 
   const ledger = Array.isArray(rawState.ledger)
@@ -146,7 +170,8 @@ async function startServer() {
       const response = await fetch(targetUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'text/plain;charset=utf-8'
+          'Content-Type': 'text/plain;charset=utf-8',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         },
         body: JSON.stringify(payload),
         signal: controller.signal
