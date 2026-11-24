@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AppState, Member } from '../types';
 import { calculateOutstandingDues, isSameMemberId, getArrearsDetails } from '../lib/database';
@@ -323,6 +323,58 @@ export default function SuratPeringatanModal({
     }
     return allArrearsRecipients.filter((x) => selectedMemberIds.includes(x.member.noAhli));
   }, [allArrearsRecipients, selectedMemberIds, printSingleMember]);
+
+  // Auto-fit each letter to strictly 1 A4 page when printing
+  const letterInnerRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [letterPrintZoomMap, setLetterPrintZoomMap] = useState<Record<string, number>>({});
+
+  const recalculatePrintZoom = () => {
+    // Printable A4 height at 8mm-10mm margins (~1046px-1062px at 96dpi). Target 890px for guaranteed 1-page fit.
+    const MAX_A4_CONTENT_HEIGHT_PX = 890;
+    const nextZoomMap: Record<string, number> = {};
+
+    recipientsToPrint.forEach((item) => {
+      const el = letterInnerRefs.current[item.member.noAhli];
+      if (!el) return;
+      const measuredHeight = el.scrollHeight;
+      if (measuredHeight > MAX_A4_CONTENT_HEIGHT_PX) {
+        const computedZoom = Math.max(0.6, Math.min(1, Number((MAX_A4_CONTENT_HEIGHT_PX / measuredHeight).toFixed(3))));
+        nextZoomMap[item.member.noAhli] = computedZoom;
+      } else {
+        nextZoomMap[item.member.noAhli] = 1;
+      }
+    });
+
+    setLetterPrintZoomMap((prev) => {
+      const prevKeys = Object.keys(prev);
+      const nextKeys = Object.keys(nextZoomMap);
+      if (
+        prevKeys.length === nextKeys.length &&
+        nextKeys.every((k) => prev[k] === nextZoomMap[k])
+      ) {
+        return prev;
+      }
+      return nextZoomMap;
+    });
+  };
+
+  useLayoutEffect(() => {
+    if (!isPrintingPortal) return;
+    recalculatePrintZoom();
+
+    let cancelled = false;
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => {
+        if (!cancelled) recalculatePrintZoom();
+      });
+    }
+    const handleBeforePrint = () => recalculatePrintZoom();
+    window.addEventListener('beforeprint', handleBeforePrint);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('beforeprint', handleBeforePrint);
+    };
+  }, [isPrintingPortal, recipientsToPrint, fontSizePt, previewFormatMode, configSemasa, configAwal]);
 
   // Save template edits
   const handleSaveConfig = () => {
@@ -1388,9 +1440,11 @@ export default function SuratPeringatanModal({
                         className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1"
                       >
                         <div>Nama Bank: <strong>{activePreviewConfig.namaBank}</strong></div>
-                        <div>Nama Akaun: <strong>{activePreviewConfig.namaPemegangAkaun}</strong></div>
+                        <div>
+                          No. Akaun: <strong className="font-mono text-slate-950 font-black">{activePreviewConfig.noAkaunBank}</strong>
+                        </div>
                         <div className="sm:col-span-2">
-                          Nombor Akaun: <strong className="font-mono text-slate-950 font-black text-base">{activePreviewConfig.noAkaunBank}</strong>
+                          Nama Akaun: <strong>{activePreviewConfig.namaPemegangAkaun}</strong>
                         </div>
                       </div>
 
@@ -1533,17 +1587,25 @@ export default function SuratPeringatanModal({
             @media print {
               @page {
                 size: A4 portrait;
-                margin: 8mm 12mm;
+                margin: 8mm 10mm;
               }
               .surat-print-page {
                 display: block !important;
                 break-after: page !important;
                 page-break-after: always !important;
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
               }
               .surat-print-page:last-child {
                 break-after: auto !important;
                 page-break-after: auto !important;
               }
+              ${recipientsToPrint
+                .map((item, idx) => {
+                  const z = letterPrintZoomMap[item.member.noAhli] ?? 1;
+                  return `#surat-print-inner-${idx} { zoom: ${z}; }`;
+                })
+                .join('\n              ')}
             }
           `}</style>
 
@@ -1552,12 +1614,15 @@ export default function SuratPeringatanModal({
             <div className="flex items-center gap-2">
               <Printer className="h-5 w-5 text-rose-400" />
               <span className="font-bold text-sm">
-                Sedia Untuk Cetak: {recipientsToPrint.length} Salinan Surat Peringatan / Amaran Awal (Piawai Font {fontSizePt})
+                Sedia Untuk Cetak: {recipientsToPrint.length} Helai Surat (1 Muka Surat / Ahli • Font {fontSizePt}pt)
               </span>
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => window.print()}
+                onClick={() => {
+                  recalculatePrintZoom();
+                  window.print();
+                }}
                 className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-sm"
               >
                 <Printer className="h-4 w-4" />
@@ -1572,7 +1637,7 @@ export default function SuratPeringatanModal({
             </div>
           </div>
 
-          {/* Individual Print Letters with CSS Page Break (1 sheet per member) */}
+          {/* Individual Print Letters with CSS Page Break (Strictly 1 A4 sheet per member) */}
           <div className="space-y-8 py-6 bg-slate-100 print:bg-white print:py-0 print:space-y-0 print:block">
             {recipientsToPrint.map((item, idx) => {
               const m = item.member;
@@ -1582,295 +1647,297 @@ export default function SuratPeringatanModal({
               return (
                 <div
                   key={m.noAhli}
-                  className="surat-print-page bg-white text-slate-900 p-8 sm:p-10 mx-auto max-w-3xl shadow-md border border-slate-200 space-y-2.5 print:p-0 print:m-0 print:max-w-none print:w-full print:shadow-none print:border-0 print:space-y-1.5 select-text"
+                  className="surat-print-page bg-white text-slate-900 p-8 sm:p-10 mx-auto max-w-[794px] shadow-md border border-slate-200 print:p-0 print:m-0 print:max-w-none print:w-full print:shadow-none print:border-0 select-text"
                   style={{
-                    fontSize: `${fontSizePt}pt`,
-                    lineHeight: 1.35,
                     pageBreakAfter: isLastLetter ? 'auto' : 'always',
                     breakAfter: isLastLetter ? 'auto' : 'page'
                   }}
                 >
-                  
-                  {/* Official Letterhead */}
-                  <div className="border-b-2 border-double border-slate-900 pb-2 text-center space-y-0.5">
-                    <div className="flex items-center justify-center gap-3 mb-0.5">
-                      <div className="w-9 h-9 rounded-full bg-emerald-700 flex items-center justify-center text-white font-black text-xs shrink-0">
-                        PKK
-                      </div>
-                      <div>
-                        <h1
-                          style={{ fontSize: `${fontSizePt + 2}pt` }}
-                          className="font-black tracking-tight text-slate-950 uppercase leading-tight"
-                        >
-                          PERTUBUHAN KEBAJIKAN KHAIRAT KEMATIAN
-                        </h1>
-                        <h2
-                          style={{ fontSize: `${fontSizePt}pt` }}
-                          className="font-bold text-slate-800 uppercase tracking-widest leading-tight"
-                        >
-                          KAMPUNG GONG BADAK, KUALA NERUS, TERENGGANU
-                        </h2>
-                      </div>
-                    </div>
-                    <p
-                      style={{ fontSize: `${fontSizePt - 2}pt` }}
-                      className="text-slate-600"
-                    >
-                      Pendaftaran Pertubuhan (PPM) &bull; Masjid Kampung Gong Badak, 21300 Kuala Nerus, Terengganu
-                    </p>
-                  </div>
-
-                  {/* Reference & Date */}
                   <div
-                    style={{ fontSize: `${fontSizePt}pt` }}
-                    className="flex justify-between items-center text-slate-700 pt-0.5"
+                    id={`surat-print-inner-${idx}`}
+                    ref={(el) => {
+                      letterInnerRefs.current[m.noAhli] = el;
+                    }}
+                    className="surat-print-inner space-y-2 print:space-y-1.5"
+                    style={{
+                      fontSize: `${fontSizePt}pt`,
+                      lineHeight: 1.28
+                    }}
                   >
-                    <div>
-                      Ruj. Kami: <strong className="font-mono font-bold">{cfg.rujukanPrefix}/{m.noAhli}</strong>
-                    </div>
-                    <div className="text-right">
-                      Tarikh: <strong>{cfg.tarikhSurat}</strong>
-                    </div>
-                  </div>
-
-                  {/* Recipient Address */}
-                  <div
-                    style={{ fontSize: `${fontSizePt}pt` }}
-                    className="space-y-0.5 pt-0.5"
-                  >
-                    <div>Kepada:</div>
-                    <div
-                      style={{ fontSize: `${fontSizePt + 1.5}pt` }}
-                      className="font-black text-slate-950 uppercase tracking-wide leading-snug"
-                    >
-                      {m.nama}
-                    </div>
-                    <div className="font-mono text-slate-700">
-                      No. Ahli: <span className="font-bold">{m.noAhli}</span>
-                      {m.ic && <span> &bull; No. KP: {m.ic}</span>}
-                    </div>
-                    <div className="text-slate-800 leading-snug whitespace-pre-line">
-                      {m.alamat || 'Kampung Gong Badak, 21300 Kuala Nerus, Terengganu'}
-                    </div>
-                  </div>
-
-                  {/* Salutation */}
-                  <div
-                    style={{ fontSize: `${fontSizePt}pt` }}
-                    className="pt-0.5 font-semibold"
-                  >
-                    Tuan / Puan,
-                  </div>
-
-                  {/* Subject */}
-                  <div
-                    style={{ fontSize: `${fontSizePt + 0.5}pt` }}
-                    className="font-black text-slate-950 uppercase underline leading-snug"
-                  >
-                    {cfg.tajukSurat}
-                  </div>
-
-                  {/* Paragraph 1 */}
-                  <div
-                    style={{ fontSize: `${fontSizePt}pt` }}
-                    className="text-justify text-slate-900 leading-snug"
-                  >
-                    {cfg.pembukaan}
-                  </div>
-
-                  {/* Box: Arrears Summary */}
-                  <div className={`border-2 rounded-lg p-2.5 space-y-1.5 ${
-                    item.category === 'amaran_awal'
-                      ? 'bg-amber-50/40 border-amber-800'
-                      : 'bg-slate-50 border-slate-800'
-                  }`}>
-                    <div
-                      style={{ fontSize: `${fontSizePt - 1}pt` }}
-                      className="font-black uppercase text-slate-900 tracking-wider border-b border-slate-300 pb-1 flex justify-between items-center"
-                    >
-                      <span>PENYATA BUTIRAN TUNGGAKAN YURAN:</span>
-                      <span className="font-mono font-bold text-slate-600">ID: {m.noAhli}</span>
-                    </div>
-                    <div
-                      style={{ fontSize: `${fontSizePt}pt` }}
-                      className="grid grid-cols-2 gap-y-1"
-                    >
-                      <div className="text-slate-600">Nama Pencarum:</div>
-                      <div className="font-bold text-slate-900 uppercase">{m.nama}</div>
-
-                      <div className="text-slate-600">Status Pembayaran Terakhir:</div>
-                      <div className="font-bold text-slate-900 font-mono">Lunas Sehingga {item.latestPaid}</div>
-
-                      <div className="text-slate-600">Tempoh / Bulan Tertunggak:</div>
-                      <div className="font-bold text-rose-800 leading-snug">{item.arrearsPeriod}</div>
-
-                      <div
-                        style={{ fontSize: `${fontSizePt + 0.5}pt` }}
-                        className="text-slate-900 font-bold pt-0.5 border-t border-slate-200"
-                      >
-                        Jumlah Tunggakan Semasa:
-                      </div>
-                      <div
-                        style={{ fontSize: `${fontSizePt + 1.5}pt` }}
-                        className="font-black text-rose-700 font-mono pt-0.5 border-t border-slate-200"
-                      >
-                        RM {item.actualDues}.00
-                      </div>
-
-                      <div
-                        style={{ fontSize: `${fontSizePt + 0.5}pt` }}
-                        className="text-slate-900 font-bold pt-0.5 border-t border-slate-200"
-                      >
-                        Anggaran Tunggakan Bulan Seterusnya (+RM{kadarYuran}):
-                      </div>
-                      <div
-                        style={{ fontSize: `${fontSizePt + 1.5}pt` }}
-                        className="font-black text-rose-800 font-mono pt-0.5 border-t border-slate-200"
-                      >
-                        RM {item.nextMonthDues}.00
-                        <span className="text-[10px] font-sans font-bold text-amber-800 block leading-tight">
-                          (Bakal Melebihi / Mencecah Had RM36)
-                        </span>
-                      </div>
-
-                      <div className="text-slate-600 pt-0.5 border-t border-slate-200">Jenis Notis Surat:</div>
-                      <div className="font-bold text-slate-900 pt-0.5 border-t border-slate-200">
-                        {item.category === 'amaran_awal' ? (
-                          <span className="text-amber-800 uppercase font-black">
-                            Surat Amaran Awal (Sebelum Penggantungan Keahlian)
-                          </span>
-                        ) : (
-                          <span className="text-rose-800 uppercase font-black">
-                            Surat Peringatan Semasa (Tunggakan ≥ RM36)
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Paragraph 2: Instructions */}
-                  <div
-                    style={{ fontSize: `${fontSizePt}pt` }}
-                    className="text-justify text-slate-900 leading-snug"
-                  >
-                    {cfg.arahanBayaran} Bayaran hendaklah diselesaikan dalam tempoh <strong>{cfg.tempohHari}</strong> melalui saluran rasmi pertubuhan berikut:
-                  </div>
-
-                  {/* Bank Info Box */}
-                  <div className="bg-slate-100 border border-slate-300 rounded-lg p-2.5 space-y-1 text-slate-900">
-                    <div
-                      style={{ fontSize: `${fontSizePt}pt` }}
-                      className="font-black text-slate-950 flex items-center gap-2 uppercase tracking-wide border-b border-slate-300 pb-0.5"
-                    >
-                      <Building2 className="h-4 w-4 text-slate-700" />
-                      <span>Saluran Pembayaran Rasmi Pertubuhan</span>
-                    </div>
-                    <div
-                      style={{ fontSize: `${fontSizePt}pt` }}
-                      className="grid grid-cols-1 sm:grid-cols-2 gap-1 pt-0.5"
-                    >
-                      <div>Nama Bank: <strong>{cfg.namaBank}</strong></div>
-                      <div>Nama Akaun: <strong>{cfg.namaPemegangAkaun}</strong></div>
-                      <div className="sm:col-span-2">
-                        Nombor Akaun: <strong className="font-mono text-slate-950 font-black text-base">{cfg.noAkaunBank}</strong>
-                      </div>
-                    </div>
-
-                    {/* WhatsApp Online Receipt Notice for Print */}
-                    {cfg.maklumanResitOnline && (
-                      <div className="bg-white border border-slate-400 rounded p-2 text-slate-900 space-y-0.5 mt-1">
-                        <div
-                          style={{ fontSize: `${fontSizePt - 1}pt` }}
-                          className="font-bold text-slate-950 uppercase tracking-wide"
-                        >
-                          Penghantaran Bukti / Resit Bayaran Atas Talian (Transfer):
+                    {/* Official Letterhead */}
+                    <div className="border-b-2 border-double border-slate-900 pb-1.5 text-center space-y-0.5">
+                      <div className="flex items-center justify-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-emerald-700 flex items-center justify-center text-white font-black text-xs shrink-0">
+                          PKK
                         </div>
-                        <div
-                          style={{ fontSize: `${fontSizePt}pt` }}
-                          className="whitespace-pre-line leading-snug pl-2 font-medium"
-                        >
-                          {cfg.maklumanResitOnline}
-                        </div>
-                        <div
-                          style={{ fontSize: `${fontSizePt - 1.5}pt` }}
-                          className="text-slate-600 font-mono pl-2 pt-0.5 border-t border-slate-200 mt-0.5"
-                        >
-                          (Rujukan Ahli: <strong>{m.nama}</strong> | No. Ahli: <strong>{m.noAhli}</strong>)
+                        <div>
+                          <h1
+                            style={{ fontSize: `${fontSizePt + 1.5}pt` }}
+                            className="font-black tracking-tight text-slate-950 uppercase leading-tight"
+                          >
+                            PERTUBUHAN KEBAJIKAN KHAIRAT KEMATIAN
+                          </h1>
+                          <h2
+                            style={{ fontSize: `${fontSizePt - 0.5}pt` }}
+                            className="font-bold text-slate-800 uppercase tracking-widest leading-tight"
+                          >
+                            KAMPUNG GONG BADAK, KUALA NERUS, TERENGGANU
+                          </h2>
                         </div>
                       </div>
-                    )}
-
-                    <div
-                      style={{ fontSize: `${fontSizePt - 0.5}pt` }}
-                      className="text-slate-700 pt-0.5 border-t border-slate-200 italic"
-                    >
-                      {cfg.maklumanTunai}
-                    </div>
-                  </div>
-
-                  {/* Paragraph 3: Warning */}
-                  <div
-                    style={{ fontSize: `${fontSizePt}pt` }}
-                    className={`text-justify leading-snug p-2 rounded-md border ${
-                      item.category === 'amaran_awal'
-                        ? 'bg-amber-50 border-amber-300 text-amber-950'
-                        : 'bg-rose-50 border-rose-300 text-rose-950'
-                    }`}
-                  >
-                    {cfg.peringatanKeahlian}
-                  </div>
-
-                  {/* Closing & Sign-off */}
-                  <div className="pt-1 space-y-2.5">
-                    <div
-                      style={{ fontSize: `${fontSizePt}pt` }}
-                      className="space-y-0.5"
-                    >
-                      <div>Sekian, terima kasih.</div>
-                      <div className="font-bold text-slate-950 tracking-wide">
-                        &quot;BERKHIDMAT UNTUK KARIAH&quot;
-                      </div>
-                    </div>
-
-                    {/* Issuer details from Bendahari */}
-                    <div
-                      style={{ fontSize: `${fontSizePt}pt` }}
-                      className="space-y-0.5"
-                    >
-                      <div>Saya yang menjalankan amanah,</div>
-                      <div
-                        style={{ fontSize: `${fontSizePt + 1.5}pt` }}
-                        className="pt-2 font-black uppercase text-slate-950 tracking-wider"
-                      >
-                        {cfg.namaBendahari}
-                      </div>
-                      <div
-                        style={{ fontSize: `${fontSizePt + 0.5}pt` }}
-                        className="font-bold text-slate-800 uppercase"
-                      >
-                        {cfg.jawatanPengeluar}
-                      </div>
-                      <div className="text-slate-600">
-                        Pertubuhan Kebajikan Khairat Kematian Kampung Gong Badak
-                      </div>
-                      <div className="font-mono text-slate-700 flex items-center gap-1 pt-0.5">
-                        <Phone className="h-3 w-3 text-slate-500" />
-                        <span>H/P: {cfg.telBendahari}</span>
-                      </div>
-                    </div>
-
-                    {/* Computer Generated Disclaimer */}
-                    <div className="pt-1.5 border-t border-slate-300 text-center">
                       <p
-                        style={{ fontSize: `${fontSizePt - 2}pt` }}
-                        className="text-slate-600 font-mono font-semibold italic bg-slate-100 py-1 px-2 rounded border border-slate-200"
+                        style={{ fontSize: `${fontSizePt - 2.5}pt` }}
+                        className="text-slate-600 leading-tight"
                       >
-                        *** {cfg.notaJanaanKomputer} ***
+                        Pendaftaran Pertubuhan (PPM) &bull; Masjid Kampung Gong Badak, 21300 Kuala Nerus, Terengganu
                       </p>
                     </div>
 
-                  </div>
+                    {/* Reference & Date */}
+                    <div
+                      style={{ fontSize: `${fontSizePt - 0.5}pt` }}
+                      className="flex justify-between items-center text-slate-700"
+                    >
+                      <div>
+                        Ruj. Kami: <strong className="font-mono font-bold">{cfg.rujukanPrefix}/{m.noAhli}</strong>
+                      </div>
+                      <div className="text-right">
+                        Tarikh: <strong>{cfg.tarikhSurat}</strong>
+                      </div>
+                    </div>
 
+                    {/* Recipient Address */}
+                    <div
+                      style={{ fontSize: `${fontSizePt - 0.5}pt` }}
+                      className="space-y-0 leading-tight"
+                    >
+                      <div className="text-slate-700">Kepada:</div>
+                      <div
+                        style={{ fontSize: `${fontSizePt + 1}pt` }}
+                        className="font-black text-slate-950 uppercase tracking-wide leading-tight"
+                      >
+                        {m.nama}
+                      </div>
+                      <div className="font-mono text-slate-700">
+                        No. Ahli: <span className="font-bold">{m.noAhli}</span>
+                        {m.ic && <span> &bull; No. KP: {m.ic}</span>}
+                      </div>
+                      <div className="text-slate-800 leading-snug whitespace-pre-line">
+                        {m.alamat || 'Kampung Gong Badak, 21300 Kuala Nerus, Terengganu'}
+                      </div>
+                    </div>
+
+                    {/* Salutation & Subject */}
+                    <div className="space-y-0.5">
+                      <div
+                        style={{ fontSize: `${fontSizePt - 0.5}pt` }}
+                        className="font-semibold"
+                      >
+                        Tuan / Puan,
+                      </div>
+                      <div
+                        style={{ fontSize: `${fontSizePt}pt` }}
+                        className="font-black text-slate-950 uppercase underline leading-snug"
+                      >
+                        {cfg.tajukSurat}
+                      </div>
+                    </div>
+
+                    {/* Paragraph 1 */}
+                    <div
+                      style={{ fontSize: `${fontSizePt - 0.5}pt` }}
+                      className="text-justify text-slate-900 leading-snug"
+                    >
+                      {cfg.pembukaan}
+                    </div>
+
+                    {/* Box: Arrears Summary */}
+                    <div className={`border-2 rounded-lg p-2 space-y-1 ${
+                      item.category === 'amaran_awal'
+                        ? 'bg-amber-50/40 border-amber-800'
+                        : 'bg-slate-50 border-slate-800'
+                    }`}>
+                      <div
+                        style={{ fontSize: `${fontSizePt - 1.5}pt` }}
+                        className="font-black uppercase text-slate-900 tracking-wider border-b border-slate-300 pb-0.5 flex justify-between items-center"
+                      >
+                        <span>PENYATA BUTIRAN TUNGGAKAN YURAN:</span>
+                        <span className="font-mono font-bold text-slate-600">ID: {m.noAhli}</span>
+                      </div>
+                      <div
+                        style={{ fontSize: `${fontSizePt - 0.5}pt` }}
+                        className="grid grid-cols-[37%_63%] gap-x-2 gap-y-0.5 leading-snug"
+                      >
+                        <div className="text-slate-600">Nama Pencarum:</div>
+                        <div className="font-bold text-slate-900 uppercase">{m.nama}</div>
+
+                        <div className="text-slate-600">Pembayaran Terakhir:</div>
+                        <div className="font-bold text-slate-900 font-mono">Lunas Sehingga {item.latestPaid}</div>
+
+                        <div className="text-slate-600">Tempoh / Bulan Tertunggak:</div>
+                        <div className="font-bold text-rose-800 leading-tight">{item.arrearsPeriod}</div>
+
+                        <div className="text-slate-900 font-bold pt-0.5 border-t border-slate-200">
+                          Jumlah Tunggakan Semasa:
+                        </div>
+                        <div
+                          style={{ fontSize: `${fontSizePt + 0.5}pt` }}
+                          className="font-black text-rose-700 font-mono pt-0.5 border-t border-slate-200"
+                        >
+                          RM {item.actualDues}.00
+                        </div>
+
+                        <div className="text-slate-900 font-bold pt-0.5 border-t border-slate-200">
+                          Anggaran Bulan Hadapan (+RM{kadarYuran}):
+                        </div>
+                        <div className="pt-0.5 border-t border-slate-200">
+                          <span
+                            style={{ fontSize: `${fontSizePt + 0.5}pt` }}
+                            className="font-black text-rose-800 font-mono"
+                          >
+                            RM {item.nextMonthDues}.00
+                          </span>
+                          <span className="text-[9.5pt] font-sans font-bold text-amber-800 ml-1.5">
+                            (Bakal Melebihi / Mencecah Had RM36)
+                          </span>
+                        </div>
+
+                        <div className="text-slate-600 pt-0.5 border-t border-slate-200">Jenis Notis Surat:</div>
+                        <div className="font-bold text-slate-900 pt-0.5 border-t border-slate-200">
+                          {item.category === 'amaran_awal' ? (
+                            <span className="text-amber-800 uppercase font-black">
+                              Surat Amaran Awal (Sebelum Penggantungan Keahlian)
+                            </span>
+                          ) : (
+                            <span className="text-rose-800 uppercase font-black">
+                              Surat Peringatan Semasa (Tunggakan ≥ RM36)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Paragraph 2: Instructions */}
+                    <div
+                      style={{ fontSize: `${fontSizePt - 0.5}pt` }}
+                      className="text-justify text-slate-900 leading-snug"
+                    >
+                      {cfg.arahanBayaran} Bayaran hendaklah diselesaikan dalam tempoh <strong>{cfg.tempohHari}</strong> melalui saluran rasmi pertubuhan berikut:
+                    </div>
+
+                    {/* Bank Info Box */}
+                    <div className="bg-slate-100 border border-slate-300 rounded-lg p-2 space-y-1 text-slate-900">
+                      <div
+                        style={{ fontSize: `${fontSizePt - 0.5}pt` }}
+                        className="font-black text-slate-950 flex items-center gap-1.5 uppercase tracking-wide border-b border-slate-300 pb-0.5"
+                      >
+                        <Building2 className="h-3.5 w-3.5 text-slate-700" />
+                        <span>Saluran Pembayaran Rasmi Pertubuhan</span>
+                      </div>
+                      <div
+                        style={{ fontSize: `${fontSizePt - 0.5}pt` }}
+                        className="grid grid-cols-2 gap-x-3 gap-y-0.5 pt-0.5 leading-snug"
+                      >
+                        <div>Nama Bank: <strong>{cfg.namaBank}</strong></div>
+                        <div>
+                          No. Akaun: <strong className="font-mono text-slate-950 font-black">{cfg.noAkaunBank}</strong>
+                        </div>
+                        <div className="col-span-2">
+                          Nama Akaun: <strong>{cfg.namaPemegangAkaun}</strong>
+                        </div>
+                      </div>
+
+                      {/* WhatsApp Online Receipt Notice for Print */}
+                      {cfg.maklumanResitOnline && (
+                        <div className="bg-white border border-slate-400 rounded p-1.5 text-slate-900 space-y-0.5">
+                          <div
+                            style={{ fontSize: `${fontSizePt - 1.5}pt` }}
+                            className="font-bold text-slate-950 uppercase tracking-wide"
+                          >
+                            Penghantaran Bukti / Resit Bayaran Atas Talian (Transfer):
+                          </div>
+                          <div
+                            style={{ fontSize: `${fontSizePt - 0.5}pt` }}
+                            className="whitespace-pre-line leading-tight pl-2 font-medium"
+                          >
+                            {cfg.maklumanResitOnline}
+                          </div>
+                          <div
+                            style={{ fontSize: `${fontSizePt - 2}pt` }}
+                            className="text-slate-600 font-mono pl-2 pt-0.5 border-t border-slate-200"
+                          >
+                            (Rujukan Ahli: <strong>{m.nama}</strong> | No. Ahli: <strong>{m.noAhli}</strong>)
+                          </div>
+                        </div>
+                      )}
+
+                      <div
+                        style={{ fontSize: `${fontSizePt - 1}pt` }}
+                        className="text-slate-700 pt-0.5 border-t border-slate-200 italic leading-tight"
+                      >
+                        {cfg.maklumanTunai}
+                      </div>
+                    </div>
+
+                    {/* Paragraph 3: Warning */}
+                    <div
+                      style={{ fontSize: `${fontSizePt - 0.5}pt` }}
+                      className={`text-justify leading-snug p-1.5 rounded-md border ${
+                        item.category === 'amaran_awal'
+                          ? 'bg-amber-50 border-amber-300 text-amber-950'
+                          : 'bg-rose-50 border-rose-300 text-rose-950'
+                      }`}
+                    >
+                      {cfg.peringatanKeahlian}
+                    </div>
+
+                    {/* Closing & Sign-off */}
+                    <div className="pt-0.5 space-y-1.5 leading-tight">
+                      <div
+                        style={{ fontSize: `${fontSizePt - 0.5}pt` }}
+                        className="flex flex-wrap items-center justify-between gap-x-4"
+                      >
+                        <span>Sekian, terima kasih.</span>
+                        <span className="font-bold text-slate-950 tracking-wide">
+                          &quot;BERKHIDMAT UNTUK KARIAH&quot;
+                        </span>
+                      </div>
+
+                      {/* Issuer details from Bendahari */}
+                      <div
+                        style={{ fontSize: `${fontSizePt - 0.5}pt` }}
+                        className="space-y-0"
+                      >
+                        <div>Saya yang menjalankan amanah,</div>
+                        <div
+                          style={{ fontSize: `${fontSizePt + 0.5}pt` }}
+                          className="pt-1 font-black uppercase text-slate-950 tracking-wider"
+                        >
+                          {cfg.namaBendahari}
+                        </div>
+                        <div
+                          style={{ fontSize: `${fontSizePt - 0.5}pt` }}
+                          className="font-bold text-slate-800 uppercase"
+                        >
+                          {cfg.jawatanPengeluar} &bull; <span className="font-normal normal-case text-slate-600">Pertubuhan Kebajikan Khairat Kematian Kampung Gong Badak</span>
+                        </div>
+                        <div className="font-mono text-slate-700 flex items-center gap-1 pt-0.5">
+                          <Phone className="h-3 w-3 text-slate-500" />
+                          <span>H/P: {cfg.telBendahari}</span>
+                        </div>
+                      </div>
+
+                      {/* Computer Generated Disclaimer */}
+                      <div className="pt-1 border-t border-slate-300 text-center">
+                        <p
+                          style={{ fontSize: `${fontSizePt - 2.5}pt` }}
+                          className="text-slate-600 font-mono font-semibold italic bg-slate-100 py-0.5 px-2 rounded border border-slate-200"
+                        >
+                          *** {cfg.notaJanaanKomputer} ***
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               );
             })}
