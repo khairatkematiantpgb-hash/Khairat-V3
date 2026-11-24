@@ -117,7 +117,9 @@ export default function Overview({ state, onChangeState, onNavigate, currentRole
           action: 'syncLocalToSheets',
           members: newState.members,
           ledger: newState.ledger,
-          kewangan: newState.kewangan || []
+          kewangan: newState.kewangan || [],
+          chartRoles: newState.chartRoles || {},
+          pekelilingList: newState.pekelilingList || []
         }).catch(console.error);
       }
 

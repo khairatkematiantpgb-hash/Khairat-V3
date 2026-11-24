@@ -424,9 +424,13 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
           action: 'syncLocalToSheets',
           members: updatedMembers,
           ledger: state.ledger,
-          kewangan: state.kewangan || []
+          kewangan: state.kewangan || [],
+          chartRoles: state.chartRoles || {},
+          pekelilingList: state.pekelilingList || []
         }).then(res => {
-          if (res.success) {
+          if (res.success && res.isLegacy6ColumnScript) {
+            showToast('error', `Disimpan di Aplikasi, tetapi skrip Google Sheets masih versi lama (6 lajur). Sila buat Deploy -> Manage deployments -> Edit -> New version di Apps Script.`);
+          } else if (res.success) {
             showToast('success', `Berjaya! ${updatedCount} rekod IC & No. Telefon telah dikemaskini di Aplikasi & Google Sheets.`);
           } else {
             showToast('error', `Disimpan di Aplikasi, tetapi ralat Google Sheets: ${res.message}`);
@@ -517,21 +521,26 @@ export default function MemberDatabase({ state, onChangeState, onRefresh, syncLo
       body: JSON.stringify({ state: newState })
     }).catch(console.error);
 
+    const totalImported = parsedRows.length;
+
     // Sync to Google Sheets if connected
     if (state.useGoogleSheets && state.appsScriptUrl) {
       writeToAppsScript(state.appsScriptUrl, {
         action: 'syncLocalToSheets',
         members: cleanMembers,
         ledger: cleanLedger,
-        kewangan: state.kewangan || []
+        kewangan: state.kewangan || [],
+        chartRoles: state.chartRoles || {},
+        pekelilingList: state.pekelilingList || []
       }).then(res => {
-        if (res.success) {
+        if (res.success && res.isLegacy6ColumnScript) {
+          showToast('error', `Disimpan di Aplikasi, tetapi skrip Google Sheets masih versi lama (6 lajur). Sila kemaskini deployment Apps Script.`);
+        } else if (res.success) {
           showToast('success', `Berjaya menyegerakkan ${totalImported} rekod ahli ke Google Sheets!`);
         }
       }).catch(console.error);
     }
 
-    const totalImported = parsedRows.length;
     setBulkPasteText('');
     setParsedRows([]);
     setShowBulkPasteModal(false);

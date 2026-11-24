@@ -138,9 +138,13 @@ export default function ProfileDashboard({ state, selectedMemberId, setSelectedM
         action: 'syncLocalToSheets',
         members: newState.members,
         ledger: newState.ledger,
-        kewangan: newState.kewangan || []
+        kewangan: newState.kewangan || [],
+        chartRoles: newState.chartRoles || {},
+        pekelilingList: newState.pekelilingList || []
       }).then(res => {
-        if (res.success) {
+        if (res.success && res.isLegacy6ColumnScript) {
+          showProfileToast('error', `Disimpan di Aplikasi, tetapi skrip Google Sheets masih versi lama (6 lajur). Sila buat Deploy -> Manage deployments -> Edit -> New version di Apps Script supaya Tanggungan masuk ke Lajur G.`);
+        } else if (res.success) {
           showProfileToast('success', `${successLabel} & berjaya disimpan ke Google Sheets!`);
         } else {
           showProfileToast('error', `Disimpan di Aplikasi, tetapi ralat Google Sheets: ${res.message}`);

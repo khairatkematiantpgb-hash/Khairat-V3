@@ -187,8 +187,14 @@ export function sanitizeMember(raw: any): Member {
   const { tel, catatan } = extractTelAndCleanCatatan(rawTel, rawCatatan);
 
   let tanggungan: Tanggungan[] = [];
-  if (Array.isArray(raw.tanggungan)) {
-    tanggungan = raw.tanggungan.map((t: any) => ({
+  let parsedTanggunganRaw = raw.tanggungan;
+  if (typeof parsedTanggunganRaw === 'string' && parsedTanggunganRaw.trim().startsWith('[')) {
+    try {
+      parsedTanggunganRaw = JSON.parse(parsedTanggunganRaw);
+    } catch {}
+  }
+  if (Array.isArray(parsedTanggunganRaw)) {
+    tanggungan = parsedTanggunganRaw.map((t: any) => ({
       nama: String(t?.nama || '').trim(),
       hubungan: String(t?.hubungan || '').trim(),
       ic: String(t?.ic || t?.noKadPengenalan || '').trim()
@@ -1164,13 +1170,21 @@ export async function fetchFromAppsScript(url: string): Promise<{ members: Membe
 export async function writeToAppsScript(
   url: string,
   payload: any
-): Promise<{ success: boolean; data?: { members: Member[]; ledger: LedgerRow[]; kewangan?: any[]; chartRoles?: any; pekelilingList?: any[] }; message?: string }> {
+): Promise<{ success: boolean; data?: { members: Member[]; ledger: LedgerRow[]; kewangan?: any[]; chartRoles?: any; pekelilingList?: any[] }; message?: string; isLegacy6ColumnScript?: boolean }> {
   try {
     // Prepare payload with backward-compatible Tel encoding so both 6-column and 8-column Apps Scripts store Tel
     const preparedPayload = {
       ...payload,
       ...(Array.isArray(payload?.members) ? { members: prepareMembersForAppsScript(payload.members) } : {})
     };
+
+    const detectLegacy = (responseData: any) =>
+      Boolean(
+        responseData &&
+        Array.isArray(responseData.members) &&
+        responseData.members.length > 0 &&
+        !responseData.members.some((m: any) => m && ('tanggungan' in m || 'tel' in m))
+      );
 
     // 1. Try server-side proxy first to completely avoid browser 302 method change and multi-login cookies
     try {
@@ -1186,6 +1200,7 @@ export async function writeToAppsScript(
         const data = await proxyRes.json();
         if (data && data.status === 'success') {
           let responseData = data.data;
+          const isLegacy6ColumnScript = detectLegacy(responseData);
           if (responseData && Array.isArray(responseData.members) && Array.isArray(responseData.ledger)) {
             const mergedWithPushed = Array.isArray(payload?.members)
               ? mergeRemoteMembersWithLocal(responseData.members, payload.members)
@@ -1197,7 +1212,8 @@ export async function writeToAppsScript(
           return {
             success: true,
             data: responseData,
-            message: data.message || 'Penyegerakan berjaya'
+            message: data.message || 'Penyegerakan berjaya',
+            isLegacy6ColumnScript
           };
         } else if (data && data.message && !data.message.includes('Aksi GET tidak ditemui')) {
           return {
@@ -1224,6 +1240,7 @@ export async function writeToAppsScript(
     const data = await res.json();
     if (data && data.status === 'success') {
       let responseData = data.data;
+      const isLegacy6ColumnScript = detectLegacy(responseData);
       if (responseData && Array.isArray(responseData.members) && Array.isArray(responseData.ledger)) {
         const mergedWithPushed = Array.isArray(payload?.members)
           ? mergeRemoteMembersWithLocal(responseData.members, payload.members)
@@ -1235,7 +1252,8 @@ export async function writeToAppsScript(
       return {
         success: true,
         data: responseData,
-        message: data.message
+        message: data.message,
+        isLegacy6ColumnScript
       };
     }
     return {

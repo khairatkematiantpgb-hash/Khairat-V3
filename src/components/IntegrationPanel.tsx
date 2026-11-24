@@ -22,6 +22,7 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
   const [appsScriptUrlInput, setAppsScriptUrlInput] = useState(state.appsScriptUrl || '');
   const [testLoading, setTestLoading] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [legacyScriptWarning, setLegacyScriptWarning] = useState(false);
   
   // Script copy success state
   const [copiedScript, setCopiedScript] = useState(false);
@@ -177,6 +178,7 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
         const result = await writeToAppsScript(targetScriptUrl, payload);
         if (result.success) {
           sheetsSaved = true;
+          setLegacyScriptWarning(Boolean(result.isLegacy6ColumnScript));
           if (result.data) {
             const mergedMembers = mergeRemoteMembersWithLocal(result.data.members || state.members, state.members);
             onChangeState({
@@ -188,20 +190,28 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
               pekelilingList: result.data.pekelilingList || state.pekelilingList || []
             });
           }
+          if (result.isLegacy6ColumnScript) {
+            sheetsErrMsg = 'AMARAN: Skrip Google Apps Script yang dideploy masih versi lama (6 lajur A-F) — Lajur G (Tanggungan) & Lajur H (No. Telefon) belum ditulis ke Google Sheet. Sila buat Deploy -> Manage deployments -> Edit -> New version -> Deploy di Google Apps Script.';
+          }
         } else {
           sheetsErrMsg = result.message || 'Ralat tidak diketahui';
         }
       }
 
-      if (serverSaved && sheetsSaved) {
+      if (serverSaved && sheetsSaved && !sheetsErrMsg) {
         setCentralResult({
           success: true,
-          message: `Selesai! Pangkalan data tempatan (${state.members?.length || 0} ahli termasuk No. IC & No. Telefon) telah berjaya dimuat naik ke Server Pusat DAN Google Sheets (Pangkalan Data Ahli)!`
+          message: `Selesai! Pangkalan data tempatan (${state.members?.length || 0} ahli termasuk No. IC, No. Telefon & Tanggungan) telah berjaya dimuat naik ke Server Pusat DAN Google Sheets (Pangkalan Data Ahli)!`
         });
-      } else if (sheetsSaved) {
+      } else if (sheetsSaved && !sheetsErrMsg) {
         setCentralResult({
           success: true,
-          message: `Selesai! Pangkalan data tempatan (${state.members?.length || 0} ahli termasuk No. IC & No. Telefon) telah berjaya dimuat naik ke Google Sheets (Pangkalan Data Ahli)!`
+          message: `Selesai! Pangkalan data tempatan (${state.members?.length || 0} ahli termasuk No. IC, No. Telefon & Tanggungan) telah berjaya dimuat naik ke Google Sheets (Pangkalan Data Ahli)!`
+        });
+      } else if (sheetsSaved && sheetsErrMsg) {
+        setCentralResult({
+          success: false,
+          message: sheetsErrMsg
         });
       } else if (serverSaved) {
         setCentralResult({
@@ -303,9 +313,12 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
     try {
       const result = await fetchFromAppsScript(appsScriptUrlInput.trim());
       if (result.success && result.data) {
+        setLegacyScriptWarning(Boolean(result.isLegacy6ColumnScript));
         setTestResult({
-          success: true,
-          message: `Sambungan berjaya! Sistem mengenal pasti ${result.data.members?.length || 0} ahli dan ${result.data.ledger?.length || 0} lejar sumbangan aktif di Google Sheet.`
+          success: !result.isLegacy6ColumnScript,
+          message: result.isLegacy6ColumnScript
+            ? `Sambungan berjaya (${result.data.members?.length || 0} ahli), TETAPI Google Apps Script pada URL ini masih VERSI LAMA (6 Lajur A-F). Lajur G (Tanggungan) & Lajur H (No. Telefon) tidak akan disimpan ke Google Sheets/Vercel selagi anda belum buat "Deploy -> Manage deployments -> Edit -> New version -> Deploy".`
+            : `Sambungan berjaya! Sistem mengenal pasti ${result.data.members?.length || 0} ahli dan ${result.data.ledger?.length || 0} lejar sumbangan aktif di Google Sheet (Sokongan Penuh 8 Lajur termasuk Tanggungan & No. Telefon).`
         });
       } else {
         setTestResult({
@@ -352,6 +365,7 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
 
       const result = await writeToAppsScript(targetUrl, payload);
       if (result.success) {
+        setLegacyScriptWarning(Boolean(result.isLegacy6ColumnScript));
         const mergedMembers = result.data?.members
           ? mergeRemoteMembersWithLocal(result.data.members, state.members)
           : state.members;
@@ -366,10 +380,18 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
         };
         onChangeState(updatedState);
         const withTelCount = mergedMembers.filter(m => m.tel && m.tel.trim() !== '').length;
-        setTestResult({
-          success: true,
-          message: `Segerak PUSH Berjaya! Pangkalan Google Sheets (Tab Pangkalan Data Ahli: ${mergedMembers.length} ahli, ${withTelCount} rekod No. Telefon) dan Server telah dikemaskinikan sepenuhnya.`
-        });
+        const withTanggunganCount = mergedMembers.filter(m => Array.isArray(m.tanggungan) && m.tanggungan.length > 0).length;
+        if (result.isLegacy6ColumnScript) {
+          setTestResult({
+            success: false,
+            message: `AMARAN PENTING: Data telah disimpan di pelayar/server (${mergedMembers.length} ahli, ${withTanggunganCount} rekod tanggungan), TETAPI URL Google Apps Script yang anda pautkan masih menjalankan SKRIP VERSI LAMA (6 Lajur A-F)! Oleh itu, Lajur G (Tanggungan) dan Lajur H (No. Telefon) di Google Sheet & Vercel masih kosong. Sila kemaskini Apps Script dan klik "Deploy -> Manage deployments -> Edit (ikon pensel) -> Version: New version -> Deploy", kemudian tekan Push sekali lagi.`
+          });
+        } else {
+          setTestResult({
+            success: true,
+            message: `Segerak PUSH Berjaya! Pangkalan Google Sheets (${mergedMembers.length} ahli, ${withTelCount} No. Telefon, ${withTanggunganCount} rekod Tanggungan di Lajur G & H) dan Server telah dikemaskinikan sepenuhnya.`
+          });
+        }
       } else {
         setTestResult({
           success: false,
@@ -393,6 +415,7 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
       const targetUrl = appsScriptUrlInput.trim() || state.appsScriptUrl || 'https://script.google.com/macros/s/AKfycbzWl9ccXM2e39h2rjYlezESn2Y-DOtQKxu3mqVZ45b64u_NtN6yeJWTGiy5eBWspo0T/exec';
       const result = await fetchFromAppsScript(targetUrl);
       if (result.success && result.data) {
+        setLegacyScriptWarning(Boolean(result.isLegacy6ColumnScript));
         const rawMembers = result.data.members || result.data.data?.members || [];
         const rawLedger = result.data.ledger || result.data.data?.ledger || [];
         const rawKewangan = result.data.kewangan || result.data.data?.kewangan || [];
@@ -881,6 +904,29 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
               </div>
             )}
 
+            {/* Legacy 6-column script warning banner */}
+            {legacyScriptWarning && (
+              <div className="p-3.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-950 text-xs space-y-2">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4.5 w-4.5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <span className="font-black block text-[10.5px] uppercase tracking-wide text-amber-900">
+                      Skrip Google Sheets Masih Versi Lama (Tiada Lajur G Tanggungan & H No. Telefon)
+                    </span>
+                    <p className="text-[11px] leading-relaxed">
+                      Walaupun kolum <strong>G (Tanggungan)</strong> dan <strong>H (No. Telefon)</strong> sudah ada pada helaian Google Sheet anda, Web App yang sedang aktif masih menjalankan kod versi lama. Untuk mengaktifkannya supaya <strong>Google Sheets &amp; Vercel</strong> memaparkan Tanggungan:
+                    </p>
+                    <ol className="list-decimal pl-4 text-[10.5px] space-y-0.5 font-medium">
+                      <li>Klik <strong>Salin Kod Google Apps Script</strong> di sebelah kanan dan tampal ke dalam <code>Code.gs</code>, kemudian tekan <strong>Save (Ctrl+S)</strong>.</li>
+                      <li>Klik <strong>Deploy &rarr; Manage deployments</strong> (bukan <em>Test deployments</em>).</li>
+                      <li>Klik ikon <strong>Pensel (Edit)</strong> &rarr; tukar <em>Version</em> kepada <strong>New version</strong> &rarr; klik <strong>Deploy</strong>.</li>
+                      <li>Kembali ke sini dan tekan <strong>Muat Naik (Push) Data Tempatan ke Google Sheets</strong>.</li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Debugging / Testing Feedback Logs placeholder wrapper */}
             {testResult && (
               <div className={`p-3.5 rounded-lg border text-xs ${
@@ -1209,18 +1255,20 @@ export default function IntegrationPanel({ state, onChangeState, onRefresh, sync
               </div>
 
               <div className="space-y-1">
-                <span className="font-bold text-slate-800 block">Langkah D: Deploy Baharu (New Deployment)</span>
+                <span className="font-bold text-slate-800 block">Langkah D: Kemaskini Deployment (Atau Deploy Baharu)</span>
                 <p className="text-slate-500 text-[11px]">
-                  Klik butang biru <strong className="text-slate-700">Deploy</strong> &rarr; pilih <strong className="text-slate-700">New Deployment</strong>. <br />
-                  &bull; Tukar jenis (Gear icon) kepada <strong className="text-slate-700">Web App</strong>. <br />
-                  &bull; Set "Execute As" sebagai <strong className="text-slate-700">Me (Akaun anda)</strong>. <br />
-                  &bull; Set "Who has access" sebagai <strong className="text-slate-700 font-extrabold text-[#be123c]">Anyone</strong> (Penting!).
+                  <strong className="text-emerald-800">Jika mengemaskini Sheet sedia ada (Disyorkan untuk Vercel):</strong><br />
+                  Klik <strong className="text-slate-700">Deploy</strong> &rarr; <strong className="text-slate-700">Manage deployments</strong> &rarr; klik ikon <strong className="text-slate-700">Pensel (Edit)</strong> &rarr; pada <em>Version</em> pilih <strong className="text-slate-700">New version</strong> &rarr; klik <strong className="text-slate-700">Deploy</strong>. (URL kekal sama supaya Vercel terus menerima data Tanggungan &amp; No. Telefon!)
+                </p>
+                <p className="text-slate-500 text-[11px] pt-1">
+                  <strong className="text-slate-700">Jika pemasangan kali pertama (Sheet baru):</strong><br />
+                  Klik <strong className="text-slate-700">Deploy</strong> &rarr; <strong className="text-slate-700">New deployment</strong> &rarr; pilih jenis <strong className="text-slate-700">Web app</strong> &rarr; Execute as: <strong className="text-slate-700">Me</strong> &rarr; Who has access: <strong className="text-[#be123c] font-extrabold">Anyone</strong>.
                 </p>
               </div>
 
               <div className="space-y-1">
-                <span className="font-bold text-slate-800 block">Langkah E: Pautkan Web App URL</span>
-                <p className="text-slate-500 text-[11px]">Salin Web App URL yang dijana (Contoh: Berakhir dengan <code className="font-mono bg-slate-100 rounded px-1 text-[10px]">/exec</code>) dan letakkan di dalam ruang URL di bahagian sebelah kiri lejar anda.</p>
+                <span className="font-bold text-slate-800 block">Langkah E: Pautkan Web App URL &amp; Tekan Push</span>
+                <p className="text-slate-500 text-[11px]">Jika URL berubah, salin Web App URL yang dijana (berakhir dengan <code className="font-mono bg-slate-100 rounded px-1 text-[10px]">/exec</code>), tampal di ruangan URL sebelah kiri, tekan <strong>Simpan URL</strong>, kemudian tekan <strong>Muat Naik (Push) Data Tempatan ke Google Sheets</strong>.</p>
               </div>
 
             </div>

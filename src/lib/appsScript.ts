@@ -31,12 +31,13 @@ function setupSheets() {
     sheetAhli.setFrozenRows(1);
   } else {
     // Pastikan pengepala mempunyai sekurang-kurangnya 8 kolum termasuk Tanggungan & No. Telefon
-    const lastCol = sheetAhli.getLastColumn();
-    if (lastCol < 7) {
+    const colG = String(sheetAhli.getRange(1, 7).getValue() || "").trim();
+    const colH = String(sheetAhli.getRange(1, 8).getValue() || "").trim();
+    if (!colG) {
       sheetAhli.getRange(1, 7).setValue("Tanggungan");
       sheetAhli.getRange("G1").setBackground("#0f172a").setFontColor("#ffffff").setFontWeight("bold");
     }
-    if (lastCol < 8) {
+    if (!colH) {
       sheetAhli.getRange(1, 8).setValue("No. Telefon");
       sheetAhli.getRange("H1").setBackground("#0f172a").setFontColor("#ffffff").setFontWeight("bold");
     }
@@ -131,6 +132,7 @@ function setupSheets() {
   // Tetapkan format teks biasa (@) bagi kolum kritikal untuk mengelakkan kehilangan '0' di depan
   sheetAhli.getRange("A:A").setNumberFormat("@"); // No. Ahli
   sheetAhli.getRange("C:C").setNumberFormat("@"); // No. IC
+  sheetAhli.getRange("G:G").setNumberFormat("@"); // Tanggungan
   sheetAhli.getRange("H:H").setNumberFormat("@"); // No. Telefon
 
   sheetLejar.getRange("A:A").setNumberFormat("@"); // No. Ahli
@@ -365,39 +367,47 @@ function doPost(e) {
   
   if (action === "syncLocalToSheets") {
     try {
-      // 1. Kosongkan semua data lama terlebih dahulu menggunakan clearContent bagi mengelakkan ralat Google Sheets
+      const members = payload.members || [];
+      const ledger = payload.ledger || [];
+      const hasKewangan = Array.isArray(payload.kewangan);
+      const kewangan = payload.kewangan || [];
+      const chartRolesObj = payload.chartRoles || {};
+      const chartRoleKeys = Object.keys(chartRolesObj);
+      const pekelilingListArr = payload.pekelilingList || [];
+
+      // 1. Kosongkan data lama bagi tab yang dihantar sahaja (elak terpadam jika payload tidak menghantar Carta/Pekeliling)
       if (sheetAhli.getLastRow() > 1) {
-        sheetAhli.getRange(2, 1, sheetAhli.getLastRow() - 1, sheetAhli.getLastColumn()).clearContent();
+        sheetAhli.getRange(2, 1, sheetAhli.getLastRow() - 1, Math.max(8, sheetAhli.getLastColumn())).clearContent();
       }
       if (sheetLejar.getLastRow() > 1) {
         sheetLejar.getRange(2, 1, sheetLejar.getLastRow() - 1, sheetLejar.getLastColumn()).clearContent();
       }
-      if (sheetKewangan && sheetKewangan.getLastRow() > 1) {
+      if (hasKewangan && kewangan.length > 0 && sheetKewangan && sheetKewangan.getLastRow() > 1) {
         sheetKewangan.getRange(2, 1, sheetKewangan.getLastRow() - 1, sheetKewangan.getLastColumn()).clearContent();
       }
-      if (sheetCarta && sheetCarta.getLastRow() > 1) {
+      if (chartRoleKeys.length > 0 && sheetCarta && sheetCarta.getLastRow() > 1) {
         sheetCarta.getRange(2, 1, sheetCarta.getLastRow() - 1, sheetCarta.getLastColumn()).clearContent();
       }
-      if (sheetPekeliling && sheetPekeliling.getLastRow() > 1) {
+      if (Array.isArray(pekelilingListArr) && pekelilingListArr.length > 0 && sheetPekeliling && sheetPekeliling.getLastRow() > 1) {
         sheetPekeliling.getRange(2, 1, sheetPekeliling.getLastRow() - 1, sheetPekeliling.getLastColumn()).clearContent();
       }
       
-      // 2. Tulis Senarai Ahli Baru
-      const members = payload.members || [];
+      // 2. Tulis Senarai Ahli Baru (8 Kolum: A-H)
       if (members.length > 0) {
         const rowsAhli = members.map(m => {
           const catatanBersih = m.cleanCatatan !== undefined
             ? m.cleanCatatan
             : String(m.catatan || "").replace(/(?:\\s*\\|\\s*|\\s+|^)\\[?Tel:\\s*([0-9+\\-\\s()]{7,20})\\]?(?=\\s*\\||$)/i, "").trim();
+          const tanggunganArr = Array.isArray(m.tanggungan) ? m.tanggungan : [];
+          const tanggunganStr = tanggunganArr.length > 0 ? JSON.stringify(tanggunganArr) : "";
           return [
-            m.noAhli, m.nama, m.ic, m.alamat, m.status, catatanBersih, JSON.stringify(m.tanggungan || []), m.tel || ""
+            m.noAhli, m.nama, m.ic, m.alamat, m.status, catatanBersih, tanggunganStr, m.tel || ""
           ];
         });
         sheetAhli.getRange(2, 1, rowsAhli.length, 8).setValues(rowsAhli);
       }
       
       // 3. Tulis Rekod Lejar Baru
-      const ledger = payload.ledger || [];
       if (ledger.length > 0) {
         const monthKeys = ["jan", "feb", "mac", "apr", "mei", "jun", "jul", "ogo", "sep", "okt", "nov", "dis"];
         const rowsLejar = ledger.map(l => {
@@ -412,7 +422,6 @@ function doPost(e) {
       }
 
       // 4. Tulis Rekod Kewangan (Penyata Kira-Kira) Baru
-      const kewangan = payload.kewangan || [];
       if (kewangan.length > 0 && sheetKewangan) {
         const rowsKewangan = kewangan.map(k => [
           k.id, k.tarikh, k.kenyataan, k.kategoriAkaun, k.jenisTransaksi, Number(k.amaun) || 0
@@ -421,8 +430,6 @@ function doPost(e) {
       }
 
       // 5. Tulis Carta Organisasi Baru
-      const chartRolesObj = payload.chartRoles || {};
-      const chartRoleKeys = Object.keys(chartRolesObj);
       if (chartRoleKeys.length > 0 && sheetCarta) {
         const rowsCarta = chartRoleKeys.map(k => [
           k, chartRolesObj[k].nama || "", chartRolesObj[k].tel || "", chartRolesObj[k].noAhli || ""
@@ -431,8 +438,7 @@ function doPost(e) {
       }
 
       // 6. Tulis Pekeliling Baru
-      const pekelilingListArr = payload.pekelilingList || [];
-      if (pekelilingListArr.length > 0 && sheetPekeliling) {
+      if (Array.isArray(pekelilingListArr) && pekelilingListArr.length > 0 && sheetPekeliling) {
         const rowsPekeliling = pekelilingListArr.map(p => [
           p.id, p.noRujukan || "", p.tarikh || "", p.tarikhBerkuatkuasa || "", p.jenis || "Pekeliling", p.tajuk || "", p.kandungan || "", p.penerbit || "", p.jawatanPenerbit || "", p.kepentingan || "Biasa"
         ]);
@@ -627,7 +633,15 @@ export function getAppsScriptGoogleCode(): string {
   return APPS_SCRIPT_CODE;
 }
 
-export async function fetchFromAppsScript(url: string): Promise<{ success: boolean; data?: any; message?: string }> {
+function hasLegacy6ColumnMembers(members: any): boolean {
+  return Boolean(
+    Array.isArray(members) &&
+    members.length > 0 &&
+    !members.some((m: any) => m && ('tanggungan' in m || 'tel' in m))
+  );
+}
+
+export async function fetchFromAppsScript(url: string): Promise<{ success: boolean; data?: any; message?: string; isLegacy6ColumnScript?: boolean }> {
   try {
     // 1. Try server-side proxy route first (handles redirect chains and bot bypass reliably)
     try {
@@ -635,7 +649,8 @@ export async function fetchFromAppsScript(url: string): Promise<{ success: boole
       if (proxyRes.ok) {
         const result = await proxyRes.json();
         if (result && result.status === 'success') {
-          return { success: true, data: result };
+          const rawMembers = result.members || result.data?.members || [];
+          return { success: true, data: result, isLegacy6ColumnScript: hasLegacy6ColumnMembers(rawMembers) };
         } else if (result && result.message) {
           return { success: false, message: result.message };
         }
@@ -664,7 +679,8 @@ export async function fetchFromAppsScript(url: string): Promise<{ success: boole
       return { success: false, message: 'Format data Google Sheets tidak sah.' };
     }
     if (result.status === 'success') {
-      return { success: true, data: result };
+      const rawMembers = result.members || result.data?.members || [];
+      return { success: true, data: result, isLegacy6ColumnScript: hasLegacy6ColumnMembers(rawMembers) };
     } else {
       return { success: false, message: result.message || 'Ralat tidak diketahui.' };
     }
@@ -673,7 +689,7 @@ export async function fetchFromAppsScript(url: string): Promise<{ success: boole
   }
 }
 
-export async function writeToAppsScript(url: string, payload: any): Promise<{ success: boolean; data?: any; message?: string }> {
+export async function writeToAppsScript(url: string, payload: any): Promise<{ success: boolean; data?: any; message?: string; isLegacy6ColumnScript?: boolean }> {
   try {
     // Prepare payload with backward-compatible Tel encoding so both 6-column and 8-column Apps Scripts store Tel
     const preparedPayload = {
@@ -707,7 +723,8 @@ export async function writeToAppsScript(url: string, payload: any): Promise<{ su
       if (proxyRes.ok) {
         const result = await proxyRes.json();
         if (result && result.status === 'success') {
-          return { success: true, data: mergeResponseData(result.data), message: result.message };
+          const isLegacy6ColumnScript = hasLegacy6ColumnMembers(result.data?.members);
+          return { success: true, data: mergeResponseData(result.data), message: result.message, isLegacy6ColumnScript };
         } else if (result && result.message && !result.message.includes('Aksi GET tidak ditemui')) {
           return { success: false, message: result.message };
         }
@@ -742,7 +759,8 @@ export async function writeToAppsScript(url: string, payload: any): Promise<{ su
       return { success: false, message: 'Maklum balas tidak sah dari Google Sheets.' };
     }
     if (result.status === 'success') {
-      return { success: true, data: mergeResponseData(result.data), message: result.message };
+      const isLegacy6ColumnScript = hasLegacy6ColumnMembers(result.data?.members);
+      return { success: true, data: mergeResponseData(result.data), message: result.message, isLegacy6ColumnScript };
     } else {
       return { success: false, message: result.message || 'Ralat memuat naik data.' };
     }
