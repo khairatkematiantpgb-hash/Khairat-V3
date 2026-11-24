@@ -1525,13 +1525,34 @@ export default function SuratPeringatanModal({
 
       {/* 2. PRINT PORTAL (FOR REAL A4 BATCH PRINTING) */}
       {isPrintingPortal && createPortal(
-        <div className="fixed inset-0 z-99999 bg-white text-black p-0 overflow-y-auto">
+        <div
+          id="print-area-outlet"
+          className="fixed inset-0 z-[99999] bg-white text-black p-0 overflow-y-auto print:relative print:inset-auto print:p-0 print:m-0 print:overflow-visible print:bg-white print:block print:h-auto print:w-full"
+        >
+          <style>{`
+            @media print {
+              @page {
+                size: A4 portrait;
+                margin: 8mm 12mm;
+              }
+              .surat-print-page {
+                display: block !important;
+                break-after: page !important;
+                page-break-after: always !important;
+              }
+              .surat-print-page:last-child {
+                break-after: auto !important;
+                page-break-after: auto !important;
+              }
+            }
+          `}</style>
+
           {/* Top Bar for Print Screen */}
           <div className="p-4 bg-slate-900 text-white flex items-center justify-between print:hidden sticky top-0 z-50 shadow-md">
             <div className="flex items-center gap-2">
               <Printer className="h-5 w-5 text-rose-400" />
               <span className="font-bold text-sm">
-                Sedia Untuk Cetak: {recipientsToPrint.length} Salinan Surat Peringatan / Amaran Awal (Piawai Font 12)
+                Sedia Untuk Cetak: {recipientsToPrint.length} Salinan Surat Peringatan / Amaran Awal (Piawai Font {fontSizePt})
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -1551,40 +1572,41 @@ export default function SuratPeringatanModal({
             </div>
           </div>
 
-          {/* Individual Print Letters with CSS Page Break */}
-          <div className="space-y-8 print:space-y-0">
+          {/* Individual Print Letters with CSS Page Break (1 sheet per member) */}
+          <div className="space-y-8 py-6 bg-slate-100 print:bg-white print:py-0 print:space-y-0 print:block">
             {recipientsToPrint.map((item, idx) => {
               const m = item.member;
               const cfg = getLetterConfigForRecipient(item);
+              const isLastLetter = idx === recipientsToPrint.length - 1;
 
               return (
                 <div
                   key={m.noAhli}
-                  className="bg-white text-slate-900 p-8 sm:p-12 mx-auto max-w-3xl space-y-4 print:p-0 print:m-0 print:max-w-none print:w-full select-text"
+                  className="surat-print-page bg-white text-slate-900 p-8 sm:p-10 mx-auto max-w-3xl shadow-md border border-slate-200 space-y-2.5 print:p-0 print:m-0 print:max-w-none print:w-full print:shadow-none print:border-0 print:space-y-1.5 select-text"
                   style={{
                     fontSize: `${fontSizePt}pt`,
-                    lineHeight: 1.5,
-                    pageBreakAfter: idx === recipientsToPrint.length - 1 ? 'auto' : 'always',
-                    breakAfter: idx === recipientsToPrint.length - 1 ? 'auto' : 'page'
+                    lineHeight: 1.35,
+                    pageBreakAfter: isLastLetter ? 'auto' : 'always',
+                    breakAfter: isLastLetter ? 'auto' : 'page'
                   }}
                 >
                   
                   {/* Official Letterhead */}
-                  <div className="border-b-2 border-double border-slate-900 pb-3 text-center space-y-1">
-                    <div className="flex items-center justify-center gap-3 mb-1">
-                      <div className="w-10 h-10 rounded-full bg-emerald-700 flex items-center justify-center text-white font-black text-sm shrink-0">
+                  <div className="border-b-2 border-double border-slate-900 pb-2 text-center space-y-0.5">
+                    <div className="flex items-center justify-center gap-3 mb-0.5">
+                      <div className="w-9 h-9 rounded-full bg-emerald-700 flex items-center justify-center text-white font-black text-xs shrink-0">
                         PKK
                       </div>
                       <div>
                         <h1
                           style={{ fontSize: `${fontSizePt + 2}pt` }}
-                          className="font-black tracking-tight text-slate-950 uppercase"
+                          className="font-black tracking-tight text-slate-950 uppercase leading-tight"
                         >
                           PERTUBUHAN KEBAJIKAN KHAIRAT KEMATIAN
                         </h1>
                         <h2
                           style={{ fontSize: `${fontSizePt}pt` }}
-                          className="font-bold text-slate-800 uppercase tracking-widest"
+                          className="font-bold text-slate-800 uppercase tracking-widest leading-tight"
                         >
                           KAMPUNG GONG BADAK, KUALA NERUS, TERENGGANU
                         </h2>
@@ -1601,7 +1623,7 @@ export default function SuratPeringatanModal({
                   {/* Reference & Date */}
                   <div
                     style={{ fontSize: `${fontSizePt}pt` }}
-                    className="flex justify-between items-center text-slate-700 pt-1"
+                    className="flex justify-between items-center text-slate-700 pt-0.5"
                   >
                     <div>
                       Ruj. Kami: <strong className="font-mono font-bold">{cfg.rujukanPrefix}/{m.noAhli}</strong>
@@ -1614,12 +1636,12 @@ export default function SuratPeringatanModal({
                   {/* Recipient Address */}
                   <div
                     style={{ fontSize: `${fontSizePt}pt` }}
-                    className="space-y-0.5 pt-1"
+                    className="space-y-0.5 pt-0.5"
                   >
                     <div>Kepada:</div>
                     <div
                       style={{ fontSize: `${fontSizePt + 1.5}pt` }}
-                      className="font-black text-slate-950 uppercase tracking-wide"
+                      className="font-black text-slate-950 uppercase tracking-wide leading-snug"
                     >
                       {m.nama}
                     </div>
@@ -1635,7 +1657,7 @@ export default function SuratPeringatanModal({
                   {/* Salutation */}
                   <div
                     style={{ fontSize: `${fontSizePt}pt` }}
-                    className="pt-1 font-semibold"
+                    className="pt-0.5 font-semibold"
                   >
                     Tuan / Puan,
                   </div>
@@ -1643,7 +1665,7 @@ export default function SuratPeringatanModal({
                   {/* Subject */}
                   <div
                     style={{ fontSize: `${fontSizePt + 0.5}pt` }}
-                    className="font-black text-slate-950 uppercase underline leading-snug pt-0.5"
+                    className="font-black text-slate-950 uppercase underline leading-snug"
                   >
                     {cfg.tajukSurat}
                   </div>
@@ -1651,13 +1673,13 @@ export default function SuratPeringatanModal({
                   {/* Paragraph 1 */}
                   <div
                     style={{ fontSize: `${fontSizePt}pt` }}
-                    className="text-justify text-slate-900 leading-relaxed"
+                    className="text-justify text-slate-900 leading-snug"
                   >
                     {cfg.pembukaan}
                   </div>
 
                   {/* Box: Arrears Summary */}
-                  <div className={`border-2 rounded-lg p-3.5 space-y-2 ${
+                  <div className={`border-2 rounded-lg p-2.5 space-y-1.5 ${
                     item.category === 'amaran_awal'
                       ? 'bg-amber-50/40 border-amber-800'
                       : 'bg-slate-50 border-slate-800'
@@ -1671,7 +1693,7 @@ export default function SuratPeringatanModal({
                     </div>
                     <div
                       style={{ fontSize: `${fontSizePt}pt` }}
-                      className="grid grid-cols-2 gap-y-1.5"
+                      className="grid grid-cols-2 gap-y-1"
                     >
                       <div className="text-slate-600">Nama Pencarum:</div>
                       <div className="font-bold text-slate-900 uppercase">{m.nama}</div>
@@ -1680,39 +1702,39 @@ export default function SuratPeringatanModal({
                       <div className="font-bold text-slate-900 font-mono">Lunas Sehingga {item.latestPaid}</div>
 
                       <div className="text-slate-600">Tempoh / Bulan Tertunggak:</div>
-                      <div className="font-bold text-rose-800">{item.arrearsPeriod}</div>
+                      <div className="font-bold text-rose-800 leading-snug">{item.arrearsPeriod}</div>
 
                       <div
                         style={{ fontSize: `${fontSizePt + 0.5}pt` }}
-                        className="text-slate-900 font-bold pt-1 border-t border-slate-200"
+                        className="text-slate-900 font-bold pt-0.5 border-t border-slate-200"
                       >
                         Jumlah Tunggakan Semasa:
                       </div>
                       <div
                         style={{ fontSize: `${fontSizePt + 1.5}pt` }}
-                        className="font-black text-rose-700 font-mono pt-1 border-t border-slate-200"
+                        className="font-black text-rose-700 font-mono pt-0.5 border-t border-slate-200"
                       >
                         RM {item.actualDues}.00
                       </div>
 
                       <div
                         style={{ fontSize: `${fontSizePt + 0.5}pt` }}
-                        className="text-slate-900 font-bold pt-1 border-t border-slate-200"
+                        className="text-slate-900 font-bold pt-0.5 border-t border-slate-200"
                       >
                         Anggaran Tunggakan Bulan Seterusnya (+RM{kadarYuran}):
                       </div>
                       <div
                         style={{ fontSize: `${fontSizePt + 1.5}pt` }}
-                        className="font-black text-rose-800 font-mono pt-1 border-t border-slate-200"
+                        className="font-black text-rose-800 font-mono pt-0.5 border-t border-slate-200"
                       >
                         RM {item.nextMonthDues}.00
-                        <span className="text-[10px] font-sans font-bold text-amber-800 block">
+                        <span className="text-[10px] font-sans font-bold text-amber-800 block leading-tight">
                           (Bakal Melebihi / Mencecah Had RM36)
                         </span>
                       </div>
 
-                      <div className="text-slate-600 pt-1 border-t border-slate-200">Jenis Notis Surat:</div>
-                      <div className="font-bold text-slate-900 pt-1 border-t border-slate-200">
+                      <div className="text-slate-600 pt-0.5 border-t border-slate-200">Jenis Notis Surat:</div>
+                      <div className="font-bold text-slate-900 pt-0.5 border-t border-slate-200">
                         {item.category === 'amaran_awal' ? (
                           <span className="text-amber-800 uppercase font-black">
                             Surat Amaran Awal (Sebelum Penggantungan Keahlian)
@@ -1729,23 +1751,23 @@ export default function SuratPeringatanModal({
                   {/* Paragraph 2: Instructions */}
                   <div
                     style={{ fontSize: `${fontSizePt}pt` }}
-                    className="text-justify text-slate-900 leading-relaxed"
+                    className="text-justify text-slate-900 leading-snug"
                   >
                     {cfg.arahanBayaran} Bayaran hendaklah diselesaikan dalam tempoh <strong>{cfg.tempohHari}</strong> melalui saluran rasmi pertubuhan berikut:
                   </div>
 
                   {/* Bank Info Box */}
-                  <div className="bg-slate-100 border border-slate-300 rounded-lg p-3 space-y-1.5 text-slate-900">
+                  <div className="bg-slate-100 border border-slate-300 rounded-lg p-2.5 space-y-1 text-slate-900">
                     <div
                       style={{ fontSize: `${fontSizePt}pt` }}
-                      className="font-black text-slate-950 flex items-center gap-2 uppercase tracking-wide border-b border-slate-300 pb-1"
+                      className="font-black text-slate-950 flex items-center gap-2 uppercase tracking-wide border-b border-slate-300 pb-0.5"
                     >
                       <Building2 className="h-4 w-4 text-slate-700" />
                       <span>Saluran Pembayaran Rasmi Pertubuhan</span>
                     </div>
                     <div
                       style={{ fontSize: `${fontSizePt}pt` }}
-                      className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1"
+                      className="grid grid-cols-1 sm:grid-cols-2 gap-1 pt-0.5"
                     >
                       <div>Nama Bank: <strong>{cfg.namaBank}</strong></div>
                       <div>Nama Akaun: <strong>{cfg.namaPemegangAkaun}</strong></div>
@@ -1756,7 +1778,7 @@ export default function SuratPeringatanModal({
 
                     {/* WhatsApp Online Receipt Notice for Print */}
                     {cfg.maklumanResitOnline && (
-                      <div className="bg-white border border-slate-400 rounded p-2 text-slate-900 space-y-1 mt-2">
+                      <div className="bg-white border border-slate-400 rounded p-2 text-slate-900 space-y-0.5 mt-1">
                         <div
                           style={{ fontSize: `${fontSizePt - 1}pt` }}
                           className="font-bold text-slate-950 uppercase tracking-wide"
@@ -1765,13 +1787,13 @@ export default function SuratPeringatanModal({
                         </div>
                         <div
                           style={{ fontSize: `${fontSizePt}pt` }}
-                          className="whitespace-pre-line leading-relaxed pl-2 font-medium"
+                          className="whitespace-pre-line leading-snug pl-2 font-medium"
                         >
                           {cfg.maklumanResitOnline}
                         </div>
                         <div
                           style={{ fontSize: `${fontSizePt - 1.5}pt` }}
-                          className="text-slate-600 font-mono pl-2 pt-0.5 border-t border-slate-200 mt-1"
+                          className="text-slate-600 font-mono pl-2 pt-0.5 border-t border-slate-200 mt-0.5"
                         >
                           (Rujukan Ahli: <strong>{m.nama}</strong> | No. Ahli: <strong>{m.noAhli}</strong>)
                         </div>
@@ -1780,7 +1802,7 @@ export default function SuratPeringatanModal({
 
                     <div
                       style={{ fontSize: `${fontSizePt - 0.5}pt` }}
-                      className="text-slate-700 pt-1 border-t border-slate-200 italic"
+                      className="text-slate-700 pt-0.5 border-t border-slate-200 italic"
                     >
                       {cfg.maklumanTunai}
                     </div>
@@ -1789,7 +1811,7 @@ export default function SuratPeringatanModal({
                   {/* Paragraph 3: Warning */}
                   <div
                     style={{ fontSize: `${fontSizePt}pt` }}
-                    className={`text-justify leading-relaxed p-2.5 rounded-md border ${
+                    className={`text-justify leading-snug p-2 rounded-md border ${
                       item.category === 'amaran_awal'
                         ? 'bg-amber-50 border-amber-300 text-amber-950'
                         : 'bg-rose-50 border-rose-300 text-rose-950'
@@ -1799,13 +1821,13 @@ export default function SuratPeringatanModal({
                   </div>
 
                   {/* Closing & Sign-off */}
-                  <div className="pt-2 space-y-4">
+                  <div className="pt-1 space-y-2.5">
                     <div
                       style={{ fontSize: `${fontSizePt}pt` }}
-                      className="space-y-1"
+                      className="space-y-0.5"
                     >
                       <div>Sekian, terima kasih.</div>
-                      <div className="font-bold text-slate-950 tracking-wide mt-1">
+                      <div className="font-bold text-slate-950 tracking-wide">
                         &quot;BERKHIDMAT UNTUK KARIAH&quot;
                       </div>
                     </div>
@@ -1818,7 +1840,7 @@ export default function SuratPeringatanModal({
                       <div>Saya yang menjalankan amanah,</div>
                       <div
                         style={{ fontSize: `${fontSizePt + 1.5}pt` }}
-                        className="pt-3 font-black uppercase text-slate-950 tracking-wider"
+                        className="pt-2 font-black uppercase text-slate-950 tracking-wider"
                       >
                         {cfg.namaBendahari}
                       </div>
@@ -1838,10 +1860,10 @@ export default function SuratPeringatanModal({
                     </div>
 
                     {/* Computer Generated Disclaimer */}
-                    <div className="pt-2 border-t border-slate-300 text-center">
+                    <div className="pt-1.5 border-t border-slate-300 text-center">
                       <p
                         style={{ fontSize: `${fontSizePt - 2}pt` }}
-                        className="text-slate-600 font-mono font-semibold italic bg-slate-100 py-1.5 px-3 rounded border border-slate-200"
+                        className="text-slate-600 font-mono font-semibold italic bg-slate-100 py-1 px-2 rounded border border-slate-200"
                       >
                         *** {cfg.notaJanaanKomputer} ***
                       </p>
